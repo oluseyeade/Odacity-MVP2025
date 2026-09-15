@@ -1,0 +1,111 @@
+{% extends "user/layout.html" %}
+
+{% block title %}My Inspection Requests — Odacity{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark text-white py-3 mb-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('homepage') }}" class="text-light">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}" class="text-light">Dashboard</a></li>
+                <li class="breadcrumb-item active text-info" aria-current="page">My Inspections</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-calendar-event-fill text-primary me-2"></i>My Inspection Requests</h2>
+            <p class="text-muted mb-0">Track and manage your requested and scheduled property inspections.</p>
+        </div>
+        <a href="{{ url_for('properties', intent='rent') }}" class="btn btn-outline-primary fw-bold">
+            <i class="bi bi-search me-1"></i> Browse Rental Listings
+        </a>
+    </div>
+
+    {% if inspections %}
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" style="width: 80px;">Insp ID</th>
+                        <th scope="col">Property Details</th>
+                        <th scope="col">Requested Date</th>
+                        <th scope="col">Scheduled Date</th>
+                        <th scope="col">Notes</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for insp_item in inspections %}
+                    <tr>
+                        <td class="fw-bold text-muted">#INSP-{{ insp_item.inspection_id }}</td>
+                        <td>
+                            {% if insp_item.property %}
+                                <a href="{{ url_for('property_detail', property_id=insp_item.property_id) }}" class="fw-bold text-decoration-none text-dark">
+                                    {{ insp_item.property.title }}
+                                </a>
+                                <div class="small text-muted">
+                                    <i class="bi bi-geo-alt"></i> {{ insp_item.property.city or '' }}{% if insp_item.property.state %}, {{ insp_item.property.state }}{% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">Property #{{ insp_item.property_id }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="small text-muted">
+                            {{ insp_item.requested_at.strftime('%b %d, %Y %H:%M') if insp_item.requested_at else 'N/A' }}
+                        </td>
+                        <td class="small text-muted">
+                            {{ insp_item.scheduled_for.strftime('%b %d, %Y') if insp_item.scheduled_for else 'To be confirmed' }}
+                        </td>
+                        <td class="small text-secondary">
+                            {{ insp_item.notes or '—' }}
+                        </td>
+                        <td>
+                            {% if insp_item.status == 'Requested' %}
+                                <span class="badge bg-warning text-dark">Requested</span>
+                            {% elif insp_item.status == 'Scheduled' %}
+                                <span class="badge bg-primary">Scheduled</span>
+                            {% elif insp_item.status == 'Completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% elif insp_item.status == 'Cancelled' %}
+                                <span class="badge bg-secondary">Cancelled</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">{{ insp_item.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if insp_item.status in ['Requested', 'Scheduled'] %}
+                                <form method="POST" action="{{ url_for('cancel_inspection', inspection_id=insp_item.inspection_id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this inspection request?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                                </form>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm p-5 text-center">
+        <div class="my-3">
+            <i class="bi bi-calendar-x text-muted display-4"></i>
+        </div>
+        <h4 class="fw-bold">No Inspection Requests Yet</h4>
+        <p class="text-muted">You haven't requested any property inspections. Find a property you like and schedule a visit.</p>
+        <div class="mt-2">
+            <a href="{{ url_for('properties', intent='rent') }}" class="btn btn-primary fw-bold">Explore Rent Listings</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

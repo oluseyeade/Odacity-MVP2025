@@ -1,0 +1,15 @@
+{% extends "user/layout.html" %}
+{% block title %}Property Owners & Direct Asset Briefs — Odacity{% endblock %}
+{% block main_content %}
+<div class="bg-dark text-white py-5 text-center">
+    <div class="container py-3">
+        <h1 class="display-5 fw-bold mb-3">List Your Property Direct with Odacity</h1>
+        <p class="lead text-light opacity-75">Connect directly with verified renters and buyers through Direct Asset Briefs (DAP).</p>
+    </div>
+</div>
+<div class="container py-5 text-center">
+    <h3 class="fw-bold mb-3">Are you a Property Owner?</h3>
+    <p class="text-muted mb-4">Create your Property Owner profile, upload title documents for verification, and lock in performance guarantees.</p>
+    <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg fw-bold">Create Owner Account &rarr;</a>
+</div>
+{% endblock %}

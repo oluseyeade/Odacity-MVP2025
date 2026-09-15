@@ -1,0 +1,72 @@
+{% extends "user/layout.html" %}
+
+{% block title %}Property Owner Profile — Odacity{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark text-white py-3 mb-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('homepage') }}" class="text-light">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}" class="text-light">Dashboard</a></li>
+                <li class="breadcrumb-item active text-info" aria-current="page">Owner Profile</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white p-4">
+                    <h4 class="fw-bold mb-1"><i class="bi bi-person-badge text-warning me-2"></i>Property Owner Profile</h4>
+                    <p class="text-white-50 small mb-0">Manage your property owner identity and business entity information for listing assets.</p>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" action="{{ url_for('owner_profile') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-4">
+                            <label for="owner_type" class="form-label fw-bold">Owner Classification <span class="text-danger">*</span></label>
+                            {{ form.owner_type(class="form-select form-select-lg") }}
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="company_name" class="form-label fw-bold">Company / Organization Name</label>
+                                {{ form.company_name(class="form-control", placeholder="e.g. Odacity Real Estate Ltd") }}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="business_name" class="form-label fw-bold">Business Trading Name</label>
+                                {{ form.business_name(class="form-control", placeholder="e.g. Odacity Holdings") }}
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="tax_id" class="form-label fw-bold">Tax Identification Number (TIN)</label>
+                                {{ form.tax_id(class="form-control", placeholder="e.g. TIN-12345678-0001") }}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="tin_number" class="form-label fw-bold">RC / Registration Number</label>
+                                {{ form.tin_number(class="form-control", placeholder="e.g. RC-987654") }}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="address" class="form-label fw-bold">Registered Office / Contact Address</label>
+                            {{ form.address(class="form-control", rows="3", placeholder="Enter official registered office address...") }}
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary fw-bold">Cancel</a>
+                            {{ form.submit(class="btn btn-primary px-4 fw-bold") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

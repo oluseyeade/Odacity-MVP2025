@@ -1,0 +1,46 @@
+{% extends "user/layout.html" %}
+{% block title %}Log In — Odacity{% endblock %}
+{% block main_content %}
+<div class="container py-5 flex-grow-1 d-flex align-items-center justify-content-center">
+    <div class="row w-100 justify-content-center">
+        <div class="col-md-8 col-lg-5">
+            <div class="card border-0 shadow-sm animate__animated animate__zoomIn">
+                <div class="card-body p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-person-circle fs-1 text-primary"></i>
+                        <h2 class="mt-2 mb-1 fw-bold">Welcome Back</h2>
+                        <p class="text-muted small">Please log in to your Odacity account</p>
+                    </div>
+
+                    <form action="{{ url_for('login') }}" method="post" novalidate>
+                        {{ form.csrf_token }}
+                        <div class="mb-3">
+                            {{ form.email.label(class="form-label fw-bold small") }}
+                            {{ form.email(class="form-control form-control-lg", placeholder="name@example.com") }}
+                            {% for e in form.email.errors %}
+                                <span class="text-danger small">{{ e }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                {{ form.password.label(class="form-label fw-bold small mb-0") }}
+                            </div>
+                            {{ form.password(class="form-control form-control-lg", placeholder="••••••••") }}
+                            {% for e in form.password.errors %}
+                                <span class="text-danger small">{{ e }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="d-grid">
+                            {{ form.submit(class="btn btn-primary btn-lg fw-bold") }}
+                        </div>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <p class="text-muted small mb-0">Don't have an account? <a href="{{ url_for('register') }}" class="text-decoration-none fw-bold">Sign up</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

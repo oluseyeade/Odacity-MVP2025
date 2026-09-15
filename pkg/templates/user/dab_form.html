@@ -1,0 +1,73 @@
+{% extends "user/layout.html" %}
+
+{% block title %}Submit Direct Asset Brief — Odacity{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark text-white py-3 mb-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('homepage') }}" class="text-light">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}" class="text-light">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('seller_properties') }}" class="text-light">My Properties</a></li>
+                <li class="breadcrumb-item active text-info" aria-current="page">Submit Asset Brief</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white p-4">
+                    <h4 class="fw-bold mb-1"><i class="bi bi-file-earmark-plus text-success me-2"></i>Submit Direct Asset Brief (DAB)</h4>
+                    <p class="text-white-50 small mb-0">List your property for Sale, Lease, or Rent directly with Odacity verified network.</p>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" action="{{ url_for('submit_dab') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-4">
+                            <label for="title" class="form-label fw-bold">Property Listing Title <span class="text-danger">*</span></label>
+                            {{ form.title(class="form-control form-control-lg", placeholder="e.g. 5 Bedroom Detached Villa with Pool in Lekki Phase 1") }}
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="service_type" class="form-label fw-bold">Listing Intent <span class="text-danger">*</span></label>
+                                {{ form.service_type(class="form-select") }}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="property_type" class="form-label fw-bold">Property Type</label>
+                                {{ form.property_type(class="form-select") }}
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="location" class="form-label fw-bold">Property Location / Address / City</label>
+                                {{ form.location(class="form-control", placeholder="e.g. Admiralty Way, Lekki Phase 1, Lagos") }}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="budget_range" class="form-label fw-bold">Asking Price / Budget Range (NGN)</label>
+                                {{ form.budget_range(class="form-control", placeholder="e.g. 350,000,000.00") }}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="brief_details" class="form-label fw-bold">Property Details & Specifications</label>
+                            {{ form.brief_details(class="form-control", rows="5", placeholder="Describe property condition, amenities, title documents available, land size, and terms...") }}
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <a href="{{ url_for('seller_properties') }}" class="btn btn-outline-secondary fw-bold">Cancel</a>
+                            {{ form.submit(class="btn btn-success px-4 fw-bold") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

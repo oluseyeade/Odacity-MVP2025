@@ -1,0 +1,8 @@
+{% set message = get_flashed_messages ( with_categories = True)%}
+{%if message%}
+<div>
+    {% for cat, msg in message %}
+    <p class="alert {% if cat == 'errormsg'%} alert-danger {%else%} alert-success {%endif%}"> {{msg}}</p>
+    {% endfor %}
+</div>
+{%endif%}

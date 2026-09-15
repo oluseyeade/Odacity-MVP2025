@@ -1,0 +1,83 @@
+{% extends 'user/layout.html' %}
+
+{% block title %}Customer Identity Verification (KYC) — Odacity{% endblock %}
+
+{% block main_content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white py-4 text-center">
+                    <h3 class="fw-bold mb-1">Customer Identity Verification</h3>
+                    <p class="text-white-50 mb-0">Submit your verification request to unlock tenant & buyer protections on Odacity.</p>
+                </div>
+                <div class="card-body p-4 p-md-5">
+
+                    <!-- Current KYC Status Notice -->
+                    <div class="alert alert-info border-0 shadow-sm mb-4">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3 fs-3">🛡️</div>
+                            <div>
+                                <h6 class="fw-bold mb-1">Verification Status: 
+                                    {% if profile and profile.kyc_status == 'VERIFIED' %}
+                                        <span class="text-success fw-bold">VERIFIED</span>
+                                    {% elif profile and profile.kyc_status == 'PENDING' %}
+                                        <span class="text-warning text-dark fw-bold">PENDING REVIEW</span>
+                                    {% elif profile and profile.kyc_status == 'REJECTED' %}
+                                        <span class="text-danger fw-bold">REJECTED</span>
+                                    {% else %}
+                                        <span class="text-secondary fw-bold">NOT STARTED</span>
+                                    {% endif %}
+                                </h6>
+                                <p class="small mb-0 text-muted">
+                                    {% if profile and profile.kyc_status == 'VERIFIED' %}
+                                        Your customer identity has been verified. You have full access to Odacity features.
+                                    {% elif profile and profile.kyc_status == 'PENDING' %}
+                                        Your verification request has been submitted and is currently under review by compliance.
+                                    {% elif profile and profile.kyc_status == 'REJECTED' %}
+                                        Your previous verification request was rejected. Please re-submit your verification request below.
+                                    {% else %}
+                                        Submit your identity verification request below to initiate customer verification.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if profile and profile.kyc_status == 'PENDING' %}
+                        <div class="text-center py-4">
+                            <div class="mb-3">
+                                <span class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                    <span class="visually-hidden">Loading...</span>
+                                </span>
+                            </div>
+                            <h5 class="fw-bold">Verification Request Submitted</h5>
+                            <p class="text-muted">Your customer identity verification is currently pending review by our compliance team.</p>
+                            <a href="{{ url_for('profile') }}" class="btn btn-outline-primary mt-2">Return to My Profile</a>
+                        </div>
+                    {% else %}
+                        <div class="mb-4">
+                            <h5 class="fw-bold text-dark mb-2">Initiate Customer Identity Verification</h5>
+                            <p class="text-muted small">
+                                By clicking the button below, you request identity verification for your Odacity customer account.
+                                Ensure your profile personal details (full name, phone number, date of birth, and address) are accurate before submitting.
+                            </p>
+                        </div>
+
+                        <!-- Identity Verification Form -->
+                        <form method="POST" action="{{ url_for('kyc') }}" novalidate>
+                            {{ form.csrf_token }}
+
+                            <div class="d-grid gap-2 mt-4">
+                                {{ form.submit(class="btn btn-primary btn-lg fw-bold") }}
+                                <a href="{{ url_for('profile') }}" class="btn btn-link text-muted text-decoration-none text-center">Cancel and Return to Profile</a>
+                            </div>
+                        </form>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

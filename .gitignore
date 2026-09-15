@@ -1,0 +1,19 @@
+# Python Bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual Environment
+.venv/
+
+# Local Instance Directory
+instance/
+
+# Superseded SQL & Web Exports
+odasitydb_backup.sql
+Odacity_MVP2025.htm
+
+# OS / IDE Artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

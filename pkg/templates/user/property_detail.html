@@ -1,0 +1,296 @@
+{% extends "user/layout.html" %}
+
+{% block title %}{{ property.title if property else 'Property Details' }} — Odacity Verified{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark text-white py-3 mb-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('homepage') }}" class="text-light">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('properties', intent=intent) }}" class="text-light">Listings</a></li>
+                <li class="breadcrumb-item active text-info" aria-current="page">{{ property.title if property else 'Details' }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="container pb-5">
+    {% if property %}
+    <div class="row g-4">
+        <!-- LEFT COLUMN: MEDIA & DETAILS -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm mb-4">
+                {% set approved_media = property.media | selectattr('review_status', 'equalto', 'Approved') | list %}
+                {% if approved_media %}
+                    {% set primary_media = approved_media | selectattr('is_primary', 'equalto', true) | first or approved_media[0] %}
+                    <img src="{{ primary_media.file_path }}" class="card-img-top rounded-top" alt="{{ primary_media.alt_text or property.title }}" style="max-height: 420px; object-fit: cover;">
+                {% else %}
+                    <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top rounded-top" alt="{{ property.title }}" style="max-height: 420px; object-fit: cover;">
+                {% endif %}
+
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <span class="badge bg-success p-2 me-2">✓ Verified Title Document</span>
+                            <span class="badge bg-primary p-2 me-2">✓ Performance Guarantee</span>
+                            <span class="badge bg-secondary p-2">{{ property.availability_status or 'Available' }}</span>
+                        </div>
+                        <span class="text-muted small">Ref ID: #PROP-{{ property.property_id }}</span>
+                    </div>
+
+                    <h1 class="h2 fw-bold mb-2">{{ property.title }}</h1>
+                    <p class="text-muted mb-4">
+                        <i class="bi bi-geo-alt-fill text-danger"></i> 
+                        {{ property.address or '' }}
+                        {% if property.locality %}, {{ property.locality }}{% endif %}
+                        {% if property.city %}, {{ property.city }}{% endif %}
+                        {% if property.state %}, {{ property.state }}{% endif %}
+                    </p>
+
+                    <hr>
+
+                    <h5 class="fw-bold mb-3">Property Description</h5>
+                    <p class="text-secondary mb-4">{{ property.description or 'Direct Asset Brief verified property. Verified document ownership and title protection guaranteed by Odacity.' }}</p>
+
+                    <h5 class="fw-bold mb-3">Key Features & Specifications</h5>
+                    <div class="row g-3 text-muted small mb-4">
+                        <div class="col-6 col-md-4"><i class="bi bi-check-circle-fill text-success me-2"></i> Bedrooms: {{ property.bedroom_count or 'N/A' }}</div>
+                        <div class="col-6 col-md-4"><i class="bi bi-check-circle-fill text-success me-2"></i> Bathrooms: {{ property.bathroom_count or 'N/A' }}</div>
+                        <div class="col-6 col-md-4"><i class="bi bi-check-circle-fill text-success me-2"></i> Land Area: {{ property.land_area_sq_m or 'N/A' }} sq m</div>
+                        <div class="col-6 col-md-4"><i class="bi bi-check-circle-fill text-success me-2"></i> Property Type: {{ property.property_type or 'General' }}</div>
+                        <div class="col-6 col-md-4"><i class="bi bi-check-circle-fill text-success me-2"></i> Currency: {{ property.currency or 'NGN' }}</div>
+                        <div class="col-6 col-md-4"><i class="bi bi-check-circle-fill text-success me-2"></i> Status: {{ property.publication_status or 'Approved' }}</div>
+                    </div>
+
+                    {% if property.amenities %}
+                    <h5 class="fw-bold mb-3">Amenities</h5>
+                    <div class="row g-2">
+                        {% if property.amenities is mapping or property.amenities is sequence %}
+                            {% for amenity in property.amenities %}
+                                <div class="col-md-4"><span class="badge bg-light text-dark border p-2 w-100 text-start">✓ {{ amenity }}</span></div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="col-12"><p class="text-muted small">{{ property.amenities }}</p></div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if approved_media | length > 1 %}
+                    <hr class="my-4">
+                    <h5 class="fw-bold mb-3">Property Gallery</h5>
+                    <div class="row g-2">
+                        {% for media_item in approved_media %}
+                            <div class="col-4 col-md-3">
+                                <img src="{{ media_item.file_path }}" class="img-thumbnail rounded" alt="{{ media_item.alt_text or property.title }}" style="height: 100px; width: 100%; object-fit: cover;">
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: INTENT ACTION SIDEBAR -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm p-4 sticky-top" style="top: 90px;">
+                <span class="text-muted small text-uppercase fw-bold mb-1">Pricing</span>
+                <h3 class="text-primary fw-bold mb-3">₦{{ "{:,.2f}".format(property.price) if property.price else 'Contact for Price' }}</h3>
+
+                <div class="alert alert-info py-2 small mb-3">
+                    <strong>Selected Intent:</strong> {% if intent == 'rent' %}RENT LEASE{% elif intent == 'buy' %}OUTRIGHT BUY{% else %}DIRECT TRANSACTION{% endif %}
+                </div>
+
+                {% if session.get('user_id') %}
+                    {% if intent == 'buy' %}
+                        <!-- PURCHASE OFFER ACTION -->
+                        <div class="mb-3">
+                            {% if active_offer %}
+                                <div class="alert alert-success py-2 small mb-2">
+                                    <i class="bi bi-check-circle-fill me-1"></i> <strong>Offer Status:</strong> {{ active_offer.status }}
+                                    <div class="fw-bold mt-1">Amount: ₦{{ "{:,.2f}".format(active_offer.offer_amount) }}</div>
+                                </div>
+                                <a href="{{ url_for('buyer_offers') }}" class="btn btn-outline-success w-100 btn-sm mb-2 fw-bold">
+                                    View My Purchase Offers
+                                </a>
+                            {% else %}
+                                <button type="button" class="btn btn-success btn-lg fw-bold w-100 mb-2" data-bs-toggle="modal" data-bs-target="#offerModal">
+                                    Submit Purchase Offer
+                                </button>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <!-- RENTAL APPLICATION ACTION -->
+                        <div class="mb-3">
+                            {% if active_application %}
+                                <div class="alert alert-success py-2 small mb-2">
+                                    <i class="bi bi-check-circle-fill me-1"></i> <strong>Application Status:</strong> {{ active_application.status }}
+                                </div>
+                                <a href="{{ url_for('renter_applications') }}" class="btn btn-outline-success w-100 btn-sm mb-2 fw-bold">
+                                    View My Applications
+                                </a>
+                            {% else %}
+                                <button type="button" class="btn btn-primary btn-lg fw-bold w-100 mb-2" data-bs-toggle="modal" data-bs-target="#applyModal">
+                                    Initiate Rent Application
+                                </button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    <!-- INSPECTION REQUEST ACTION -->
+                    <div class="mb-3">
+                        {% if active_inspection %}
+                            <div class="alert alert-primary py-2 small mb-2">
+                                <i class="bi bi-calendar-check-fill me-1"></i> <strong>Inspection Status:</strong> {{ active_inspection.status }}
+                            </div>
+                            <a href="{{ url_for('renter_inspections') }}" class="btn btn-outline-primary w-100 btn-sm mb-2 fw-bold">
+                                View My Inspections
+                            </a>
+                        {% else %}
+                            <button type="button" class="btn btn-outline-secondary w-100 fw-bold mb-2" data-bs-toggle="modal" data-bs-target="#inspectionModal">
+                                Schedule Inspection
+                            </button>
+                        {% endif %}
+                    </div>
+
+                    <!-- FAVORITE / SAVE PROPERTY -->
+                    <div class="mb-3">
+                        {% if is_saved %}
+                            <form method="POST" action="{{ url_for('unsave_property', property_id=property.property_id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger w-100 fw-bold">💔 Remove from Saved Properties</button>
+                            </form>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('save_property', property_id=property.property_id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger w-100 fw-bold">❤️ Save Property to Favorites</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <!-- UNAUTHENTICATED CTAs -->
+                    <div class="d-grid gap-2 mb-3">
+                        {% if intent == 'buy' %}
+                            <a href="{{ url_for('login', next=url_for('property_detail', property_id=property.property_id)) }}" class="btn btn-success btn-lg fw-bold">
+                                Submit Purchase Offer
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('login', next=url_for('property_detail', property_id=property.property_id)) }}" class="btn btn-primary btn-lg fw-bold">
+                                Initiate Rent Application
+                            </a>
+                        {% endif %}
+                        <a href="{{ url_for('login', next=url_for('property_detail', property_id=property.property_id)) }}" class="btn btn-outline-secondary w-100 fw-bold">
+                            Schedule Inspection
+                        </a>
+                    </div>
+                {% endif %}
+
+                <div class="bg-light p-3 rounded small mt-2">
+                    <h6 class="fw-bold mb-2">Odacity Trust Guarantee</h6>
+                    <ul class="list-unstyled text-muted mb-0 small">
+                        <li class="mb-1">✓ Verified Legal Ownership</li>
+                        <li class="mb-1">✓ Locked Title Documents</li>
+                        <li>✓ Performance Guarantee Backup</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if session.get('user_id') %}
+    <!-- RENTAL APPLICATION MODAL -->
+    <div class="modal fade" id="applyModal" tabindex="-1" aria-labelledby="applyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="{{ url_for('apply_property', property_id=property.property_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold" id="applyModalLabel"><i class="bi bi-file-earmark-plus me-2"></i>Initiate Rent Application</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small">Applying for: <strong>{{ property.title }}</strong> (Ref: #PROP-{{ property.property_id }})</p>
+                        <div class="mb-3">
+                            <label for="app_notes" class="form-label fw-bold">Additional Notes / Terms (Optional)</label>
+                            <textarea name="notes" id="app_notes" class="form-control" rows="4" placeholder="Enter any specific requests, lease preferences, or notes..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Submit Application</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PURCHASE OFFER MODAL -->
+    <div class="modal fade" id="offerModal" tabindex="-1" aria-labelledby="offerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="{{ url_for('submit_offer', property_id=property.property_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title fw-bold" id="offerModalLabel"><i class="bi bi-cash-stack me-2"></i>Submit Purchase Offer</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small">Property: <strong>{{ property.title }}</strong> (Asking Price: ₦{{ "{:,.2f}".format(property.price) if property.price else 'Contact' }})</p>
+                        <div class="mb-3">
+                            <label for="offer_amount" class="form-label fw-bold">Your Offer Amount (NGN) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" min="1" name="offer_amount" id="offer_amount" class="form-control form-control-lg" placeholder="e.g. 50000000.00" value="{{ property.price or '' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="offer_notes" class="form-label fw-bold">Offer Terms / Notes (Optional)</label>
+                            <textarea name="notes" id="offer_notes" class="form-control" rows="3" placeholder="Specify any closing terms, financing details, or validity periods..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success fw-bold">Submit Offer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCHEDULE INSPECTION MODAL -->
+    <div class="modal fade" id="inspectionModal" tabindex="-1" aria-labelledby="inspectionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="{{ url_for('request_inspection', property_id=property.property_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title fw-bold" id="inspectionModalLabel"><i class="bi bi-calendar-event me-2"></i>Schedule Property Inspection</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small">Property: <strong>{{ property.title }}</strong></p>
+                        <div class="mb-3">
+                            <label for="scheduled_for" class="form-label fw-bold">Preferred Inspection Date (Optional)</label>
+                            <input type="date" name="scheduled_for" id="scheduled_for" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label for="insp_notes" class="form-label fw-bold">Preferred Time & Notes (Optional)</label>
+                            <textarea name="notes" id="insp_notes" class="form-control" rows="3" placeholder="Preferred time of day or special requests..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success fw-bold">Submit Inspection Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+
+    {% else %}
+    <div class="text-center py-5">
+        <h3 class="fw-bold text-muted">Property Not Found</h3>
+        <a href="{{ url_for('properties') }}" class="btn btn-primary mt-3">Back to Listings</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

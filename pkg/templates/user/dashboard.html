@@ -1,0 +1,220 @@
+{% extends 'user/layout.html' %}
+
+{% block title %}User Dashboard — Odacity{% endblock %}
+
+{% block main_content %}
+<div class="container py-5">
+    <!-- WELCOME & ACCOUNT OVERVIEW BANNER -->
+    <div class="card border-0 shadow-sm mb-4 bg-dark text-white">
+        <div class="card-body p-4 p-md-5 d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+            <div>
+                <span class="badge bg-primary px-3 py-2 fw-bold mb-2">COMMON USER DASHBOARD</span>
+                <h2 class="fw-bold mb-1">Welcome back, {{ user.full_name or 'Customer' }}!</h2>
+                <p class="text-white-50 mb-0">
+                    <i class="bi bi-envelope"></i> {{ user.email }} &bull; 
+                    Member since {{ user.created_at.strftime('%B %Y') if user.created_at else 'N/A' }}
+                </p>
+            </div>
+            <div class="mt-3 mt-md-0">
+                <span class="badge bg-success fs-6 px-3 py-2">Account Status: Active</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- IDENTITY / KYC SUMMARY CARD -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                <div class="d-flex align-items-center mb-3 mb-md-0">
+                    <div class="me-3 fs-2">🛡️</div>
+                    <div>
+                        <h5 class="fw-bold mb-1">Identity Verification (KYC) Status</h5>
+                        <p class="text-muted small mb-0">
+                            {% if profile and profile.kyc_status == 'VERIFIED' %}
+                                Your customer identity is fully verified. You have access to all tenant and buyer protections.
+                            {% elif profile and profile.kyc_status == 'PENDING' %}
+                                Your verification request is currently under review by compliance.
+                            {% elif profile and profile.kyc_status == 'REJECTED' %}
+                                Your previous verification request was rejected. Please re-submit your verification request.
+                            {% else %}
+                                Initiate customer identity verification to unlock full platform features and protection guarantees.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div>
+                    {% if profile and profile.kyc_status == 'VERIFIED' %}
+                        <span class="badge bg-success fs-6 px-3 py-2">✓ VERIFIED</span>
+                    {% elif profile and profile.kyc_status == 'PENDING' %}
+                        <span class="badge bg-warning text-dark fs-6 px-3 py-2">⏳ PENDING REVIEW</span>
+                    {% elif profile and profile.kyc_status == 'REJECTED' %}
+                        <a href="{{ url_for('kyc') }}" class="btn btn-danger btn-sm px-3 fw-bold">Re-submit Verification</a>
+                    {% else %}
+                        <a href="{{ url_for('kyc') }}" class="btn btn-primary btn-sm px-3 fw-bold">Complete Verification</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- METRIC CARDS ROW -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4 col-lg-2-4">
+            <div class="card border-0 shadow-sm h-100 text-center p-3">
+                <div class="card-body p-2">
+                    <div class="display-6 fw-bold text-success mb-1">{{ offers_count or 0 }}</div>
+                    <h6 class="fw-bold text-dark mb-2">Purchase Offers</h6>
+                    <p class="text-muted small mb-2">Submitted property offers.</p>
+                    <a href="{{ url_for('buyer_offers') }}" class="btn btn-outline-success btn-sm fw-bold w-100">My Offers</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-lg-2-4">
+            <div class="card border-0 shadow-sm h-100 text-center p-3">
+                <div class="card-body p-2">
+                    <div class="display-6 fw-bold text-primary mb-1">{{ applications_count or 0 }}</div>
+                    <h6 class="fw-bold text-dark mb-2">Rental Applications</h6>
+                    <p class="text-muted small mb-2">Rental property applications.</p>
+                    <a href="{{ url_for('renter_applications') }}" class="btn btn-outline-primary btn-sm fw-bold w-100">My Applications</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-lg-2-4">
+            <div class="card border-0 shadow-sm h-100 text-center p-3">
+                <div class="card-body p-2">
+                    <div class="display-6 fw-bold text-info mb-1">{{ inspections_count or 0 }}</div>
+                    <h6 class="fw-bold text-dark mb-2">Inspection Requests</h6>
+                    <p class="text-muted small mb-2">Requested inspections.</p>
+                    <a href="{{ url_for('renter_inspections') }}" class="btn btn-outline-info btn-sm fw-bold w-100">My Inspections</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-2-4">
+            <div class="card border-0 shadow-sm h-100 text-center p-3">
+                <div class="card-body p-2">
+                    <div class="display-6 fw-bold text-warning mb-1">{{ saved_props_count or 0 }}</div>
+                    <h6 class="fw-bold text-dark mb-2">Saved Properties</h6>
+                    <p class="text-muted small mb-2">Bookmarked properties.</p>
+                    <a href="{{ url_for('saved_properties') }}" class="btn btn-outline-warning btn-sm fw-bold w-100 text-dark">Saved Properties</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-2-4">
+            <div class="card border-0 shadow-sm h-100 text-center p-3">
+                <div class="card-body p-2">
+                    <div class="display-6 fw-bold text-secondary mb-1">{{ saved_searches_count or 0 }}</div>
+                    <h6 class="fw-bold text-dark mb-2">Saved Searches</h6>
+                    <p class="text-muted small mb-2">Stored search criteria.</p>
+                    <a href="{{ url_for('saved_searches') }}" class="btn btn-outline-secondary btn-sm fw-bold w-100">Saved Searches</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SELLER / PROPERTY OWNER METRICS ROW -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0"><i class="bi bi-building-check text-warning me-2"></i>Property Owner & Seller Management</h5>
+            <div>
+                <a href="{{ url_for('submit_dab') }}" class="btn btn-sm btn-success fw-bold me-2">+ Submit Asset Brief</a>
+                <a href="{{ url_for('owner_profile') }}" class="btn btn-sm btn-outline-light fw-bold">Owner Profile</a>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-3 text-center">
+                <div class="col-md-4">
+                    <div class="p-3 border rounded bg-light">
+                        <div class="display-6 fw-bold text-primary mb-1">{{ seller_props_count or 0 }}</div>
+                        <h6 class="fw-bold mb-1">Properties Listed</h6>
+                        <p class="text-muted small mb-2">Direct asset briefs submitted.</p>
+                        <a href="{{ url_for('seller_properties') }}" class="btn btn-sm btn-outline-primary fw-bold w-100">My Listed Properties</a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 border rounded bg-light">
+                        <div class="display-6 fw-bold text-success mb-1">{{ received_offers_count or 0 }}</div>
+                        <h6 class="fw-bold mb-1">Offers Received</h6>
+                        <p class="text-muted small mb-2">Purchase offers on your listings.</p>
+                        <a href="{{ url_for('seller_offers') }}" class="btn btn-sm btn-outline-success fw-bold w-100">Received Offers</a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 border rounded bg-light">
+                        <div class="display-6 fw-bold text-info mb-1">{{ received_apps_count or 0 }}</div>
+                        <h6 class="fw-bold mb-1">Applications Received</h6>
+                        <p class="text-muted small mb-2">Rental applications on your listings.</p>
+                        <a href="{{ url_for('seller_applications') }}" class="btn btn-sm btn-outline-info fw-bold w-100">Received Applications</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- QUICK ACTIONS GRID -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="fw-bold text-dark mb-0">⚡ Quick Actions</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('properties', intent='buy') }}" class="btn btn-success btn-lg fw-bold text-start p-3">
+                            <i class="bi bi-search me-2"></i> Explore Outright Buy Listings &rarr;
+                        </a>
+                        <a href="{{ url_for('buyer_offers') }}" class="btn btn-outline-success fw-bold text-start p-3">
+                            💰 View My Purchase Offers ({{ offers_count or 0 }})
+                        </a>
+                        <a href="{{ url_for('renter_applications') }}" class="btn btn-outline-primary fw-bold text-start p-3">
+                            📋 View My Rental Applications ({{ applications_count or 0 }})
+                        </a>
+                        <a href="{{ url_for('renter_inspections') }}" class="btn btn-outline-info fw-bold text-start p-3">
+                            📅 View My Inspection Requests ({{ inspections_count or 0 }})
+                        </a>
+                        <a href="{{ url_for('saved_properties') }}" class="btn btn-outline-warning text-dark fw-bold text-start p-3">
+                            ❤️ View Saved Properties ({{ saved_props_count or 0 }})
+                        </a>
+                        <a href="{{ url_for('saved_searches') }}" class="btn btn-outline-secondary fw-bold text-start p-3">
+                            🔍 View Saved Searches ({{ saved_searches_count or 0 }})
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- RECENT ACTIVITY FEED -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="fw-bold text-dark mb-0">📜 Recent Account Activity</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% if recent_events %}
+                        <div class="list-group list-group-flush">
+                            {% for event in recent_events %}
+                                <div class="list-group-item px-0 py-3 border-bottom">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="badge bg-light text-dark border">{{ event.event_type }}</span>
+                                        <span class="text-muted small">{{ event.created_at.strftime('%b %d, %H:%M') if event.created_at else '' }}</span>
+                                    </div>
+                                    <p class="mb-0 small text-secondary">{{ event.description or 'Account activity logged' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-0">No recent activity recorded for this account.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

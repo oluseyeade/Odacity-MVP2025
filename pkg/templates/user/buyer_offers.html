@@ -1,0 +1,113 @@
+{% extends "user/layout.html" %}
+
+{% block title %}My Purchase Offers — Odacity{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark text-white py-3 mb-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('homepage') }}" class="text-light">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}" class="text-light">Dashboard</a></li>
+                <li class="breadcrumb-item active text-info" aria-current="page">My Offers</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-cash-stack text-success me-2"></i>My Purchase Offers</h2>
+            <p class="text-muted mb-0">Track and manage your submitted purchase offers on property listings.</p>
+        </div>
+        <a href="{{ url_for('properties', intent='buy') }}" class="btn btn-outline-primary fw-bold">
+            <i class="bi bi-search me-1"></i> Browse Sale Listings
+        </a>
+    </div>
+
+    {% if offers %}
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" style="width: 90px;">Offer ID</th>
+                        <th scope="col">Property Details</th>
+                        <th scope="col">Offer Amount</th>
+                        <th scope="col">Submitted Date</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for offer_item in offers %}
+                    <tr>
+                        <td class="fw-bold text-muted">#OFFER-{{ offer_item.offer_id }}</td>
+                        <td>
+                            {% if offer_item.property %}
+                                <a href="{{ url_for('property_detail', property_id=offer_item.property_id) }}" class="fw-bold text-decoration-none text-dark">
+                                    {{ offer_item.property.title }}
+                                </a>
+                                <div class="small text-muted">
+                                    <i class="bi bi-geo-alt"></i> {{ offer_item.property.city or '' }}{% if offer_item.property.state %}, {{ offer_item.property.state }}{% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">Property #{{ offer_item.property_id }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold text-success">
+                            ₦{{ "{:,.2f}".format(offer_item.offer_amount) if offer_item.offer_amount else 'N/A' }}
+                        </td>
+                        <td class="small text-muted">
+                            {{ offer_item.submitted_at.strftime('%b %d, %Y %H:%M') if offer_item.submitted_at else 'N/A' }}
+                        </td>
+                        <td>
+                            {% if offer_item.status == 'Submitted' %}
+                                <span class="badge bg-info text-dark">Submitted</span>
+                            {% elif offer_item.status == 'Under Review' %}
+                                <span class="badge bg-warning text-dark">Under Review</span>
+                            {% elif offer_item.status == 'Accepted' %}
+                                <span class="badge bg-success">Accepted</span>
+                            {% elif offer_item.status == 'Countered' %}
+                                <span class="badge bg-primary">Countered</span>
+                            {% elif offer_item.status == 'Rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                            {% elif offer_item.status == 'Cancelled' %}
+                                <span class="badge bg-secondary">Cancelled</span>
+                            {% elif offer_item.status == 'Expired' %}
+                                <span class="badge bg-dark">Expired</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">{{ offer_item.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if offer_item.status in ['Submitted', 'Under Review'] %}
+                                <form method="POST" action="{{ url_for('cancel_offer', offer_id=offer_item.offer_id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this purchase offer?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Cancel Offer</button>
+                                </form>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm p-5 text-center">
+        <div class="my-3">
+            <i class="bi bi-journal-x text-muted display-4"></i>
+        </div>
+        <h4 class="fw-bold">No Purchase Offers Submitted Yet</h4>
+        <p class="text-muted">You haven't submitted any purchase offers. Browse properties listed for sale and make your offer.</p>
+        <div class="mt-2">
+            <a href="{{ url_for('properties', intent='buy') }}" class="btn btn-primary fw-bold">Explore Properties for Sale</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

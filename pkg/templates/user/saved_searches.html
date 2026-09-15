@@ -1,0 +1,61 @@
+{% extends 'user/layout.html' %}
+
+{% block title %}My Saved Searches — Odacity{% endblock %}
+
+{% block main_content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">My Saved Searches</h2>
+            <p class="text-muted mb-0">Saved search filters to quickly revisit your property discovery criteria.</p>
+        </div>
+        <a href="{{ url_for('properties') }}" class="btn btn-outline-primary fw-bold">Explore Listings</a>
+    </div>
+
+    {% if saved_searches %}
+        <div class="row g-4">
+            {% for item in saved_searches %}
+                {% set criteria = item.search_criteria or {} %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-4 d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="fw-bold text-dark mb-0">{{ item.name or 'Saved Search' }}</h5>
+                                <span class="badge bg-light text-muted border">{{ item.created_at.strftime('%b %d, %Y') if item.created_at else '' }}</span>
+                            </div>
+
+                            <div class="bg-light p-3 rounded mb-4 flex-grow-1 small">
+                                <div class="mb-1"><strong>Intent:</strong> <span class="text-uppercase text-primary fw-bold">{{ criteria.get('intent') or 'All Intents' }}</span></div>
+                                <div class="mb-1"><strong>State:</strong> {{ criteria.get('state') or 'All States' }}</div>
+                                <div class="mb-1"><strong>Property Type:</strong> {{ criteria.get('property_type') or 'All Types' }}</div>
+                                <div><strong>Max Price:</strong> {{ ("₦{:,.2f}".format(criteria.get('max_price')|float)) if criteria.get('max_price') else 'Any Price' }}</div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a href="{{ url_for('properties', intent=criteria.get('intent', ''), state=criteria.get('state', ''), property_type=criteria.get('property_type', ''), max_price=criteria.get('max_price', '')) }}" class="btn btn-primary btn-sm flex-grow-1 fw-bold">
+                                    🔍 Run Search
+                                </a>
+                                <form method="POST" action="{{ url_for('delete_saved_search', search_id=item.saved_search_id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Search">
+                                        🗑️ Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card border-0 shadow-sm p-5 text-center my-4">
+            <div class="mb-3 display-4 text-muted">🔍</div>
+            <h4 class="fw-bold text-dark">No Saved Searches Yet</h4>
+            <p class="text-muted col-md-6 mx-auto mb-4">When searching for properties, click "Save This Search" to store your discovery criteria for quick access.</p>
+            <div>
+                <a href="{{ url_for('properties') }}" class="btn btn-primary px-4 fw-bold">Start Searching</a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
