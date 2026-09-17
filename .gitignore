@@ -17,3 +17,6 @@ Odacity_MVP2025.htm
 Thumbs.db
 .vscode/
 .idea/
+
+# Environment variables
+.env

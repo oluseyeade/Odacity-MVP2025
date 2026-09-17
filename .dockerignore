@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.vscode/
+.idea/
+instance/__pycache__/
+odasitydb_backup.sql
+Odacity_MVP2025.htm
+*.log
