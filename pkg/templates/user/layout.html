@@ -4,86 +4,235 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ title if title else 'Odacity — Direct Property Briefs & Verified Real Estate' }}{% endblock %}</title>
-    <!-- Bootstrap 5 CSS -->
+    <!-- Bootstrap 5 & Icons CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-icons/font/bootstrap-icons.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/animate.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        .text-custom-primary { color: #0d6efd; }
-        .bg-custom-light { background-color: #f8f9fa; }
-        .hero-banner { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 4rem 1rem; }
-        .intent-card { border: 2px solid transparent; transition: all 0.3s ease; }
-        .intent-card:hover { border-color: #0d6efd; transform: translateY(-4px); }
+        :root {
+            --odacity-black: #1A1A1A;
+            --odacity-dark-gray: #242424;
+            --odacity-red: #C11B24;
+            --odacity-red-hover: #A1141C;
+        }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #212529;
+            background-color: #f8f9fa;
+        }
+        .bg-odacity-dark { background-color: var(--odacity-black) !important; }
+        .text-odacity-red { color: var(--odacity-red) !important; }
+        .bg-odacity-red { background-color: var(--odacity-red) !important; color: #ffffff !important; }
+        .btn-odacity-red { background-color: var(--odacity-red) !important; color: #ffffff !important; border: none !important; font-weight: 600; }
+        .btn-odacity-red:hover { background-color: var(--odacity-red-hover) !important; color: #ffffff !important; }
+        .btn-outline-odacity-red { color: var(--odacity-red) !important; border-color: var(--odacity-red) !important; font-weight: 600; }
+        .btn-outline-odacity-red:hover { background-color: var(--odacity-red) !important; color: #ffffff !important; }
         .badge-verified { background-color: #198754; color: white; font-weight: 600; }
-        .badge-guarantee { background-color: #0d6efd; color: white; font-weight: 600; }
+        .badge-guarantee { background-color: var(--odacity-red); color: white; font-weight: 600; }
+        
+        /* CLEAN WHITE NAVBAR DIRECTION (RESTRICTED TO 4 VISIBLE PRIMARY NAV ITEMS) */
+        .navbar-odacity {
+            background-color: #ffffff !important;
+            border-bottom: 1px solid #E5E7EB !important;
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+        .navbar-odacity .navbar-brand {
+            color: #1A1A1A !important;
+        }
+        .navbar-odacity .nav-link {
+            color: #4B5563 !important;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s ease;
+            padding-left: 0.85rem !important;
+            padding-right: 0.85rem !important;
+        }
+        .navbar-odacity .nav-link:hover, 
+        .navbar-odacity .nav-link.active {
+            color: var(--odacity-red) !important;
+            font-weight: 600;
+        }
+        .navbar-odacity .nav-link.intent-link {
+            color: #111827 !important;
+            font-weight: 700;
+        }
+        .navbar-odacity .nav-link.intent-link:hover {
+            color: var(--odacity-red) !important;
+        }
+        .brand-logo-img {
+            height: 38px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        /* FLOATING WHATSAPP CONTACT WIDGET */
+        .whatsapp-float-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1080;
+            display: flex;
+            align-items: center;
+        }
+        .whatsapp-float-btn {
+            width: 56px;
+            height: 56px;
+            background-color: #25D366 !important;
+            color: #ffffff !important;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.85rem;
+            text-decoration: none !important;
+            box-shadow: 0 4px 16px rgba(37, 211, 102, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15);
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+        .whatsapp-float-btn:hover,
+        .whatsapp-float-btn:focus {
+            background-color: #20BA5A !important;
+            color: #ffffff !important;
+            transform: scale(1.08);
+            box-shadow: 0 6px 20px rgba(37, 211, 102, 0.5), 0 3px 8px rgba(0, 0, 0, 0.2);
+            outline: none;
+        }
+        .whatsapp-tooltip {
+            position: absolute;
+            right: 68px;
+            background-color: #1A1A1A;
+            color: #ffffff;
+            font-size: 0.825rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 20px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(8px);
+            transition: all 0.2s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .whatsapp-float-btn:hover .whatsapp-tooltip,
+        .whatsapp-float-btn:focus .whatsapp-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(0);
+        }
+        @media (max-width: 575.98px) {
+            .whatsapp-float-container {
+                bottom: 18px;
+                right: 18px;
+            }
+            .whatsapp-float-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 1.65rem;
+            }
+            .whatsapp-tooltip {
+                right: 60px;
+                font-size: 0.75rem;
+            }
+        }
     </style>
     {% block customcss %}{% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100">
     <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+    <nav class="navbar navbar-expand-lg navbar-light navbar-odacity sticky-top shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold fs-3 text-primary" href="{{ url_for('homepage') }}">
-                ODACITY<span class="fs-6 text-light ms-1">NG</span>
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('homepage') }}">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="ODACITY Logo" class="brand-logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                <span class="fw-bold fs-3 text-dark" style="display:none;">ODACITY<span class="fs-6 text-odacity-red ms-1">PRO</span></span>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarMain">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('homepage') }}">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold text-info {% if intent == 'rent' or request.args.get('intent') == 'rent' %}active{% endif %}" href="{{ url_for('rent_entry') }}">RENT</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold text-warning {% if intent == 'buy' or request.args.get('intent') == 'buy' %}active{% endif %}" href="{{ url_for('buy_entry') }}">BUY</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/properties/' %}active{% endif %}" href="{{ url_for('properties') }}">All Listings</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/how-it-works/' %}active{% endif %}" href="{{ url_for('how_it_works') }}">How It Works</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/owners/' %}active{% endif %}" href="{{ url_for('owners') }}">Property Owners</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/about/' %}active{% endif %}" href="{{ url_for('about') }}">About</a>
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-lg-1">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.path in ['/about/', '/how-it-works/', '/contact/', '/owners/'] %}active{% endif %}" href="#" id="aboutUsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            About Us
+                        </a>
+                        <ul class="dropdown-menu border-0 shadow-lg mt-2 rounded-3" aria-labelledby="aboutUsDropdown">
+                            <li><a class="dropdown-item small {% if request.path == '/about/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('about') }}">About Odacity</a></li>
+                            <li><a class="dropdown-item small {% if request.path == '/how-it-works/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('how_it_works') }}">How Odacity Works</a></li>
+                            <li><a class="dropdown-item small {% if request.path == '/owners/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('owners') }}">Property Owners (DAB)</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item small {% if request.path == '/contact/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('contact') }}">Contact Operations</a></li>
+                        </ul>
                     </li>
                 </ul>
                 <div class="d-flex align-items-center gap-2">
                     {% if session.get('user_id') %}
                         <div class="dropdown">
-                            <button class="btn btn-outline-light btn-sm dropdown-toggle fw-bold" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
-                                👤 Account
+                            <button class="btn btn-outline-dark btn-sm dropdown-toggle fw-bold px-3 py-2 rounded-pill" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                                {% if active_role == 'owner' %}
+                                    🏛️ Owner View
+                                {% elif active_role == 'buyer' %}
+                                    🛍️ Buyer View
+                                {% else %}
+                                    🔑 Renter View
+                                {% endif %}
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userMenu">
-                                <li><a class="dropdown-item small fw-bold text-primary" href="{{ url_for('dashboard') }}">📊 Dashboard</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('buyer_offers') }}">💰 My Offers</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('renter_applications') }}">📋 My Applications</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('renter_inspections') }}">📅 My Inspections</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('saved_properties') }}">❤️ Saved Properties</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('saved_searches') }}">🔍 Saved Searches</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('profile') }}">👤 My Profile</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><h6 class="dropdown-header text-uppercase small text-muted">Property Owner</h6></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('seller_properties') }}">🏢 My Listed Properties</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('seller_offers') }}">📩 Offers Received</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('seller_applications') }}">📝 Applications Received</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('submit_dab') }}">➕ Submit Asset Brief</a></li>
-                                <li><a class="dropdown-item small" href="{{ url_for('owner_profile') }}">⚙️ Owner Profile</a></li>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 rounded-3" aria-labelledby="userMenu" style="min-width: 240px;">
+                                {% if active_role == 'owner' %}
+                                    <!-- PROPERTY OWNER HUB -->
+                                    <li><h6 class="dropdown-header text-uppercase small text-muted">PROPERTY OWNER HUB</h6></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('owner_dashboard') }}">🏢 Owner Dashboard</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('seller_properties') }}">🏘️ Listed Properties</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('seller_offers') }}">📥 Received Offers</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('seller_applications') }}">📄 Received Applications</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('submit_dab') }}">➕ Submit Asset Brief</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('owner_profile') }}">⚙️ Owner Profile</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('notifications') }}">🔔 Notifications {% if unread_notif_count %}<span class="badge bg-danger ms-1">{{ unread_notif_count }}</span>{% endif %}</a></li>
+                                {% elif active_role == 'buyer' %}
+                                    <!-- BUYER DASHBOARD -->
+                                    <li><h6 class="dropdown-header text-uppercase small text-muted">BUYER DASHBOARD</h6></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('buyer_dashboard') }}">🏠 Buyer Dashboard</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('buyer_offers') }}">💼 My Offers</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('renter_applications') }}">📄 My Applications</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('renter_inspections') }}">🔎 My Inspections</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('saved_properties') }}">❤️ Saved Properties</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('profile') }}">👤 My Profile</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('notifications') }}">🔔 Notifications {% if unread_notif_count %}<span class="badge bg-danger ms-1">{{ unread_notif_count }}</span>{% endif %}</a></li>
+                                {% else %}
+                                    <!-- RENTER DASHBOARD -->
+                                    <li><h6 class="dropdown-header text-uppercase small text-muted">RENTER DASHBOARD</h6></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('dashboard') }}">🏠 Renter Dashboard</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('buyer_offers') }}">💼 My Offers</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('renter_applications') }}">📄 My Applications</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('renter_inspections') }}">🔎 My Inspections</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('saved_properties') }}">❤️ Saved Properties</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('saved_searches') }}">🔍 Saved Searches</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('profile') }}">👤 My Profile</a></li>
+                                    <li><a class="dropdown-item small" href="{{ url_for('notifications') }}">🔔 Notifications {% if unread_notif_count %}<span class="badge bg-danger ms-1">{{ unread_notif_count }}</span>{% endif %}</a></li>
+                                {% endif %}
+
+                                {% if qualified_roles and qualified_roles|length > 1 %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><h6 class="dropdown-header text-uppercase small text-muted">Switch Role</h6></li>
+                                    {% if 'renter' in qualified_roles and active_role != 'renter' %}
+                                        <li><a class="dropdown-item small fw-semibold text-success" href="{{ url_for('switch_role', role_name='renter') }}">🔑 Switch to Renter View</a></li>
+                                    {% endif %}
+                                    {% if 'buyer' in qualified_roles and active_role != 'buyer' %}
+                                        <li><a class="dropdown-item small fw-semibold text-primary" href="{{ url_for('switch_role', role_name='buyer') }}">🛍️ Switch to Buyer View</a></li>
+                                    {% endif %}
+                                    {% if 'owner' in qualified_roles and active_role != 'owner' %}
+                                        <li><a class="dropdown-item small fw-semibold text-odacity-red" href="{{ url_for('switch_role', role_name='owner') }}">🏛️ Switch to Owner View</a></li>
+                                    {% endif %}
+                                {% endif %}
+
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item small text-danger fw-bold" href="{{ url_for('logout') }}">Log Out</a></li>
                             </ul>
-
-
                         </div>
                     {% else %}
-                        <a href="{{ url_for('register') }}" class="btn btn-outline-light btn-sm px-3">Sign Up</a>
-                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm px-3">Log In</a>
+                        <a href="{{ url_for('register') }}" class="btn btn-outline-dark btn-sm px-3 py-2 rounded-pill fw-semibold">Sign Up</a>
+                        <a href="{{ url_for('login') }}" class="btn btn-odacity-red btn-sm px-4 py-2 rounded-pill fw-bold">Log In</a>
                     {% endif %}
                 </div>
             </div>
@@ -95,7 +244,7 @@
       {% if messages %}
         <div class="container mt-3">
           {% for category, message in messages %}
-            <div class="alert alert-{{ category if category in ['success', 'danger', 'info', 'warning'] else 'info' }} alert-dismissible fade show shadow-sm" role="alert">
+            <div class="alert alert-{{ category if category in ['success', 'danger', 'info', 'warning'] else 'info' }} alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
               {{ message }}
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
@@ -110,50 +259,73 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-dark text-white pt-5 pb-4 mt-auto">
+    <footer class="bg-odacity-dark text-white pt-5 pb-4 mt-auto border-top border-dark">
         <div class="container">
             <div class="row g-4">
                 <div class="col-lg-4 col-md-6">
-                    <h4 class="fw-bold text-primary mb-3">ODACITY</h4>
-                    <p class="text-muted small">Abiom McRich Ltd.<br>16, Ajasa Street, Onikan, Lagos, Nigeria.<br>Direct Asset Briefs, Verified Property Documents & Guarantee Protections.</p>
+                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="ODACITY" class="brand-logo-img mb-3" style="height: 34px;" onerror="this.style.display='none';">
+                    <p class="text-white-50 small pe-lg-3">
+                        <strong>Abiom McRich Ltd.</strong><br>
+                        16, Ajasa Street, Onikan, Lagos, Nigeria.<br>
+                        Enterprise Direct Asset Briefs (DAB), Title Document Verification & Performance Guarantees.
+                    </p>
                 </div>
                 <div class="col-lg-2 col-md-6">
-                    <h5 class="fw-bold mb-3">Intent Discovery</h5>
-                    <ul class="list-unstyled text-muted small">
-                        <li class="mb-2"><a href="{{ url_for('rent_entry') }}" class="text-decoration-none text-muted">Rent Properties</a></li>
-                        <li class="mb-2"><a href="{{ url_for('buy_entry') }}" class="text-decoration-none text-muted">Buy Properties</a></li>
-                        <li class="mb-2"><a href="{{ url_for('properties') }}" class="text-decoration-none text-muted">Verified Listings</a></li>
+                    <h6 class="fw-bold text-white mb-3 text-uppercase small" style="letter-spacing: 1px;">Discovery</h6>
+                    <ul class="list-unstyled text-white-50 small">
+                        <li class="mb-2"><a href="{{ url_for('buy_entry') }}" class="text-white-50 text-decoration-none">Outright Purchase</a></li>
+                        <li class="mb-2"><a href="{{ url_for('rent_entry') }}" class="text-white-50 text-decoration-none">Rental Properties</a></li>
+                        <li class="mb-2"><a href="{{ url_for('properties') }}" class="text-white-50 text-decoration-none">All Verified Listings</a></li>
                     </ul>
                 </div>
                 <div class="col-lg-3 col-md-6">
-                    <h5 class="fw-bold mb-3">Odacity Platform</h5>
-                    <ul class="list-unstyled text-muted small">
-                        <li class="mb-2"><a href="{{ url_for('how_it_works') }}" class="text-decoration-none text-muted">Verification Engine</a></li>
-                        <li class="mb-2"><a href="{{ url_for('owners') }}" class="text-decoration-none text-muted">Direct Asset Brief (DAP)</a></li>
-                        <li class="mb-2"><a href="{{ url_for('about') }}" class="text-decoration-none text-muted">About Abiom McRich Ltd</a></li>
-                        <li class="mb-2"><a href="{{ url_for('contact') }}" class="text-decoration-none text-muted">Contact Us</a></li>
+                    <h6 class="fw-bold text-white mb-3 text-uppercase small" style="letter-spacing: 1px;">Platform Architecture</h6>
+                    <ul class="list-unstyled text-white-50 small">
+                        <li class="mb-2"><a href="{{ url_for('how_it_works') }}" class="text-white-50 text-decoration-none">Verification Engine</a></li>
+                        <li class="mb-2"><a href="{{ url_for('owners') }}" class="text-white-50 text-decoration-none">Direct Asset Brief (DAB)</a></li>
+                        <li class="mb-2"><a href="{{ url_for('about') }}" class="text-white-50 text-decoration-none">About Abiom McRich Ltd</a></li>
+                        <li class="mb-2"><a href="{{ url_for('contact') }}" class="text-white-50 text-decoration-none">Contact Operations</a></li>
                     </ul>
                 </div>
                 <div class="col-lg-3 col-md-6">
-                    <h5 class="fw-bold mb-3">Trust & Protection</h5>
-                    <span class="badge bg-success mb-2 p-2">✓ Verified Title Documents</span><br>
-                    <span class="badge bg-primary p-2">✓ Performance Guarantee Protection</span>
+                    <h6 class="fw-bold text-white mb-3 text-uppercase small" style="letter-spacing: 1px;">Indemnity & Protection</h6>
+                    <div class="d-flex flex-column gap-2">
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success px-3 py-2 rounded-pill text-start fw-semibold">
+                            ✓ Title Verification Engine
+                        </span>
+                        <span class="badge bg-danger bg-opacity-20 text-white border border-danger px-3 py-2 rounded-pill text-start fw-semibold">
+                            🛡️ 100% Performance Guarantee
+                        </span>
+                    </div>
                 </div>
             </div>
-            <hr class="my-4 border-secondary">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center text-muted small">
-                <p class="mb-0">&copy; 2026 Odacity (Abiom McRich Ltd). All rights reserved.</p>
-                <div>
-                    <a href="#" class="text-muted text-decoration-none me-3">Privacy Policy</a>
-                    <a href="#" class="text-muted text-decoration-none">Terms of Service</a>
+            <hr class="my-4 border-secondary opacity-25">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center text-white-50 small">
+                <p class="mb-0">&copy; 2026 ODACITY (Abiom McRich Ltd). All rights reserved.</p>
+                <div class="mt-2 mt-md-0">
+                    <a href="{{ url_for('about') }}" class="text-white-50 text-decoration-none me-3">Privacy Policy</a>
+                    <a href="{{ url_for('about') }}" class="text-white-50 text-decoration-none">Terms of Service</a>
                 </div>
             </div>
         </div>
     </footer>
 
-    <!-- Bootstrap 5 JavaScript Bundle -->
+    <!-- Scripts -->
     <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/jq.js') }}"></script>
-    {% block customjs %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/intent-switcher.js') }}"></script>
+    <!-- FLOATING WHATSAPP CONTACT WIDGET -->
+    <div class="whatsapp-float-container">
+        <a href="https://wa.me/2348030000000?text=Hello%20Odacity%2C%20I%20would%20like%20to%20learn%20more%20about%20your%20real%20estate%20services." 
+           class="whatsapp-float-btn shadow-lg" 
+           target="_blank" 
+           rel="noopener noreferrer" 
+           aria-label="Chat with Odacity on WhatsApp" 
+           title="Chat with Odacity on WhatsApp">
+            <span class="whatsapp-tooltip">Chat with Odacity</span>
+            <i class="bi bi-whatsapp"></i>
+        </a>
+    </div>
+
 </body>
 </html>

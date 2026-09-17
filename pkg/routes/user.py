@@ -4,7 +4,7 @@ from flask import render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from pkg import app
-from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer
+from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification
 from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm
 
 
@@ -56,17 +56,39 @@ def properties():
     intent = request.args.get('intent', '').lower()
     state = request.args.get('state', '').strip()
     property_type = request.args.get('property_type', '').strip()
+    min_price = request.args.get('min_price', '').strip()
     max_price = request.args.get('max_price', '').strip()
+    price_range = request.args.get('price_range', '').strip()
+
+    if price_range:
+        if price_range.endswith('+'):
+            try:
+                min_price = price_range.rstrip('+')
+            except ValueError:
+                pass
+        elif '-' in price_range:
+            parts = price_range.split('-')
+            if len(parts) == 2:
+                if parts[0] != '0':
+                    min_price = parts[0]
+                max_price = parts[1]
 
     # Enforce publication filtering for public discovery (fallback to query if no Approved properties yet)
     query = Property.query.filter_by(publication_status='Approved')
     if query.count() == 0:
         query = Property.query
 
+    query = query.outerjoin(DirectAssetBrief, Property.dab_id == DirectAssetBrief.dab_id)
+
     if state:
         query = query.filter(Property.state.ilike(f'%{state}%'))
     if property_type:
         query = query.filter(Property.property_type.ilike(f'%{property_type}%'))
+    if min_price:
+        try:
+            query = query.filter(Property.price >= float(min_price))
+        except ValueError:
+            pass
     if max_price:
         try:
             query = query.filter(Property.price <= float(max_price))
@@ -74,9 +96,10 @@ def properties():
             pass
 
     if intent == 'rent':
+        query = query.filter(DirectAssetBrief.service_type.in_(['rent', 'lease']))
         query = query.filter(Property.property_type.notin_(['Land', 'Plot']))
     elif intent == 'buy':
-        pass
+        query = query.filter(DirectAssetBrief.service_type == 'sale')
 
     results = query.all()
 
@@ -174,6 +197,12 @@ def owners():
 
 @app.route('/register/', methods=['GET', 'POST'])
 def register():
+    # Capture referral code from URL query string or session
+    ref_param = request.args.get('ref', '').strip()
+    if ref_param:
+        session['referral_code'] = ref_param
+    ref_code = session.get('referral_code', '')
+
     form = RegisterForm()
     if form.validate_on_submit():
         firstname = form.firstname.data.strip() if form.firstname.data else ''
@@ -187,13 +216,13 @@ def register():
         # Password mismatch check
         if password != confirm_pass:
             flash('Passwords do not match. Please re-enter your password.', 'danger')
-            return render_template('user/register.html', title='Create an Account', form=form)
+            return render_template('user/register.html', title='Create an Account', form=form, ref_code=ref_code)
 
         # Application-level duplicate email check
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
             flash('An account with this email address already exists. Please log in.', 'danger')
-            return render_template('user/register.html', title='Create an Account', form=form)
+            return render_template('user/register.html', title='Create an Account', form=form, ref_code=ref_code)
 
         try:
             pw_hash = generate_password_hash(password)
@@ -219,6 +248,46 @@ def register():
                 created_at=now
             )
             db.session.add(profile)
+            db.session.flush()
+
+            # Process PRD Referral Attribution
+            if ref_code:
+                clean_code = ref_code.upper().replace('REF-OD-', '').replace('REF-', '').strip()
+                try:
+                    referrer_user_id = int(clean_code)
+                    referrer_user = User.query.get(referrer_user_id)
+                    if referrer_user and referrer_user.customer_profile:
+                        referrer_profile = referrer_user.customer_profile
+                        # Enforce PRD self-referral invalidation rule
+                        if referrer_profile.customer_id != profile.customer_id:
+                            existing_ref = Referral.query.filter_by(referred_customer_id=profile.customer_id).first()
+                            if not existing_ref:
+                                referral = Referral(
+                                    referrer_customer_id=referrer_profile.customer_id,
+                                    referred_customer_id=profile.customer_id,
+                                    referral_code_used=ref_code,
+                                    status='Registered',
+                                    relationship_created_at=now,
+                                    created_at=now
+                                )
+                                db.session.add(referral)
+                                db.session.flush()
+
+                                ref_evt = ReferralEvent(
+                                    referral_id=referral.referral_id,
+                                    event_type='Registered',
+                                    event_data={
+                                        'referrer_customer_id': referrer_profile.customer_id,
+                                        'referred_customer_id': profile.customer_id,
+                                        'code': ref_code
+                                    },
+                                    occurred_at=now,
+                                    created_at=now
+                                )
+                                db.session.add(ref_evt)
+                                session.pop('referral_code', None)
+                except ValueError:
+                    pass
 
             # Log SecurityEvent
             sec_event = SecurityEvent(
@@ -242,9 +311,9 @@ def register():
         except Exception as e:
             db.session.rollback()
             flash('An error occurred while creating your account. Please try again.', 'danger')
-            return render_template('user/register.html', title='Create an Account', form=form)
+            return render_template('user/register.html', title='Create an Account', form=form, ref_code=ref_code)
 
-    return render_template('user/register.html', title='Create an Account', form=form)
+    return render_template('user/register.html', title='Create an Account', form=form, ref_code=ref_code)
 
 
 @app.route('/login/', methods=['GET', 'POST'])
@@ -645,6 +714,119 @@ def delete_saved_search(search_id):
     return redirect(url_for('saved_searches'))
 
 
+def get_customer_referral_context(user_id, cust_profile):
+    ref_code = f"REF-OD-{user_id:05d}"
+    ref_link = request.host_url.rstrip('/') + url_for('register', ref=ref_code)
+
+    referrals_list = Referral.query.filter_by(referrer_customer_id=cust_profile.customer_id).order_by(Referral.created_at.desc()).all()
+    referral_rewards = ReferralReward.query.filter_by(referrer_customer_id=cust_profile.customer_id).order_by(ReferralReward.created_at.desc()).all()
+    gold_rewards = GoldReward.query.filter_by(customer_id=cust_profile.customer_id).order_by(GoldReward.created_at.desc()).all()
+    gold_account = GoldAccount.query.filter_by(customer_id=cust_profile.customer_id).first()
+
+    direct_referrals_count = len(referrals_list)
+    qualified_referrals_count = len([r for r in referrals_list if r.status in ['Completed', 'Qualified']])
+    pending_referrals_count = len([r for r in referrals_list if r.status not in ['Completed', 'Qualified']])
+
+    gold_total = sum(float(r.amount) for r in gold_rewards if r.amount and r.reward_type != 'WITHDRAWAL')
+    ref_total = sum(float(r.reward_amount) for r in referral_rewards if r.reward_amount)
+    rewards_total = gold_total + ref_total
+
+    gold_eligible = sum(float(r.amount) for r in gold_rewards if r.status in ['APPROVED', 'SETTLED', 'EARNED'] and r.reward_type != 'WITHDRAWAL' and r.amount)
+    ref_eligible = sum(float(r.reward_amount) for r in referral_rewards if r.status in ['APPROVED', 'SETTLED'] and r.reward_amount)
+    rewards_eligible = gold_eligible + ref_eligible
+
+    return {
+        'referral_code': ref_code,
+        'referral_link': ref_link,
+        'referrals_list': referrals_list,
+        'referral_rewards': referral_rewards,
+        'gold_rewards': gold_rewards,
+        'gold_account': gold_account,
+        'direct_referrals_count': direct_referrals_count,
+        'qualified_referrals_count': qualified_referrals_count,
+        'pending_referrals_count': pending_referrals_count,
+        'rewards_total': rewards_total,
+        'rewards_eligible': rewards_eligible,
+        'rew_total': rewards_total,
+        'rew_eligible': rewards_eligible
+    }
+
+
+def process_referral_qualification(transaction):
+    if not transaction or not transaction.customer_id:
+        return None
+
+    referral = Referral.query.filter_by(referred_customer_id=transaction.customer_id).filter(Referral.status != 'Completed').first()
+    if not referral:
+        return None
+
+    now = datetime.utcnow()
+    referral.status = 'Completed'
+    referral.qualified_at = now
+
+    trans_amount = float(transaction.total_amount or transaction.transaction_value or 0.0)
+    reward_amount = round(trans_amount * 0.05, 2)
+
+    reward = ReferralReward(
+        referral_id=referral.referral_id,
+        qualifying_transaction_id=transaction.transaction_id,
+        transaction_id=transaction.transaction_id,
+        referrer_customer_id=referral.referrer_customer_id,
+        status='Approved',
+        transaction_value=trans_amount,
+        odacity_earning=round(trans_amount * 0.10, 2),
+        reward_rate_percentage=5.00,
+        reward_amount=reward_amount,
+        calculated_at=now,
+        approved_at=now,
+        created_at=now
+    )
+    db.session.add(reward)
+
+    ref_evt = ReferralEvent(
+        referral_id=referral.referral_id,
+        event_type='Qualifying_Transaction_Detected',
+        event_data={'transaction_id': transaction.transaction_id, 'amount': trans_amount, 'reward_amount': reward_amount},
+        occurred_at=now,
+        created_at=now
+    )
+    db.session.add(ref_evt)
+
+    gold_acc = GoldAccount.query.filter_by(customer_id=referral.referrer_customer_id).first()
+    if not gold_acc:
+        gold_acc = GoldAccount(customer_id=referral.referrer_customer_id, current_points=0, tier='Standard', created_at=now)
+        db.session.add(gold_acc)
+        db.session.flush()
+
+    points_earned = int(trans_amount / 1000)
+    gold_acc.current_points += points_earned
+    gold_acc.last_activity_at = now
+
+    gold_evt = GoldEvent(
+        gold_account_id=gold_acc.gold_account_id,
+        customer_profile_id=referral.referrer_customer_id,
+        event_type='Referral_Reward',
+        description=f'Earned {points_earned} Gold points for referred transaction #{transaction.transaction_id}',
+        points_change=points_earned,
+        amount=reward_amount,
+        new_balance=gold_acc.current_points,
+        balance_after=reward_amount,
+        created_at=now
+    )
+    db.session.add(gold_evt)
+
+    gold_reward = GoldReward(
+        customer_id=referral.referrer_customer_id,
+        reward_type='REFERRAL_BONUS',
+        amount=reward_amount,
+        status='APPROVED',
+        created_at=now
+    )
+    db.session.add(gold_reward)
+    db.session.commit()
+    return reward
+
+
 # ==========================================
 # PHASE 6 — COMMON USER DASHBOARD ROUTE
 # ==========================================
@@ -663,6 +845,8 @@ def dashboard():
         cust_profile = CustomerProfile(user_id=user_id, created_at=datetime.utcnow())
         db.session.add(cust_profile)
         db.session.commit()
+
+    session['active_role'] = 'renter'
 
     saved_props_count = SavedProperty.query.filter_by(customer_id=cust_profile.customer_id).count()
     saved_searches_count = SavedSearch.query.filter_by(customer_id=cust_profile.customer_id).count()
@@ -687,6 +871,8 @@ def dashboard():
                 received_offers_count = Offer.query.filter(Offer.property_id.in_(prop_ids)).count()
                 received_apps_count = Application.query.filter(Application.property_id.in_(prop_ids)).count()
 
+    ref_ctx = get_customer_referral_context(user_id, cust_profile)
+
     return render_template(
         'user/dashboard.html',
         title='User Dashboard',
@@ -701,8 +887,113 @@ def dashboard():
         seller_props_count=seller_props_count,
         received_offers_count=received_offers_count,
         received_apps_count=received_apps_count,
-        recent_events=recent_events
+        recent_events=recent_events,
+        **ref_ctx
     )
+
+
+# ==========================================
+# DEDICATED BUYER DASHBOARD ROUTES
+# ==========================================
+
+@app.route('/buyer/dashboard/')
+def buyer_dashboard():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access your Buyer Dashboard.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    user = User.query.get_or_404(user_id)
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+
+    if not cust_profile:
+        cust_profile = CustomerProfile(user_id=user_id, created_at=datetime.utcnow())
+        db.session.add(cust_profile)
+        db.session.commit()
+
+    session['active_role'] = 'buyer'
+
+    # Query Buyer Collections & Data
+    saved_properties_list = SavedProperty.query.filter_by(customer_id=cust_profile.customer_id).order_by(SavedProperty.saved_at.desc()).all()
+    saved_searches_list = SavedSearch.query.filter_by(customer_id=cust_profile.customer_id).order_by(SavedSearch.created_at.desc()).all()
+    inspections_list = Inspection.query.filter_by(customer_id=cust_profile.customer_id).order_by(Inspection.requested_at.desc()).all()
+    offers_list = Offer.query.filter_by(customer_id=cust_profile.customer_id).order_by(Offer.submitted_at.desc()).all()
+    transactions_list = Transaction.query.filter_by(customer_id=cust_profile.customer_id).order_by(Transaction.created_at.desc()).all()
+
+    # Future Home retrieval from CustomerProfile.preferences
+    preferences = cust_profile.preferences or {}
+    future_home_id = preferences.get('future_home_property_id')
+    future_home_property = Property.query.get(future_home_id) if future_home_id else None
+
+    # Performance Guarantee & Cycle retrieval
+    perf_guarantee = PerformanceGuarantee.query.filter_by(customer_id=cust_profile.customer_id).order_by(PerformanceGuarantee.created_at.desc()).first()
+    guarantee_cycle = GuaranteeCycle.query.filter_by(performance_guarantee_id=perf_guarantee.guarantee_id).order_by(GuaranteeCycle.cycle_number.desc()).first() if perf_guarantee else None
+
+    ref_ctx = get_customer_referral_context(user_id, cust_profile)
+    recent_events = SecurityEvent.query.filter_by(user_id=user_id).order_by(SecurityEvent.created_at.desc()).limit(5).all()
+
+    return render_template(
+        'user/buyer_dashboard.html',
+        title='Buyer Dashboard — ODACITY',
+        user=user,
+        profile=cust_profile,
+        saved_props_count=len(saved_properties_list),
+        saved_searches_count=len(saved_searches_list),
+        inspections_count=len(inspections_list),
+        offers_count=len(offers_list),
+        transactions_count=len(transactions_list),
+        saved_properties_list=saved_properties_list,
+        saved_searches_list=saved_searches_list,
+        inspections_list=inspections_list,
+        offers_list=offers_list,
+        transactions_list=transactions_list,
+        future_home_property=future_home_property,
+        perf_guarantee=perf_guarantee,
+        guarantee_cycle=guarantee_cycle,
+        recent_events=recent_events,
+        **ref_ctx
+    )
+
+
+@app.route('/buyer/future-home/set/<int:property_id>', methods=['POST'])
+def set_future_home(property_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to set your Future Home.', 'warning')
+        return redirect(url_for('login', next=url_for('buyer_dashboard')))
+
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    if not cust_profile:
+        cust_profile = CustomerProfile(user_id=user_id, created_at=datetime.utcnow())
+        db.session.add(cust_profile)
+
+    prop = Property.query.get_or_404(property_id)
+    preferences = dict(cust_profile.preferences or {})
+    preferences['future_home_property_id'] = property_id
+    preferences['future_home_set_at'] = datetime.utcnow().isoformat()
+    cust_profile.preferences = preferences
+    db.session.commit()
+
+    flash(f'"{prop.title or "Property #" + str(property_id)}" has been selected as your Future Home!', 'success')
+    return redirect(url_for('buyer_dashboard'))
+
+
+@app.route('/buyer/future-home/remove', methods=['POST'])
+def remove_future_home():
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login', next=url_for('buyer_dashboard')))
+
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    if cust_profile and cust_profile.preferences:
+        preferences = dict(cust_profile.preferences)
+        preferences.pop('future_home_property_id', None)
+        preferences.pop('future_home_set_at', None)
+        cust_profile.preferences = preferences
+        db.session.commit()
+        flash('Future Home selection removed.', 'info')
+
+    return redirect(url_for('buyer_dashboard'))
 
 
 
@@ -1099,8 +1390,102 @@ def cancel_offer(offer_id):
 
 
 # ==========================================
-# PHASE 9 — SELLER WORKFLOW ROUTES
+# PHASE 9 — INDIVIDUAL PROPERTY OWNER DASHBOARD & SELLER WORKFLOW ROUTES
 # ==========================================
+
+@app.route('/owner/dashboard/')
+def owner_dashboard():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access your Owner Dashboard.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    user = User.query.get_or_404(user_id)
+    owner_prof = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+
+    if not owner_prof:
+        owner_prof = PropertyOwnerProfile(user_id=user_id, owner_type='individual', created_at=datetime.utcnow())
+        db.session.add(owner_prof)
+        db.session.commit()
+
+    session['active_role'] = 'owner'
+
+    if owner_prof.owner_type and owner_prof.owner_type != 'individual':
+        flash('This dashboard is designed for Individual Property Owners.', 'info')
+
+    # Owner-scoped queries (User -> PropertyOwnerProfile -> DirectAssetBrief -> Property)
+    dabs = DirectAssetBrief.query.filter_by(owner_profile_id=owner_prof.owner_profile_id).order_by(DirectAssetBrief.created_at.desc()).all()
+    dab_ids = [d.dab_id for d in dabs]
+
+    properties = Property.query.filter(Property.dab_id.in_(dab_ids)).all() if dab_ids else []
+    prop_ids = [p.property_id for p in properties]
+
+    offers = Offer.query.filter(Offer.property_id.in_(prop_ids)).order_by(Offer.submitted_at.desc()).all() if prop_ids else []
+    applications = Application.query.filter(Application.property_id.in_(prop_ids)).order_by(Application.applied_at.desc()).all() if prop_ids else []
+    inspections = Inspection.query.filter(Inspection.property_id.in_(prop_ids)).order_by(Inspection.requested_at.desc()).all() if prop_ids else []
+    transactions = Transaction.query.filter(Transaction.property_id.in_(prop_ids)).order_by(Transaction.created_at.desc()).all() if prop_ids else []
+    documents = PropertyDocument.query.filter(PropertyDocument.property_id.in_(prop_ids)).order_by(PropertyDocument.created_at.desc()).all() if prop_ids else []
+    perf_guarantees = PerformanceGuarantee.query.filter_by(owner_profile_id=owner_prof.owner_profile_id).order_by(PerformanceGuarantee.created_at.desc()).all()
+
+    # Portfolio Metrics
+    total_properties_count = len(dabs)
+    available_properties = [p for p in properties if p.publication_status == 'Available']
+    pending_dabs = [d for d in dabs if d.status in ['Submitted', 'Under Verification', 'Draft']]
+    approved_dabs = [d for d in dabs if d.status == 'Approved']
+    sold_properties = [p for p in properties if p.publication_status == 'Sold']
+    rented_properties = [p for p in properties if p.publication_status == 'Rented']
+
+    available_count = len(available_properties)
+    pending_approval_count = len(pending_dabs)
+    approved_count = len(approved_dabs)
+    sold_count = len(sold_properties)
+    rented_count = len(rented_properties)
+
+    inspections_count = len(inspections)
+    offers_count = len(offers)
+    applications_count = len(applications)
+    documents_count = len(documents)
+
+    documents_pending = len([d for d in documents if d.review_status == 'Pending'])
+    documents_verified = len([d for d in documents if d.review_status == 'Verified'])
+    documents_rejected = len([d for d in documents if d.review_status == 'Rejected'])
+
+    recent_events = SecurityEvent.query.filter_by(user_id=user_id).order_by(SecurityEvent.created_at.desc()).limit(5).all()
+
+    return render_template(
+        'user/owner_dashboard.html',
+        title='Owner Dashboard — ODACITY',
+        user=user,
+        owner_profile=owner_prof,
+        dabs=dabs,
+        properties=properties,
+        offers=offers,
+        applications=applications,
+        inspections=inspections,
+        transactions=transactions,
+        documents=documents,
+        perf_guarantees=perf_guarantees,
+        available_properties=available_properties,
+        pending_dabs=pending_dabs,
+        sold_properties=sold_properties,
+        rented_properties=rented_properties,
+        total_properties_count=total_properties_count,
+        available_count=available_count,
+        pending_approval_count=pending_approval_count,
+        approved_count=approved_count,
+        sold_count=sold_count,
+        rented_count=rented_count,
+        inspections_count=inspections_count,
+        offers_count=offers_count,
+        applications_count=applications_count,
+        documents_count=documents_count,
+        documents_pending=documents_pending,
+        documents_verified=documents_verified,
+        documents_rejected=documents_rejected,
+        recent_events=recent_events
+    )
+
+
 
 @app.route('/owner/profile/', methods=['GET', 'POST'])
 def owner_profile():
@@ -1308,6 +1693,94 @@ def seller_applications():
                 applications = Application.query.filter(Application.property_id.in_(prop_ids)).order_by(Application.applied_at.desc()).all()
 
     return render_template('user/seller_applications.html', title='Applications Received', applications=applications)
+
+
+# ==========================================
+# ACTIVE ROLE CONTEXT PROCESSOR & SWITCHER
+# ==========================================
+
+@app.context_processor
+def inject_active_role():
+    user_id = session.get('user_id')
+    if not user_id:
+        return {'active_role': None, 'qualified_roles': [], 'unread_notif_count': 0}
+
+    user = User.query.get(user_id)
+    if not user:
+        return {'active_role': None, 'qualified_roles': [], 'unread_notif_count': 0}
+
+    qualified_roles = []
+    if user.customer_profile:
+        qualified_roles.extend(['renter', 'buyer'])
+    if user.property_owner_profile:
+        qualified_roles.append('owner')
+
+    active_role = session.get('active_role')
+    if active_role not in qualified_roles:
+        active_role = qualified_roles[0] if qualified_roles else 'renter'
+        session['active_role'] = active_role
+
+    unread_notif_count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
+
+    return {
+        'active_role': active_role,
+        'qualified_roles': qualified_roles,
+        'unread_notif_count': unread_notif_count
+    }
+
+
+@app.route('/switch-role/<role_name>')
+def switch_role(role_name):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to switch roles.', 'warning')
+        return redirect(url_for('login'))
+
+    user = User.query.get_or_404(user_id)
+    target_role = role_name.lower().strip()
+
+    # Verify existing backend qualification
+    is_qualified = False
+    if target_role in ['renter', 'buyer'] and user.customer_profile:
+        is_qualified = True
+    elif target_role == 'owner' and user.property_owner_profile:
+        is_qualified = True
+
+    if not is_qualified:
+        flash(f'Access denied. You are not qualified for the {target_role.capitalize()} role.', 'danger')
+        return redirect(request.referrer or url_for('homepage'))
+
+    session['active_role'] = target_role
+    flash(f'Switched to {target_role.capitalize()} View.', 'success')
+
+    if target_role == 'buyer':
+        return redirect(url_for('buyer_dashboard'))
+    elif target_role == 'owner':
+        return redirect(url_for('owner_dashboard'))
+    else:
+        return redirect(url_for('dashboard'))
+
+
+@app.route('/notifications/')
+def notifications():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to view your notifications.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    user = User.query.get_or_404(user_id)
+    notifs = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
+
+    # Mark unread notifications as read
+    unread_notifs = [n for n in notifs if not n.is_read]
+    if unread_notifs:
+        for n in unread_notifs:
+            n.is_read = True
+            n.read_at = datetime.utcnow()
+        db.session.commit()
+
+    return render_template('user/notifications.html', title='My Notifications — ODACITY', user=user, notifications=notifs)
+
 
 
 

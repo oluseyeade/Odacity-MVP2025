@@ -1,0 +1,54 @@
+{% extends "user/layout.html" %}
+
+{% block title %}My Notifications — ODACITY{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark text-white py-4 mb-4">
+    <div class="container">
+        <h1 class="h3 fw-bold mb-1"><i class="bi bi-bell me-2"></i>My Notifications</h1>
+        <p class="text-white-50 small mb-0">System alerts, application updates, and activity notifications for your account.</p>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card border-0 shadow-sm rounded-4 p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+                    <h5 class="fw-bold mb-0">Recent System Notifications</h5>
+                    <span class="badge bg-secondary">{{ notifications|length }} Total</span>
+                </div>
+
+                {% if notifications %}
+                    <div class="list-group list-group-flush">
+                        {% for n in notifications %}
+                            <div class="list-group-item px-0 py-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="fw-bold mb-1 text-dark">
+                                            {{ n.subject or n.notification_type or 'Notification' }}
+                                        </h6>
+                                        <p class="text-muted small mb-1">{{ n.body or n.message }}</p>
+                                        <span class="text-secondary small opacity-75">
+                                            <i class="bi bi-clock me-1"></i>{{ n.created_at.strftime('%b %d, %Y at %H:%M') if n.created_at else '' }}
+                                        </span>
+                                    </div>
+                                    {% if n.url %}
+                                        <a href="{{ n.url }}" class="btn btn-outline-primary btn-sm rounded-pill fw-bold">View Details &rarr;</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-bell-slash display-4 mb-3 d-block text-secondary opacity-50"></i>
+                        <h6 class="fw-bold mb-1">No Notifications Found</h6>
+                        <p class="small mb-0">You currently have no unread or system notifications.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
