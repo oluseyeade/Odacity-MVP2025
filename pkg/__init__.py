@@ -12,7 +12,7 @@ csrf = CSRFProtect()
 def create_app():
     from pkg.models import db
     app= Flask(__name__,instance_relative_config=True)
-    app.config.from_pyfile('config.py')
+    app.config.from_pyfile('config.py', silent=True)
     app.config.from_object(ProConfig)
 
    
