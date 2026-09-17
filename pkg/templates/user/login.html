@@ -1,46 +1,98 @@
 {% extends "user/layout.html" %}
-{% block title %}Log In — Odacity{% endblock %}
+{% block title %}Log In — Odacity Real Estate{% endblock %}
 {% block main_content %}
-<div class="container py-5 flex-grow-1 d-flex align-items-center justify-content-center">
-    <div class="row w-100 justify-content-center">
-        <div class="col-md-8 col-lg-5">
-            <div class="card border-0 shadow-sm animate__animated animate__zoomIn">
-                <div class="card-body p-4 p-md-5">
-                    <div class="text-center mb-4">
-                        <i class="bi bi-person-circle fs-1 text-primary"></i>
-                        <h2 class="mt-2 mb-1 fw-bold">Welcome Back</h2>
-                        <p class="text-muted small">Please log in to your Odacity account</p>
+<div class="auth-page-wrapper">
+    <div class="row w-100 justify-content-center m-0">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4 px-0">
+            <div class="auth-card">
+                <div class="auth-card-body">
+                    <!-- Brand Header -->
+                    <div class="auth-brand-header">
+                        <a href="{{ url_for('homepage') }}" class="text-decoration-none">
+                            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Odacity Logo" class="auth-brand-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                            <span class="auth-brand-fallback" style="display:none;">ODA<span>CITY</span></span>
+                        </a>
+                        <h1 class="auth-brand-title">Welcome back</h1>
+                        <p class="auth-brand-subtitle">Sign in to your Odacity account</p>
                     </div>
 
-                    <form action="{{ url_for('login') }}" method="post" novalidate>
+                    <!-- Login Form -->
+                    <form action="{{ url_for('login') }}" method="post" novalidate class="auth-form" id="login-form">
                         {{ form.csrf_token }}
+                        
+                        <!-- Email Input -->
                         <div class="mb-3">
-                            {{ form.email.label(class="form-label fw-bold small") }}
-                            {{ form.email(class="form-control form-control-lg", placeholder="name@example.com") }}
+                            <label for="{{ form.email.id }}" class="form-label">Email address</label>
+                            {{ form.email(class="form-control", placeholder="Enter your email address", autocomplete="email", required=true) }}
                             {% for e in form.email.errors %}
-                                <span class="text-danger small">{{ e }}</span>
+                                <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                             {% endfor %}
                         </div>
+
+                        <!-- Password Input -->
                         <div class="mb-4">
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                {{ form.password.label(class="form-label fw-bold small mb-0") }}
+                                <label for="{{ form.password.id }}" class="form-label mb-0">Password</label>
                             </div>
-                            {{ form.password(class="form-control form-control-lg", placeholder="••••••••") }}
+                            <div class="auth-password-group">
+                                {{ form.password(class="form-control", placeholder="Enter your password", id="login-password", autocomplete="current-password", required=true) }}
+                                <button type="button" class="auth-password-toggle" id="toggle-password-btn" title="Show or hide password" aria-label="Toggle password visibility">
+                                    <i class="bi bi-eye" id="toggle-password-icon"></i>
+                                </button>
+                            </div>
                             {% for e in form.password.errors %}
-                                <span class="text-danger small">{{ e }}</span>
+                                <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                             {% endfor %}
                         </div>
-                        <div class="d-grid">
-                            {{ form.submit(class="btn btn-primary btn-lg fw-bold") }}
-                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="auth-btn-primary" id="login-submit-btn">
+                            <span>Sign in</span>
+                        </button>
                     </form>
 
-                    <div class="text-center mt-4">
-                        <p class="text-muted small mb-0">Don't have an account? <a href="{{ url_for('register') }}" class="text-decoration-none fw-bold">Sign up</a></p>
+                    <!-- Secondary Link -->
+                    <div class="auth-footer-note">
+                        <p class="mb-0">Don't have an account? <a href="{{ url_for('register') }}" class="auth-link">Create an account</a></p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('toggle-password-btn');
+    const passwordInput = document.getElementById('login-password');
+    const toggleIcon = document.getElementById('toggle-password-icon');
+    const loginForm = document.getElementById('login-form');
+    const submitBtn = document.getElementById('login-submit-btn');
+
+    if (toggleBtn && passwordInput && toggleIcon) {
+        toggleBtn.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            if (type === 'text') {
+                toggleIcon.classList.remove('bi-eye');
+                toggleIcon.classList.add('bi-eye-slash');
+            } else {
+                toggleIcon.classList.remove('bi-eye-slash');
+                toggleIcon.classList.add('bi-eye');
+            }
+        });
+    }
+
+    if (loginForm && submitBtn) {
+        loginForm.addEventListener('submit', function() {
+            if (loginForm.checkValidity()) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Signing in...';
+                loginForm.submit();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
+

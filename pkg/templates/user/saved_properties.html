@@ -20,7 +20,7 @@
                     <div class="card h-100 border-0 shadow-sm intent-card">
                         {% set primary_media = prop.media | selectattr('review_status', 'equalto', 'Approved') | first %}
                         {% if primary_media and primary_media.file_path %}
-                            <img src="{{ primary_media.file_path }}" class="card-img-top" alt="{{ prop.title }}" style="height: 220px; object-fit: cover;">
+                            <img src="{{ primary_media.file_path if (primary_media.file_path.startswith('/') or primary_media.file_path.startswith('http')) else url_for('static', filename=primary_media.file_path) }}" class="card-img-top" alt="{{ prop.title }}" style="height: 220px; object-fit: cover;">
                         {% else %}
                             <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top" alt="{{ prop.title }}" style="height: 220px; object-fit: cover;">
                         {% endif %}

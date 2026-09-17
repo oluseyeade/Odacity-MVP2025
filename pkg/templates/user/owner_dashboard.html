@@ -1,0 +1,444 @@
+{% extends 'user/layout.html' %}
+
+{% block title %}Owner Dashboard — ODACITY{% endblock %}
+
+{% block main_content %}
+<style>
+    .odacity-bg-dark { background-color: #1A1A1A; }
+    .odacity-text-red { color: #C11B24; }
+    .odacity-bg-red { background-color: #C11B24; color: #ffffff; }
+    .odacity-btn-red { background-color: #C11B24; color: #ffffff; border: none; font-weight: 600; }
+    .odacity-btn-red:hover { background-color: #a1141c; color: #ffffff; }
+    .odacity-card { border: 1px solid #E5E7EB; border-radius: 12px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .odacity-card:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .stat-number { font-size: 2rem; font-weight: 800; }
+    .nav-tabs-odacity .nav-link { color: #4B5563; font-weight: 600; border: none; border-bottom: 3px solid transparent; padding: 0.75rem 1.25rem; }
+    .nav-tabs-odacity .nav-link.active { color: #C11B24; border-bottom: 3px solid #C11B24; background: transparent; }
+</style>
+
+<div class="bg-light py-4 min-vh-100">
+    <div class="container">
+
+        <!-- 1. PERSONALIZED OWNER WELCOME BANNER -->
+        <div class="card border-0 odacity-bg-dark text-white shadow-sm mb-4 rounded-4 overflow-hidden">
+            <div class="card-body p-4 p-lg-5 d-flex flex-column flex-md-row justify-content-between align-items-md-center position-relative">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-20 px-3 py-1 rounded-pill fw-semibold">
+                            <i class="bi bi-building-check me-1"></i> INDIVIDUAL PROPERTY OWNER
+                        </span>
+                        <span class="text-white-50 small">PROFILE ID: PR-{{ "%05d"|format(owner_profile.owner_profile_id or 0) }}</span>
+                    </div>
+                    <h2 class="fw-bold text-white mb-1">Welcome back, {{ user.full_name or 'Property Owner' }}</h2>
+                    <p class="text-white-50 mb-0">
+                        <i class="bi bi-envelope me-1"></i> {{ user.email }} &bull; 
+                        <i class="bi bi-briefcase me-1"></i> {{ owner_profile.business_name or owner_profile.company_name or 'Individual Asset Manager' }}
+                    </p>
+                </div>
+                <div class="mt-3 mt-md-0 d-flex flex-wrap gap-2">
+                    {% if owner_profile.is_approved or owner_profile.verification_status == 'Approved' %}
+                        <a href="{{ url_for('submit_dab') }}" class="btn odacity-btn-red px-4 py-2 rounded-pill shadow-sm">
+                            <i class="bi bi-plus-circle me-1"></i> List New Property Brief
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('owner_profile') }}" class="btn btn-warning text-dark px-4 py-2 rounded-pill shadow-sm fw-bold">
+                            <i class="bi bi-shield-exclamation me-1"></i> Complete Verification Profile
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. OWNER APPROVAL & VERIFICATION STATUS BANNER -->
+        <div class="card odacity-card mb-4 bg-white overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    {% if owner_profile.is_approved or owner_profile.verification_status == 'Approved' %}
+                        <div class="bg-success bg-opacity-10 text-success p-3 rounded-circle fs-3">
+                            <i class="bi bi-patch-check-fill"></i>
+                        </div>
+                        <div>
+                            <span class="badge bg-success px-3 py-1 rounded-pill mb-1">✓ APPROVED TO LIST</span>
+                            <h5 class="fw-bold text-dark mb-0">Verified Individual Property Owner</h5>
+                            <small class="text-muted">Your identity and listing rights are fully verified by Odacity Compliance.</small>
+                        </div>
+                    {% else %}
+                        <div class="bg-warning bg-opacity-10 text-warning p-3 rounded-circle fs-3">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                        <div>
+                            <span class="badge bg-warning text-dark px-3 py-1 rounded-pill mb-1">PENDING VERIFICATION</span>
+                            <h5 class="fw-bold text-dark mb-0">Owner Profile Status: {{ owner_profile.verification_status or 'Pending' }}</h5>
+                            <small class="text-muted">KYC Status: {{ owner_profile.kyc_status or 'Not Started' }}. Submit property briefs for admin review and approval.</small>
+                        </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <a href="{{ url_for('owner_profile') }}" class="btn btn-outline-dark rounded-pill px-4 btn-sm fw-bold">
+                        <i class="bi bi-person-gear me-1"></i> Manage Owner Profile
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. PORTFOLIO METRICS GRID -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-dark">{{ total_properties_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Total Briefs</div>
+                    <a href="{{ url_for('seller_properties') }}" class="stretched-link"></a>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-success">{{ available_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Available Stock</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-warning">{{ pending_approval_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Pending Approval</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-info">{{ inspections_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Inspections</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-primary">{{ offers_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Offers Received</div>
+                    <a href="{{ url_for('seller_offers') }}" class="stretched-link"></a>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number odacity-text-red">{{ sold_count + rented_count }}</div>
+                    <div class="text-muted small fw-semibold">Completed Deals</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. DEMAND SIGNALS & ACTIVITY OVERVIEW -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="card odacity-card h-100 bg-white">
+                    <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-graph-up-arrow text-danger me-2"></i>Demand Signals</h5>
+                        <span class="badge bg-light text-dark border">Owner Portfolio</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3 text-center">
+                            <div class="col-6">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="fs-2 fw-bold text-primary">{{ offers_count or 0 }}</div>
+                                    <div class="text-muted small fw-semibold">Purchase Offers</div>
+                                    <a href="{{ url_for('seller_offers') }}" class="btn btn-sm btn-outline-primary rounded-pill w-100 mt-2">View Offers</a>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="fs-2 fw-bold text-info">{{ applications_count or 0 }}</div>
+                                    <div class="text-muted small fw-semibold">Rental Applications</div>
+                                    <a href="{{ url_for('seller_applications') }}" class="btn btn-sm btn-outline-info rounded-pill w-100 mt-2">View Applications</a>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="fs-2 fw-bold text-dark">{{ inspections_count or 0 }}</div>
+                                    <div class="text-muted small fw-semibold">Inspection Requests</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="fs-2 fw-bold text-success">{{ available_count or 0 }}</div>
+                                    <div class="text-muted small fw-semibold">Active Listings</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card odacity-card h-100 bg-white">
+                    <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-file-earmark-check text-danger me-2"></i>Document Verification</h5>
+                        <span class="badge bg-light text-dark border">{{ documents_count }} Documents</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-4 text-center">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="fs-3 fw-bold text-success">{{ documents_verified or 0 }}</div>
+                                    <div class="text-muted small fw-semibold">Verified</div>
+                                </div>
+                            </div>
+                            <div class="col-4 text-center">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="fs-3 fw-bold text-warning">{{ documents_pending or 0 }}</div>
+                                    <div class="text-muted small fw-semibold">Pending Review</div>
+                                </div>
+                            </div>
+                            <div class="col-4 text-center">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="fs-3 fw-bold text-danger">{{ documents_rejected or 0 }}</div>
+                                    <div class="text-muted small fw-semibold">Rejected</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-light rounded-3 text-muted small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Compliance Note:</strong> Title deeds, land surveys, and ownership documents undergo rigorous legal verification prior to listing publication.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. PROPERTY APPROVALS & BRIEFS TABLE -->
+        <div class="card odacity-card mb-4 bg-white">
+            <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-list-check text-danger me-2"></i>Property Briefs & Approvals</h5>
+                <a href="{{ url_for('submit_dab') }}" class="btn odacity-btn-red btn-sm rounded-pill px-3">+ Submit Asset Brief</a>
+            </div>
+            <div class="card-body p-4">
+                {% if dabs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Brief Ref</th>
+                                    <th>Title</th>
+                                    <th>Service Type</th>
+                                    <th>Property Type</th>
+                                    <th>Budget / Target</th>
+                                    <th>Status</th>
+                                    <th>Date Submitted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dab_item in dabs %}
+                                    <tr>
+                                        <td><code>#DAB-{{ dab_item.dab_id }}</code></td>
+                                        <td class="fw-bold">{{ dab_item.title }}</td>
+                                        <td><span class="badge bg-light text-dark border text-uppercase">{{ dab_item.service_type or 'Sale' }}</span></td>
+                                        <td>{{ dab_item.property_type or 'Property' }}</td>
+                                        <td>{{ dab_item.budget_range or 'N/A' }}</td>
+                                        <td>
+                                            {% if dab_item.status == 'Approved' %}
+                                                <span class="badge bg-success">APPROVED ✓</span>
+                                            {% elif dab_item.status == 'Submitted' %}
+                                                <span class="badge bg-warning text-dark">SUBMITTED (Pending Review)</span>
+                                            {% elif dab_item.status == 'Rejected' %}
+                                                <span class="badge bg-danger">REJECTED</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ dab_item.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ dab_item.submitted_at.strftime('%d %b %Y') if dab_item.submitted_at else 'N/A' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p class="mb-2">No property briefs submitted yet.</p>
+                        <a href="{{ url_for('submit_dab') }}" class="btn btn-outline-danger btn-sm rounded-pill fw-bold">Submit Your First Asset Brief</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 6. CATEGORIZED PORTFOLIO SECTIONS (TABBED) -->
+        <div class="card odacity-card mb-4 bg-white">
+            <div class="card-header bg-white border-bottom-0 p-0">
+                <ul class="nav nav-tabs nav-tabs-odacity px-3 pt-2" id="ownerPortfolioTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="available-props-tab" data-bs-toggle="tab" data-bs-target="#available-props-pane" type="button" role="tab">
+                            🏠 Available Properties ({{ available_count or 0 }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pending-props-tab" data-bs-toggle="tab" data-bs-target="#pending-props-pane" type="button" role="tab">
+                            ⏳ Pending Approval ({{ pending_approval_count or 0 }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="sold-props-tab" data-bs-toggle="tab" data-bs-target="#sold-props-pane" type="button" role="tab">
+                            🤝 Sold Properties ({{ sold_count or 0 }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="rented-props-tab" data-bs-toggle="tab" data-bs-target="#rented-props-pane" type="button" role="tab">
+                            🔑 Rented Properties ({{ rented_count or 0 }})
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-4 tab-content" id="ownerPortfolioTabsContent">
+
+                <!-- AVAILABLE PROPERTIES PANE -->
+                <div class="tab-pane fade show active" id="available-props-pane" role="tabpanel">
+                    {% if available_properties %}
+                        <div class="row g-3">
+                            {% for prop in available_properties %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 border rounded-3 bg-light h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <span class="badge bg-success mb-2">AVAILABLE</span>
+                                            <h6 class="fw-bold mb-1">{{ prop.title }}</h6>
+                                            <p class="text-muted small mb-2"><i class="bi bi-geo-alt me-1"></i>{{ prop.address or prop.locality or 'Lagos, Nigeria' }}</p>
+                                            <h6 class="fw-bold odacity-text-red mb-2">₦{{ "{:,.2f}".format(prop.price or 0) }}</h6>
+                                        </div>
+                                        <div class="mt-3">
+                                            <a href="{{ url_for('property_detail', property_id=prop.property_id) }}" class="btn btn-sm btn-outline-danger rounded-pill w-100">View Public Listing &rarr;</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-0">No active properties currently available in published listings.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- PENDING APPROVAL PANE -->
+                <div class="tab-pane fade" id="pending-props-pane" role="tabpanel">
+                    {% if pending_dabs %}
+                        <div class="list-group">
+                            {% for pd in pending_dabs %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="fw-bold mb-0">#DAB-{{ pd.dab_id }}: {{ pd.title }}</h6>
+                                        <span class="text-muted small">Submitted on {{ pd.submitted_at.strftime('%d %b %Y') if pd.submitted_at else 'N/A' }}</span>
+                                    </div>
+                                    <span class="badge bg-warning text-dark">{{ pd.status }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-0">No property briefs currently awaiting platform approval.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- SOLD PROPERTIES PANE -->
+                <div class="tab-pane fade" id="sold-props-pane" role="tabpanel">
+                    {% if sold_properties %}
+                        <div class="row g-3">
+                            {% for prop in sold_properties %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 border rounded-3 bg-light">
+                                        <span class="badge bg-primary mb-2">SOLD</span>
+                                        <h6 class="fw-bold mb-1">{{ prop.title }}</h6>
+                                        <p class="text-muted small mb-0"><i class="bi bi-geo-alt me-1"></i>{{ prop.address or 'Lagos, Nigeria' }}</p>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-0">No completed sales recorded in historical portfolio.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- RENTED PROPERTIES PANE -->
+                <div class="tab-pane fade" id="rented-props-pane" role="tabpanel">
+                    {% if rented_properties %}
+                        <div class="row g-3">
+                            {% for prop in rented_properties %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 border rounded-3 bg-light">
+                                        <span class="badge bg-info text-dark mb-2">RENTED</span>
+                                        <h6 class="fw-bold mb-1">{{ prop.title }}</h6>
+                                        <p class="text-muted small mb-0"><i class="bi bi-geo-alt me-1"></i>{{ prop.address or 'Lagos, Nigeria' }}</p>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-0">No active rental listings recorded in historical portfolio.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 7. PERFORMANCE GUARANTEE FOR OWNERS -->
+        {% if perf_guarantees %}
+            <div class="card odacity-card mb-4 bg-white overflow-hidden">
+                <div class="card-header bg-dark text-white p-4 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="fw-bold mb-1 text-white"><i class="bi bi-shield-check text-warning me-2"></i>Owner Performance Guarantee</h5>
+                        <p class="text-white-50 small mb-0">Odacity Service Guarantee policy linked to your property listings.</p>
+                    </div>
+                    <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill fw-bold">
+                        {{ perf_guarantees[0].status | upper }}
+                    </span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        {% for pg in perf_guarantees %}
+                            <div class="col-md-6">
+                                <div class="p-3 border rounded-3 bg-light">
+                                    <div class="text-muted small">Guarantee #{{ pg.guarantee_id }} &bull; Property #{{ pg.property_id or 'N/A' }}</div>
+                                    <div class="fw-bold text-dark fs-5 mb-1">Status: {{ pg.status }}</div>
+                                    <div class="text-muted small">Start Date: {{ pg.start_at.strftime('%d %b %Y') if pg.start_at else 'Pending' }} &bull; Review: {{ pg.end_date.strftime('%d %b %Y') if pg.end_date else 'N/A' }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- 8. OWNER ACTION CENTRE QUICK LINKS -->
+        <div class="card odacity-card mb-4 bg-white">
+            <div class="card-header bg-white border-bottom p-4">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-grid-3x3-gap text-danger me-2"></i>Owner Action Centre</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('submit_dab') }}" class="btn btn-outline-danger w-100 p-3 text-start rounded-3 h-100 fw-bold">
+                            <i class="bi bi-plus-square fs-4 d-block mb-1"></i>
+                            List New Property Brief
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('seller_properties') }}" class="btn btn-outline-dark w-100 p-3 text-start rounded-3 h-100 fw-bold">
+                            <i class="bi bi-building fs-4 d-block mb-1"></i>
+                            My Listed Properties
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('seller_offers') }}" class="btn btn-outline-primary w-100 p-3 text-start rounded-3 h-100 fw-bold">
+                            <i class="bi bi-cash-stack fs-4 d-block mb-1"></i>
+                            Offers Received ({{ offers_count or 0 }})
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('seller_applications') }}" class="btn btn-outline-info w-100 p-3 text-start rounded-3 h-100 fw-bold">
+                            <i class="bi bi-file-earmark-text fs-4 d-block mb-1"></i>
+                            Applications Received ({{ applications_count or 0 }})
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

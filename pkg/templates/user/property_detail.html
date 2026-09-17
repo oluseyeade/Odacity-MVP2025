@@ -24,7 +24,7 @@
                 {% set approved_media = property.media | selectattr('review_status', 'equalto', 'Approved') | list %}
                 {% if approved_media %}
                     {% set primary_media = approved_media | selectattr('is_primary', 'equalto', true) | first or approved_media[0] %}
-                    <img src="{{ primary_media.file_path }}" class="card-img-top rounded-top" alt="{{ primary_media.alt_text or property.title }}" style="max-height: 420px; object-fit: cover;">
+                    <img src="{{ primary_media.file_path if (primary_media.file_path.startswith('/') or primary_media.file_path.startswith('http')) else url_for('static', filename=primary_media.file_path) }}" class="card-img-top rounded-top" alt="{{ primary_media.alt_text or property.title }}" style="max-height: 420px; object-fit: cover;">
                 {% else %}
                     <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top rounded-top" alt="{{ property.title }}" style="max-height: 420px; object-fit: cover;">
                 {% endif %}
@@ -82,7 +82,7 @@
                     <div class="row g-2">
                         {% for media_item in approved_media %}
                             <div class="col-4 col-md-3">
-                                <img src="{{ media_item.file_path }}" class="img-thumbnail rounded" alt="{{ media_item.alt_text or property.title }}" style="height: 100px; width: 100%; object-fit: cover;">
+                                <img src="{{ media_item.file_path if (media_item.file_path.startswith('/') or media_item.file_path.startswith('http')) else url_for('static', filename=media_item.file_path) }}" class="img-thumbnail rounded" alt="{{ media_item.alt_text or property.title }}" style="height: 100px; width: 100%; object-fit: cover;">
                             </div>
                         {% endfor %}
                     </div>

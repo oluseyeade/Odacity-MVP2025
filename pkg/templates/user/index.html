@@ -1,123 +1,470 @@
 {% extends "user/layout.html" %}
 
-{% block title %}Odacity — What do you want to do? Rent or Buy Verified Properties{% endblock %}
+{% block title %}ODACITY — Direct Asset Briefs & Verified Real Estate Platform{% endblock %}
+
+{% block customcss %}
+<style>
+    /* HERO SECTION CONTAINER */
+    .hero-container {
+        position: relative;
+        min-height: 560px;
+        background-color: #0f172a;
+        overflow: hidden;
+        color: #ffffff;
+    }
+
+    /* CROSS-FADING BACKGROUND IMAGES */
+    .hero-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-size: cover;
+        background-position: center;
+        filter: brightness(1.08) contrast(1.04);
+        transition: opacity 0.6s ease-in-out;
+        z-index: 1;
+    }
+    .hero-bg::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.32) 0%, rgba(15, 23, 42, 0.55) 100%);
+    }
+
+    /* HERO CONTENT Z-INDEX */
+    .hero-content-wrapper {
+        position: relative;
+        z-index: 2;
+        padding-top: 3.5rem;
+        padding-bottom: 3.75rem;
+    }
+    .hero-content-wrapper h1 {
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+        letter-spacing: -0.02em;
+    }
+    .hero-content-wrapper p.lead {
+        color: rgba(255, 255, 255, 0.92) !important;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    /* INTENT SELECTOR TABS */
+    .intent-tabs-container {
+        background-color: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 50rem;
+        padding: 5px;
+        display: inline-flex;
+        max-width: 100%;
+        overflow-x: auto;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .intent-tab-btn {
+        background: transparent;
+        border: none;
+        color: #d1d5db;
+        font-weight: 700;
+        font-size: 0.88rem;
+        letter-spacing: 0.5px;
+        padding: 0.6rem 1.6rem;
+        border-radius: 50rem;
+        transition: all 0.25s ease;
+        white-space: nowrap;
+    }
+    .intent-tab-btn:hover {
+        color: #ffffff;
+    }
+    .intent-tab-btn.active {
+        background-color: #C11B24;
+        color: #ffffff;
+        box-shadow: 0 4px 15px rgba(193, 27, 36, 0.4);
+    }
+
+    /* GREYSCALE PROPERTY DISCOVERY & LISTING PRESENTATION */
+    .odacity-feature-card {
+        background: #ffffff;
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .odacity-feature-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+    }
+    .feature-icon-wrapper {
+        width: 52px;
+        height: 52px;
+        border-radius: 10px;
+        background: rgba(193, 27, 36, 0.08);
+        color: #C11B24;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .property-card {
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #ffffff;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .property-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+    }
+    .property-card-img-wrapper {
+        position: relative;
+        height: 210px;
+        overflow: hidden;
+        background-color: #f3f4f6;
+    }
+    .property-card-img-wrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.4s ease;
+    }
+    .property-card:hover .property-card-img-wrapper img {
+        transform: scale(1.03);
+    }
+</style>
+{% endblock %}
 
 {% block main_content %}
-<!-- INTENT-DRIVEN HERO SECTION -->
-<section class="hero-banner text-center py-5">
-    <div class="container py-4">
-        <h1 class="display-4 fw-bold mb-3">What do you want to do?</h1>
-        <p class="lead text-light opacity-75 mb-5 mx-auto" style="max-width: 650px;">
-            Odacity provides direct asset briefs, verified property title documents, and financial performance guarantees. Select your intent to get started.
-        </p>
+<!-- FOUR-INTENT HERO SECTION -->
+<section class="hero-container">
+    <!-- BACKGROUND IMAGES (FOR CROSS-FADING DRIVEN BY INTENT-SWITCHER.JS) -->
+    <div id="hero-bg-buy" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/herooffice.jpg') }}'); opacity: 1;"></div>
+    <div id="hero-bg-rent" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/heropage.png.jpg') }}'); opacity: 0;"></div>
+    <div id="hero-bg-list" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/main.png.jpg') }}'); opacity: 0;"></div>
+    <div id="hero-bg-institutional" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/ikoyi.png.jpg') }}'); opacity: 0;"></div>
 
-        <!-- INTENT SELECTION CARDS -->
-        <div class="row g-4 justify-content-center" style="max-width: 900px; margin: 0 auto;">
-            <!-- RENT INTENT CARD -->
-            <div class="col-md-6">
-                <div class="card h-100 bg-dark text-white border-info shadow-lg intent-card p-4">
-                    <div class="card-body text-center d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="display-5 text-info mb-3">🔑</div>
-                            <h2 class="h3 fw-bold text-info mb-2">I WANT TO RENT</h2>
-                            <p class="text-muted small mb-4">Discover verified residential and commercial rental properties with guaranteed lease protection.</p>
-                        </div>
-                        <div>
-                            <a href="{{ url_for('rent_entry') }}" class="btn btn-info btn-lg w-100 fw-bold text-dark">
-                                Browse Rental Properties &rarr;
-                            </a>
-                        </div>
-                    </div>
-                </div>
+    <div class="container hero-content-wrapper text-center">
+        <!-- INTENT SELECTOR TABS -->
+        <div class="mb-4">
+            <div class="intent-tabs-container shadow-sm">
+                <button type="button" id="btn-intent-buy" class="intent-tab-btn active" aria-selected="true">BUY</button>
+                <button type="button" id="btn-intent-rent" class="intent-tab-btn" aria-selected="false">RENT</button>
+                <button type="button" id="btn-intent-list" class="intent-tab-btn" aria-selected="false">LISTING</button>
+                <button type="button" id="btn-intent-institutional" class="intent-tab-btn" aria-selected="false">INSTITUTIONAL</button>
             </div>
+        </div>
 
-            <!-- BUY INTENT CARD -->
-            <div class="col-md-6">
-                <div class="card h-100 bg-dark text-white border-warning shadow-lg intent-card p-4">
-                    <div class="card-body text-center d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="display-5 text-warning mb-3">🏛️</div>
-                            <h2 class="h3 fw-bold text-warning mb-2">I WANT TO BUY</h2>
-                            <p class="text-muted small mb-4">Explore verified land parcels and homes for purchase backed by title verification & performance guarantees.</p>
-                        </div>
-                        <div>
-                            <a href="{{ url_for('buy_entry') }}" class="btn btn-warning btn-lg w-100 fw-bold text-dark">
-                                Browse Properties to Buy &rarr;
-                            </a>
-                        </div>
+        <!-- HERO PANELS CONTAINER -->
+        <div class="row justify-content-center">
+            <div class="col-lg-10 col-xl-9">
+
+                <!-- 1. BUY HERO PANEL (DEFAULT ACTIVE) -->
+                <div id="hero-panel-buy" class="animate__animated animate__fadeIn">
+                    <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
+                        🛡️ DIRECT ASSET BRIEFS & OUTRIGHT PURCHASE
+                    </span>
+                    <h1 class="display-5 fw-extrabold text-white mb-3">
+                        Verified Real Estate Acquisitions & Title Guarantees
+                    </h1>
+                    <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 720px;">
+                        Access direct owner asset briefs, legal title verification, and performance indemnity guarantees for verified property purchases across Nigeria.
+                    </p>
+
+                    <!-- BUY PROPERTY SEARCH WIDGET -->
+                    <div class="card border border-secondary border-opacity-25 shadow-lg p-3 p-md-4 rounded-4 mb-4 mx-auto text-start" style="max-width: 840px; background-color: rgba(15, 23, 42, 0.78) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+                        <form action="{{ url_for('properties') }}" method="get" class="row g-2 align-items-end">
+                            <input type="hidden" name="intent" value="buy">
+                            <div class="col-md-4">
+                                <label class="form-label text-white-50 small fw-bold mb-1"><i class="bi bi-geo-alt text-odacity-red me-1"></i>State / Location</label>
+                                <input type="text" name="state" class="form-control bg-dark text-white border-secondary border-opacity-50 rounded-3 py-2" placeholder="e.g. Lagos, Abuja" value="{{ request.args.get('state', '') }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-white-50 small fw-bold mb-1"><i class="bi bi-building text-odacity-red me-1"></i>Property Type</label>
+                                <select name="property_type" class="form-select bg-dark text-white border-secondary border-opacity-50 rounded-3 py-2">
+                                    <option value="">All Types</option>
+                                    <option value="Residential">Residential</option>
+                                    <option value="Commercial">Commercial</option>
+                                    <option value="Land">Land / Plot</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-white-50 small fw-bold mb-1"><i class="bi bi-tag text-odacity-red me-1"></i>Price Range</label>
+                                <select name="price_range" class="form-select bg-dark text-white border-secondary border-opacity-50 rounded-3 py-2">
+                                    <option value="">All Prices</option>
+                                    <option value="0-10000000" {% if request.args.get('price_range') == '0-10000000' %}selected{% endif %}>Below ₦10M</option>
+                                    <option value="10000000-50000000" {% if request.args.get('price_range') == '10000000-50000000' %}selected{% endif %}>₦10M – ₦50M</option>
+                                    <option value="50000000-100000000" {% if request.args.get('price_range') == '50000000-100000000' %}selected{% endif %}>₦50M – ₦100M</option>
+                                    <option value="100000000-200000000" {% if request.args.get('price_range') == '100000000-200000000' %}selected{% endif %}>₦100M – ₦200M</option>
+                                    <option value="200000000+" {% if request.args.get('price_range') == '200000000+' %}selected{% endif %}>Above ₦200M+</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-odacity-red w-100 rounded-3 py-2 fw-bold shadow-sm">
+                                    <i class="bi bi-search me-1"></i> Search
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-center gap-3">
+                        <a href="{{ url_for('buy_entry') }}" class="btn btn-odacity-red btn-md rounded-pill px-4 py-2 fw-bold shadow-sm">
+                            Explore Outright Purchase Briefs &rarr;
+                        </a>
+                        <a href="{{ url_for('properties', intent='buy') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-2 fw-bold">
+                            View All Purchase Listings
+                        </a>
                     </div>
                 </div>
+
+                <!-- 2. RENT HERO PANEL -->
+                <div id="hero-panel-rent" class="d-none animate__animated animate__fadeIn">
+                    <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
+                        🔑 VERIFIED RENTAL PROPERTIES
+                    </span>
+                    <h1 class="display-5 fw-extrabold text-white mb-3">
+                        Trusted Residential & Commercial Spaces for Rent with Performance Guarantees
+                    </h1>
+                    <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 720px;">
+                        Refer|Connect|Earn Cash.
+                    </p>
+
+                    <!-- RENT PROPERTY SEARCH WIDGET -->
+                    <div class="card border border-secondary border-opacity-25 shadow-lg p-3 p-md-4 rounded-4 mb-4 mx-auto text-start" style="max-width: 840px; background-color: rgba(15, 23, 42, 0.78) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+                        <form action="{{ url_for('properties') }}" method="get" class="row g-2 align-items-end">
+                            <input type="hidden" name="intent" value="rent">
+                            <div class="col-md-4">
+                                <label class="form-label text-white-50 small fw-bold mb-1"><i class="bi bi-geo-alt text-odacity-red me-1"></i>State / Location</label>
+                                <input type="text" name="state" class="form-control bg-dark text-white border-secondary border-opacity-50 rounded-3 py-2" placeholder="e.g. Lagos, Ikeja" value="{{ request.args.get('state', '') }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-white-50 small fw-bold mb-1"><i class="bi bi-building text-odacity-red me-1"></i>Property Type</label>
+                                <select name="property_type" class="form-select bg-dark text-white border-secondary border-opacity-50 rounded-3 py-2">
+                                    <option value="">All Rental Types</option>
+                                    <option value="Residential">Residential</option>
+                                    <option value="Commercial">Commercial</option>
+                                    <option value="Commercial">Farms</option>
+                                    <option value="Commercial">Factories</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-white-50 small fw-bold mb-1"><i class="bi bi-tag text-odacity-red me-1"></i>Price Range</label>
+                                <select name="price_range" class="form-select bg-dark text-white border-secondary border-opacity-50 rounded-3 py-2">
+                                    <option value="">All Prices</option>
+                                    <option value="0-1000000" {% if request.args.get('price_range') == '0-1000000' %}selected{% endif %}>Below ₦1M</option>
+                                    <option value="1000000-10000000" {% if request.args.get('price_range') == '1000000-10000000' %}selected{% endif %}>₦1M – ₦10M</option>
+                                    <option value="10000000-50000000" {% if request.args.get('price_range') == '10000000-50000000' %}selected{% endif %}>₦10M – ₦50M</option>
+                                    <option value="50000000-100000000" {% if request.args.get('price_range') == '50000000-100000000' %}selected{% endif %}>₦50M – ₦100M</option>
+                                    <option value="100000000-200000000" {% if request.args.get('price_range') == '100000000-200000000' %}selected{% endif %}>₦100M – ₦200M</option>
+                                    <option value="200000000+" {% if request.args.get('price_range') == '200000000+' %}selected{% endif %}>Above ₦200M+</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-odacity-red w-100 rounded-3 py-2 fw-bold shadow-sm">
+                                    <i class="bi bi-search me-1"></i> Search
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-center gap-3">
+                        <a href="{{ url_for('rent_entry') }}" class="btn btn-odacity-red btn-md rounded-pill px-4 py-2 fw-bold shadow-sm">
+                            Browse Rental Opportunities &rarr;
+                        </a>
+                        <a href="{{ url_for('properties', intent='rent') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-2 fw-bold">
+                            View All Rental Listings
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 3. LISTING HERO PANEL -->
+                <div id="hero-panel-list" class="d-none animate__animated animate__fadeIn">
+                    <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
+                        🏛️ FOR APPROVED PROPERTY OWNERS
+                    </span>
+                    <h1 class="display-5 fw-extrabold text-white mb-3">
+                        Submit Direct Asset Brief (DAB) to Verified Buyers
+                    </h1>
+                    <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 720px;">
+                        List your property directly with Odacity legal verification. Lock in performance guarantee protection ,we have qualified buyers and renters.
+                    </p>
+                    <div class="d-flex flex-wrap justify-content-center gap-3">
+                        <a href="{{ url_for('submit_dab') }}" class="btn btn-odacity-red btn-md rounded-pill px-4 py-2 fw-bold shadow-sm">
+                            Submit Direct Asset Brief &rarr;
+                        </a>
+                        <a href="{{ url_for('owners') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-2 fw-bold">
+                            Property Owner Guidelines
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 4. INSTITUTIONAL HERO PANEL -->
+                <div id="hero-panel-institutional" class="d-none animate__animated animate__fadeIn">
+                    <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
+                        🏢 INSTITUTIONAL ASSET PLACEMENT
+                    </span>
+                    <h1 class="display-5 fw-extrabold text-white mb-3">
+                        Structured Real Estate Portfolios & Placement
+                    </h1>
+                    <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 720px;">
+                        Institutional property transactions, corporate portfolio acquisition briefs, verified legal documentation, and monitored settlement processes.
+                    </p>
+                    <div class="d-flex flex-wrap justify-content-center gap-3">
+                        <a href="{{ url_for('contact') }}" class="btn btn-odacity-red btn-md rounded-pill px-4 py-2 fw-bold shadow-sm">
+                            Contact Institutional Desk &rarr;
+                        </a>
+                        <a href="{{ url_for('about') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-2 fw-bold">
+                            Read Architecture Overview
+                        </a>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 </section>
 
-<!-- VALUE PROPOSITIONS & TRUST BANNER -->
-<section class="py-5 bg-light">
-    <div class="container">
+<!-- TRUST & PLATFORM CAPABILITIES SECTION -->
+<section class="py-5 bg-light border-bottom">
+    <div class="container py-3">
         <div class="text-center mb-5">
-            <h2 class="fw-bold">Why Choose Odacity Direct Briefs?</h2>
-            <p class="text-muted">Eliminate real estate fraud with verified documents and performance guarantee protection.</p>
+            <span class="text-odacity-red fw-bold text-uppercase small" style="letter-spacing: 1.5px;">ENTERPRISE INFRASTRUCTURE</span>
+            <h2 class="fw-bold text-dark mt-1 mb-2">The Audacity of Performance</h2>
+            <p class="text-muted lead mx-auto" style="max-width: 680px;">
+                Odacity brings greater transparency, structure, and assurance to real estate transactions in Nigeria.
+            </p>
         </div>
+
         <div class="row g-4">
-            <div class="col-md-4 text-center">
-                <div class="p-4 bg-white rounded shadow-sm h-100">
-                    <div class="fs-1 text-primary mb-3">📄</div>
-                    <h4 class="fw-bold h5">Verified Documents</h4>
-                    <p class="text-muted small">Every property document (C of O, Deed of Assignment, Survey) is verified by Odacity legal verifiers and locked for immutability.</p>
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">📄</div>
+                    <h5 class="fw-bold text-dark mb-2">Verified Title Documents</h5>
+                    <p class="text-muted small mb-0">Every property title document (C of O, Deed of Assignment, Survey) is verified by legal verifiers and locked immutably.</p>
                 </div>
             </div>
-            <div class="col-md-4 text-center">
-                <div class="p-4 bg-white rounded shadow-sm h-100">
-                    <div class="fs-1 text-primary mb-3">🛡️</div>
-                    <h4 class="fw-bold h5">Performance Guarantee</h4>
-                    <p class="text-muted small">Financial indemnity and performance guarantee protection backed by bank guarantee reference numbers.</p>
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">🛡️</div>
+                    <h5 class="fw-bold text-dark mb-2">Performance Guarantee</h5>
+                    <p class="text-muted small mb-0">Transaction integrity and performance guarantee protection backed by bank guarantee reference numbers.</p>
                 </div>
             </div>
-            <div class="col-md-4 text-center">
-                <div class="p-4 bg-white rounded shadow-sm h-100">
-                    <div class="fs-1 text-primary mb-3">🤝</div>
-                    <h4 class="fw-bold h5">Direct Asset Brief (DAP)</h4>
-                    <p class="text-muted small">Deal directly with verified property owners and direct asset brief holders without middlemen inflation.</p>
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">🤝</div>
+                    <h5 class="fw-bold text-dark mb-2">Direct Asset Briefs (DAB)</h5>
+                    <p class="text-muted small mb-0">Transact directly with verified property owners and asset brief holders, eliminating middleman price inflation.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">📊</div>
+                    <h5 class="fw-bold text-dark mb-2">Controlled Transactions</h5>
+                    <p class="text-muted small mb-0">Real-time status tracking for inspections, formal purchase offers, rental applications, and legal reviews.</p>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- FEATURED PROPERTIES SECTION -->
-{% if properties %}
-<section class="py-5">
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+<!-- FEATURED VERIFIED PROPERTIES SECTION (LIMITED TO MAXIMUM 4 VISIBLE ITEMS IN GREYSCALE SYSTEM) -->
+<section class="py-5 bg-white">
+    <div class="container py-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 pb-2 border-bottom">
             <div>
-                <h3 class="fw-bold mb-1">Featured Verified Properties</h3>
-                <p class="text-muted small mb-0">Directly verified and ready for transaction</p>
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20 px-3 py-1 rounded-pill small fw-bold">VERIFIED BRIEFS</span>
+                <h3 class="fw-bold text-dark mb-1 mt-2">Featured Property Listings</h3>
+                <p class="text-muted small mb-0">Directly verified asset briefs ready for inspection and transaction</p>
             </div>
-            <a href="{{ url_for('properties') }}" class="btn btn-outline-primary btn-sm">View All Properties &rarr;</a>
+            <div class="mt-3 mt-md-0">
+                <a href="{{ url_for('properties') }}" class="btn btn-outline-dark btn-sm px-4 py-2 rounded-pill fw-bold">
+                    View All Verified Listings &rarr;
+                </a>
+            </div>
         </div>
+
+        {% if properties %}
         <div class="row g-4">
-            {% for prop in properties[:3] %}
-            <div class="col-md-4">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="position-relative">
-                        <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top" alt="{{ prop.title }}" style="height: 200px; object-fit: cover;">
-                        <span class="position-absolute top-0 start-0 m-2 badge badge-verified">✓ VERIFIED</span>
+            <!-- MAXIMUM FOUR (4) VISIBLE PRIMARY FEATURED ITEMS -->
+            {% for prop in properties[:4] %}
+            <div class="col-md-6 col-lg-3">
+                <div class="card property-card h-100">
+                    <div class="property-card-img-wrapper">
+                        {% set primary_media = prop.media | selectattr('review_status', 'equalto', 'Approved') | first %}
+                        {% if primary_media and primary_media.file_path %}
+                            <img src="{{ primary_media.file_path if (primary_media.file_path.startswith('/') or primary_media.file_path.startswith('http')) else url_for('static', filename=primary_media.file_path) }}" alt="{{ prop.title }}">
+                        {% elif loop.index == 1 %}
+                            <img src="{{ url_for('static', filename='img/herooffice.jpg') }}" alt="{{ prop.title }}">
+                        {% elif loop.index == 2 %}
+                            <img src="{{ url_for('static', filename='img/heropage.png.jpg') }}" alt="{{ prop.title }}">
+                        {% elif loop.index == 3 %}
+                            <img src="{{ url_for('static', filename='img/main.png.jpg') }}" alt="{{ prop.title }}">
+                        {% elif loop.index == 4 %}
+                            <img src="{{ url_for('static', filename='img/ikoyi.png.jpg') }}" alt="{{ prop.title }}">
+                        {% else %}
+                            <img src="{{ url_for('static', filename='img/herooffice.jpg') }}" alt="{{ prop.title }}">
+                        {% endif %}
+                        <span class="position-absolute top-0 start-0 m-2 badge badge-verified px-2 py-1 small">✓ VERIFIED</span>
+                        <span class="position-absolute top-0 end-0 m-2 badge badge-guarantee px-2 py-1 small">GUARANTEED</span>
                     </div>
-                    <div class="card-body">
-                        <span class="badge bg-secondary mb-2">{{ prop.property_type }}</span>
-                        <h5 class="card-title fw-bold text-truncate">{{ prop.title }}</h5>
-                        <p class="text-muted small mb-2"><i class="bi bi-geo-alt"></i> {{ prop.city }}, {{ prop.state }}</p>
-                        <h6 class="text-primary fw-bold fs-5">₦{{ "{:,.2f}".format(prop.price) }}</h6>
-                    </div>
-                    <div class="card-footer bg-white border-0 pt-0">
-                        <a href="{{ url_for('property_detail', property_id=prop.property_id) }}" class="btn btn-outline-primary btn-sm w-100">View Details</a>
+                    <div class="card-body p-3 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-light text-dark border px-2 py-1 small fw-semibold">{{ prop.property_type or 'Property' }}</span>
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1 small fw-bold">{{ prop.availability_status or 'Available' }}</span>
+                            </div>
+                            <h6 class="card-title fw-bold text-dark text-truncate mb-2">{{ prop.title }}</h6>
+                            <p class="text-muted small mb-3"><i class="bi bi-geo-alt me-1 text-odacity-red"></i> {{ prop.state or 'Lagos' }}, Nigeria</p>
+                        </div>
+                        <div class="pt-2 border-top d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="text-muted small d-block" style="font-size: 0.75rem;">Price</span>
+                                <h6 class="text-dark fw-bold mb-0">₦{{ "{:,.2f}".format(prop.price) if prop.price else 'Contact Price' }}</h6>
+                            </div>
+                            <a href="{{ url_for('property_detail', property_id=prop.property_id) }}" class="btn btn-odacity-red btn-sm px-3 py-1 rounded-pill fw-bold">
+                                View Brief
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
+        {% else %}
+        <!-- EMPTY PROPERTIES STATE -->
+        <div class="text-center py-5 bg-light rounded-4 p-5">
+            <div class="display-4 text-muted mb-3">🏢</div>
+            <h4 class="fw-bold text-dark">No Featured Listings Currently Displayed</h4>
+            <p class="text-muted small mb-4">Properties undergoing verification will appear here once approved by compliance verifiers.</p>
+            <a href="{{ url_for('properties') }}" class="btn btn-odacity-red btn-sm rounded-pill px-4 py-2 fw-bold">Explore All Property Listings</a>
+        </div>
+        {% endif %}
     </div>
 </section>
-{% endif %}
+
+<!-- CALL TO ACTION BANNER -->
+<section class="py-5 bg-odacity-dark text-white position-relative overflow-hidden">
+    <div class="container py-4 text-center position-relative" style="z-index: 2;">
+        <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
+            GET STARTED TODAY
+        </span>
+        <h2 class="display-6 fw-extrabold mb-3">Ready to Transact with Guaranteed Real Estate Protection?</h2>
+        <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 680px;">
+            Join  buyers, renters, and verified property owners on Nigeria's premier Direct Asset Brief platform.
+        </p>
+        <div class="d-flex flex-wrap justify-content-center gap-3">
+            <a href="{{ url_for('buy_entry') }}" class="btn btn-odacity-red btn-md rounded-pill px-4 py-3 fw-bold shadow">
+                Explore Verified Purchases
+            </a>
+            <a href="{{ url_for('register') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-3 fw-bold">
+                Earn rewards 
+            </a>
+        </div>
+    </div>
+</section>
 {% endblock %}

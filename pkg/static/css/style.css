@@ -1,0 +1,203 @@
+/* ==========================================
+   ODACITY CORPORATE LOGIN & AUTHENTICATION STYLES
+   ========================================== */
+
+.auth-page-wrapper {
+    background-color: #F8F9FA;
+    min-height: calc(100vh - 180px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+}
+
+.auth-card {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    width: 100%;
+}
+
+.auth-card-body {
+    padding: 2.5rem;
+}
+
+@media (max-width: 576px) {
+    .auth-card-body {
+        padding: 1.75rem 1.25rem;
+    }
+}
+
+.auth-brand-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.auth-brand-logo {
+    height: 42px;
+    width: auto;
+    object-fit: contain;
+    margin-bottom: 1rem;
+}
+
+.auth-brand-fallback {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #111827;
+    letter-spacing: -0.03em;
+    margin-bottom: 1rem;
+    display: inline-block;
+}
+
+.auth-brand-fallback span {
+    color: #C11B24;
+}
+
+.auth-brand-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.35rem;
+}
+
+.auth-brand-subtitle {
+    font-size: 0.9rem;
+    color: #6B7280;
+    font-weight: 400;
+}
+
+.auth-form .form-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.4rem;
+}
+
+.auth-form .form-control {
+    height: 48px;
+    font-size: 0.95rem;
+    color: #111827;
+    background-color: #FFFFFF;
+    border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.auth-form .form-control::placeholder {
+    color: #9CA3AF;
+    font-weight: 400;
+}
+
+.auth-form .form-control:focus {
+    border-color: #C11B24;
+    box-shadow: 0 0 0 3px rgba(193, 27, 36, 0.12);
+    outline: none;
+}
+
+.auth-password-group {
+    position: relative;
+}
+
+.auth-password-group .form-control {
+    padding-right: 2.75rem;
+}
+
+.auth-password-toggle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 48px;
+    width: 44px;
+    border: none;
+    background: transparent;
+    color: #6B7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: color 0.15s ease;
+}
+
+.auth-password-toggle:hover {
+    color: #111827;
+}
+
+.auth-password-toggle:focus {
+    outline: none;
+    color: #C11B24;
+}
+
+.auth-btn-primary {
+    height: 48px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    background-color: #C11B24;
+    border: none;
+    border-radius: 8px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.auth-btn-primary:hover {
+    background-color: #A1141C;
+    color: #FFFFFF;
+}
+
+.auth-btn-primary:focus {
+    background-color: #A1141C;
+    box-shadow: 0 0 0 3px rgba(193, 27, 36, 0.25);
+    outline: none;
+}
+
+.auth-btn-primary:disabled {
+    background-color: #E5E7EB;
+    color: #9CA3AF;
+    cursor: not-allowed;
+}
+
+.auth-link {
+    color: #C11B24;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.auth-link:hover {
+    color: #A1141C;
+    text-decoration: underline;
+}
+
+.auth-footer-note {
+    text-align: center;
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #F3F4F6;
+    font-size: 0.875rem;
+    color: #6B7280;
+}
+
+.auth-referral-banner {
+    background-color: #FEF2F2;
+    border: 1px solid #FCA5A5;
+    color: #991B1B;
+    border-radius: 8px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-top: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+

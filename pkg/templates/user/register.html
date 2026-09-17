@@ -1,79 +1,147 @@
 {% extends "user/layout.html" %}
-{% block title %}Create an Account — Odacity{% endblock %}
+{% block title %}Create an Account — Odacity Real Estate{% endblock %}
 {% block main_content %}
-<div class="container py-5 flex-grow-1 d-flex align-items-center justify-content-center">
-    <div class="row w-100 justify-content-center">
-        <div class="col-md-8 col-lg-6">
-            <div class="card border-0 shadow-sm animate__animated animate__zoomIn">
-                <div class="card-body p-4 p-md-5">
-                    <div class="text-center mb-4">
-                        <i class="bi bi-person-plus fs-1 text-primary"></i>
-                        <h2 class="mt-2 mb-1 fw-bold">Create an Account</h2>
-                        <p class="text-muted small">Join Odacity verified real estate platform today</p>
+<div class="auth-page-wrapper">
+    <div class="row w-100 justify-content-center m-0">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5 px-0">
+            <div class="auth-card">
+                <div class="auth-card-body">
+                    <!-- Brand Header -->
+                    <div class="auth-brand-header">
+                        <a href="{{ url_for('homepage') }}" class="text-decoration-none">
+                            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Odacity Logo" class="auth-brand-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+                            <span class="auth-brand-fallback" style="display:none;">ODA<span>CITY</span></span>
+                        </a>
+                        <h1 class="auth-brand-title">Create your account</h1>
+                        <p class="auth-brand-subtitle">Join Odacity verified real estate platform today</p>
+                        {% if ref_code %}
+                            <div class="auth-referral-banner">
+                                <i class="bi bi-gift-fill me-1 text-danger"></i> <span>Referred by <strong>{{ ref_code }}</strong></span>
+                            </div>
+                        {% endif %}
                     </div>
-                    <form action="{{ url_for('register') }}" method="post" novalidate>
+
+                    <!-- Registration Form -->
+                    <form action="{{ url_for('register') }}" method="post" novalidate class="auth-form" id="register-form">
                         {{ form.csrf_token }}
+                        <input type="hidden" name="referral_code" value="{{ ref_code or '' }}">
+                        
+                        <!-- First Name & Last Name -->
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                {{ form.firstname.label(class="form-label fw-bold small") }}
-                                {{ form.firstname(class="form-control form-control-lg", placeholder="Chidi") }}
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label for="{{ form.firstname.id }}" class="form-label">First name</label>
+                                {{ form.firstname(class="form-control", placeholder="Chidi", autocomplete="given-name", required=true) }}
                                 {% for e in form.firstname.errors %}
-                                    <span class="text-danger small">{{ e }}</span>
+                                    <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                                 {% endfor %}
                             </div>
                             <div class="col-md-6">
-                                {{ form.lastname.label(class="form-label fw-bold small") }}
-                                {{ form.lastname(class="form-control form-control-lg", placeholder="Okafor") }}
+                                <label for="{{ form.lastname.id }}" class="form-label">Last name</label>
+                                {{ form.lastname(class="form-control", placeholder="Okafor", autocomplete="family-name", required=true) }}
                                 {% for e in form.lastname.errors %}
-                                    <span class="text-danger small">{{ e }}</span>
+                                    <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                                 {% endfor %}
                             </div>
                         </div>
 
+                        <!-- Email Address -->
                         <div class="mb-3">
-                            {{ form.email.label(class="form-label fw-bold small") }}
-                            {{ form.email(class="form-control form-control-lg", placeholder="chidi@example.com") }}
+                            <label for="{{ form.email.id }}" class="form-label">Email address</label>
+                            {{ form.email(class="form-control", placeholder="chidi@example.com", autocomplete="email", required=true) }}
                             {% for e in form.email.errors %}
-                                <span class="text-danger small">{{ e }}</span>
+                                <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                             {% endfor %}
                         </div>
 
+                        <!-- Phone Number -->
                         <div class="mb-3">
-                            {{ form.phone.label(class="form-label fw-bold small") }}
-                            {{ form.phone(class="form-control form-control-lg", placeholder="+234 803 000 0000") }}
+                            <label for="{{ form.phone.id }}" class="form-label">Phone number</label>
+                            {{ form.phone(class="form-control", placeholder="+234 803 000 0000", autocomplete="tel", required=true) }}
                             {% for e in form.phone.errors %}
-                                <span class="text-danger small">{{ e }}</span>
+                                <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                             {% endfor %}
                         </div>
 
+                        <!-- Password & Confirm Password -->
                         <div class="row mb-4">
-                            <div class="col-md-6">
-                                {{ form.password.label(class="form-label fw-bold small") }}
-                                {{ form.password(class="form-control form-control-lg", placeholder="••••••••") }}
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label for="{{ form.password.id }}" class="form-label">Password</label>
+                                <div class="auth-password-group">
+                                    {{ form.password(class="form-control", placeholder="Enter password", id="reg-password", autocomplete="new-password", required=true) }}
+                                    <button type="button" class="auth-password-toggle" id="toggle-reg-password-btn" title="Show or hide password" aria-label="Toggle password visibility">
+                                        <i class="bi bi-eye" id="toggle-reg-password-icon"></i>
+                                    </button>
+                                </div>
                                 {% for e in form.password.errors %}
-                                    <span class="text-danger small">{{ e }}</span>
+                                    <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                                 {% endfor %}
                             </div>
                             <div class="col-md-6">
-                                {{ form.confirm_pass.label(class="form-label fw-bold small") }}
-                                {{ form.confirm_pass(class="form-control form-control-lg", placeholder="••••••••") }}
+                                <label for="{{ form.confirm_pass.id }}" class="form-label">Confirm password</label>
+                                <div class="auth-password-group">
+                                    {{ form.confirm_pass(class="form-control", placeholder="Confirm password", id="reg-confirm-password", autocomplete="new-password", required=true) }}
+                                    <button type="button" class="auth-password-toggle" id="toggle-reg-confirm-btn" title="Show or hide confirm password" aria-label="Toggle confirm password visibility">
+                                        <i class="bi bi-eye" id="toggle-reg-confirm-icon"></i>
+                                    </button>
+                                </div>
                                 {% for e in form.confirm_pass.errors %}
-                                    <span class="text-danger small">{{ e }}</span>
+                                    <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
                                 {% endfor %}
                             </div>
                         </div>
 
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg fw-bold">Create Account</button>
-                        </div>
+                        <!-- Submit CTA -->
+                        <button type="submit" class="auth-btn-primary" id="register-submit-btn">
+                            <span>Create account</span>
+                        </button>
                     </form>
 
-                    <div class="text-center mt-4">
-                        <p class="text-muted small mb-0">Already have an account? <a href="{{ url_for('login') }}" class="text-decoration-none fw-bold">Log in</a></p>
+                    <!-- Secondary Link -->
+                    <div class="auth-footer-note">
+                        <p class="mb-0">Already have an account? <a href="{{ url_for('login') }}" class="auth-link">Log in</a></p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function setupPasswordToggle(btnId, inputId, iconId) {
+        const btn = document.getElementById(btnId);
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (btn && input && icon) {
+            btn.addEventListener('click', function() {
+                const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+                input.setAttribute('type', type);
+                if (type === 'text') {
+                    icon.classList.remove('bi-eye');
+                    icon.classList.add('bi-eye-slash');
+                } else {
+                    icon.classList.remove('bi-eye-slash');
+                    icon.classList.add('bi-eye');
+                }
+            });
+        }
+    }
+
+    setupPasswordToggle('toggle-reg-password-btn', 'reg-password', 'toggle-reg-password-icon');
+    setupPasswordToggle('toggle-reg-confirm-btn', 'reg-confirm-password', 'toggle-reg-confirm-icon');
+
+    const regForm = document.getElementById('register-form');
+    const submitBtn = document.getElementById('register-submit-btn');
+    if (regForm && submitBtn) {
+        regForm.addEventListener('submit', function() {
+            if (regForm.checkValidity()) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creating account...';
+                regForm.submit();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
+

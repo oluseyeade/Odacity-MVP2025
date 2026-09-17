@@ -1,0 +1,599 @@
+{% extends 'user/layout.html' %}
+
+{% block title %}Buyer Dashboard — ODACITY{% endblock %}
+
+{% block main_content %}
+<style>
+    .odacity-bg-dark { background-color: #1A1A1A; }
+    .odacity-text-red { color: #C11B24; }
+    .odacity-bg-red { background-color: #C11B24; color: #ffffff; }
+    .odacity-btn-red { background-color: #C11B24; color: #ffffff; border: none; font-weight: 600; }
+    .odacity-btn-red:hover { background-color: #a1141c; color: #ffffff; }
+    .odacity-card { border: 1px solid #E5E7EB; border-radius: 12px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .odacity-card:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .stat-number { font-size: 2rem; font-weight: 800; }
+    .nav-tabs-odacity .nav-link { color: #4B5563; font-weight: 600; border: none; border-bottom: 3px solid transparent; padding: 0.75rem 1.25rem; }
+    .nav-tabs-odacity .nav-link.active { color: #C11B24; border-bottom: 3px solid #C11B24; background: transparent; }
+    
+    /* Journey Stepper Styling */
+    .journey-stepper { display: flex; justify-content: space-between; position: relative; margin-bottom: 1.5rem; }
+    .journey-stepper::before { content: ''; position: absolute; top: 20px; left: 5%; right: 5%; height: 3px; background: #E5E7EB; z-index: 1; }
+    .step-item { position: relative; z-index: 2; text-align: center; background: #ffffff; padding: 0 10px; }
+    .step-circle { width: 42px; height: 42px; border-radius: 50%; background: #F3F4F6; border: 2px solid #D1D5DB; color: #6B7280; display: flex; align-items: center; justify-content: center; font-weight: 700; margin: 0 auto 8px; }
+    .step-item.active .step-circle { background: #C11B24; border-color: #C11B24; color: #ffffff; }
+    .step-item.completed .step-circle { background: #10B981; border-color: #10B981; color: #ffffff; }
+    .step-label { font-size: 0.75rem; font-weight: 700; color: #4B5563; text-transform: uppercase; }
+</style>
+
+<div class="bg-light py-4 min-vh-100">
+    <div class="container">
+
+        <!-- 1. PERSONALIZED BUYER WELCOME BANNER -->
+        <div class="card border-0 odacity-bg-dark text-white shadow-sm mb-4 rounded-4 overflow-hidden">
+            <div class="card-body p-4 p-lg-5 d-flex flex-column flex-md-row justify-content-between align-items-md-center position-relative">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-20 px-3 py-1 rounded-pill fw-semibold">
+                            <i class="bi bi-bag-check me-1"></i> BUYER DASHBOARD
+                        </span>
+                        <span class="text-white-50 small">ID: OD-{{ "%05d"|format(user.user_id) }}</span>
+                    </div>
+                    <h2 class="fw-bold text-white mb-1">Welcome back, {{ user.full_name or 'Valued Buyer' }}</h2>
+                    <p class="text-white-50 mb-0">
+                        <i class="bi bi-envelope me-1"></i> {{ user.email }} &bull; 
+                        <i class="bi bi-calendar3 me-1"></i> Member since {{ user.created_at.strftime('%B %Y') if user.created_at else 'N/A' }}
+                    </p>
+                </div>
+                <div class="mt-3 mt-md-0 d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('properties', intent='buy') }}" class="btn odacity-btn-red px-4 py-2 rounded-pill shadow-sm">
+                        <i class="bi bi-search me-1"></i> Explore Outright Buy Listings
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. BUYER ACQUISITION JOURNEY STEPPER -->
+        <div class="card odacity-card mb-4 bg-white">
+            <div class="card-header bg-white border-bottom p-4">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-signpost-split text-danger me-2"></i>My Property Acquisition Journey</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="journey-stepper">
+                    <div class="step-item {{ 'completed' if saved_searches_count > 0 or saved_props_count > 0 else 'active' }}">
+                        <div class="step-circle"><i class="bi bi-search"></i></div>
+                        <div class="step-label">Search</div>
+                    </div>
+                    <div class="step-item {{ 'completed' if saved_props_count > 0 else ('active' if saved_searches_count > 0 else '') }}">
+                        <div class="step-circle"><i class="bi bi-heart"></i></div>
+                        <div class="step-label">Saved</div>
+                    </div>
+                    <div class="step-item {{ 'completed' if inspections_count > 0 else ('active' if saved_props_count > 0 else '') }}">
+                        <div class="step-circle"><i class="bi bi-calendar-event"></i></div>
+                        <div class="step-label">Inspection Booked</div>
+                    </div>
+                    <div class="step-item {{ 'completed' if offers_count > 0 else ('active' if inspections_count > 0 else '') }}">
+                        <div class="step-circle"><i class="bi bi-patch-check"></i></div>
+                        <div class="step-label">Inspection Confirmed</div>
+                    </div>
+                    <div class="step-item {{ 'completed' if transactions_count > 0 else ('active' if offers_count > 0 else '') }}">
+                        <div class="step-circle"><i class="bi bi-briefcase"></i></div>
+                        <div class="step-label">Transaction</div>
+                    </div>
+                    <div class="step-item {{ 'completed' if transactions_count > 0 and transactions_list[0].status == 'Completion' else '' }}">
+                        <div class="step-circle"><i class="bi bi-check-all"></i></div>
+                        <div class="step-label">Completed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. PERFORMANCE GUARANTEE CLOCK SECTION -->
+        <div class="card odacity-card mb-4 bg-white overflow-hidden">
+            <div class="card-header bg-dark text-white p-4 d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold mb-1 text-white"><i class="bi bi-clock-history text-warning me-2"></i>Performance Guarantee Clock</h5>
+                    <p class="text-white-50 small mb-0">Authoritative performance period status governed by your Odacity Service Mandate.</p>
+                </div>
+                {% if perf_guarantee %}
+                    <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill fw-bold">
+                        {{ perf_guarantee.status | upper }}
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6 px-3 py-2 rounded-pill fw-bold">
+                        ELIGIBLE (NOT LINKED)
+                    </span>
+                {% endif %}
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4 align-items-center">
+                    <div class="col-lg-5 border-end-lg">
+                        <div class="p-3 bg-light rounded-3 text-center">
+                            <div class="text-muted small fw-bold text-uppercase mb-1">Guarantee Status</div>
+                            <div class="display-6 fw-bold text-dark mb-2">
+                                {{ perf_guarantee.status if perf_guarantee else 'Eligible' }}
+                            </div>
+                            {% if guarantee_cycle %}
+                                <div class="fs-5 fw-bold odacity-text-red mb-1">
+                                    {{ guarantee_cycle.days_remaining or 0 }} DAYS REMAINING
+                                </div>
+                                <div class="text-muted small">Cycle #{{ guarantee_cycle.cycle_number }} &bull; {{ guarantee_cycle.days_elapsed or 0 }} Days Elapsed</div>
+                            {% else %}
+                                <div class="text-muted small">
+                                    <i class="bi bi-info-circle me-1"></i> Guarantee clock activates upon signed mandate execution.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <div class="p-3 border rounded-3 bg-white">
+                                    <div class="text-muted small">Mandate Start Date:</div>
+                                    <div class="fw-bold text-dark">
+                                        {{ perf_guarantee.start_at.strftime('%d %b %Y') if perf_guarantee and perf_guarantee.start_at else 'Pending Mandate' }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-3 border rounded-3 bg-white">
+                                    <div class="text-muted small">Next Review Date:</div>
+                                    <div class="fw-bold text-dark">
+                                        {{ perf_guarantee.end_date.strftime('%d %b %Y') if perf_guarantee and perf_guarantee.end_date else 'Pending Mandate' }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-3 border rounded-3 bg-white">
+                                    <div class="text-muted small">Guarantee Cycle:</div>
+                                    <div class="fw-bold text-dark">
+                                        {{ perf_guarantee.period_days or 90 }} Days (Quarterly Review)
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-3 border rounded-3 bg-white">
+                                    <div class="text-muted small">Fee Credit Terms:</div>
+                                    <div class="fw-bold text-dark">0.25% Agency Fee Credit / Cycle</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-muted small">
+                            <i class="bi bi-shield-check text-success me-1"></i>
+                            <strong>Performance Assurance:</strong> Clock displays authoritative backend mandate timing. Non-performance reviews follow formal Odacity compliance evaluation.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. METRIC SUMMARY CARDS GRID -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-dark">{{ saved_props_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Saved Properties</div>
+                    <a href="{{ url_for('saved_properties') }}" class="stretched-link"></a>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-dark">{{ saved_searches_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Saved Searches</div>
+                    <a href="{{ url_for('saved_searches') }}" class="stretched-link"></a>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-dark">{{ inspections_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Inspections</div>
+                    <a href="{{ url_for('renter_inspections') }}" class="stretched-link"></a>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-dark">{{ offers_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Offers Submitted</div>
+                    <a href="{{ url_for('buyer_offers') }}" class="stretched-link"></a>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number text-primary">{{ transactions_count or 0 }}</div>
+                    <div class="text-muted small fw-semibold">Transactions</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="card odacity-card h-100 bg-white text-center p-3">
+                    <div class="stat-number odacity-text-red">₦{{ "{:,.0f}".format(rewards_total or 0) }}</div>
+                    <div class="text-muted small fw-semibold">Rewards Earned</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. MY FUTURE HOME CARD -->
+        <div class="card odacity-card mb-4 bg-white overflow-hidden">
+            <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-house-heart text-danger me-2"></i>My Future Home</h5>
+                {% if future_home_property %}
+                    <form action="{{ url_for('remove_future_home') }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill">Remove Selection</button>
+                    </form>
+                {% endif %}
+            </div>
+            <div class="card-body p-4">
+                {% if future_home_property %}
+                    <div class="row g-4 align-items-center">
+                        <div class="col-md-4">
+                            {% if future_home_property.media and future_home_property.media|length > 0 %}
+                                <img src="{{ future_home_property.media[0].file_path if (future_home_property.media[0].file_path.startswith('/') or future_home_property.media[0].file_path.startswith('http')) else url_for('static', filename=future_home_property.media[0].file_path) }}" class="img-fluid rounded-3 shadow-sm w-100" style="height: 200px; object-fit: cover;" alt="{{ future_home_property.title }}">
+                            {% else %}
+                                <div class="bg-secondary bg-opacity-10 rounded-3 d-flex align-items-center justify-content-center text-muted fw-bold" style="height: 200px;">
+                                    🏡 {{ future_home_property.title or 'Property Image' }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-8">
+                            <span class="badge bg-danger mb-2">TARGET PROPERTY</span>
+                            <h4 class="fw-bold text-dark mb-1">{{ future_home_property.title or 'Selected Future Home' }}</h4>
+                            <p class="text-muted mb-2"><i class="bi bi-geo-alt me-1"></i>{{ future_home_property.address or future_home_property.locality or 'Lagos, Nigeria' }}</p>
+                            <h4 class="fw-bold odacity-text-red mb-3">₦{{ "{:,.2f}".format(future_home_property.price or 0) }}</h4>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{{ url_for('property_detail', property_id=future_home_property.property_id) }}" class="btn odacity-btn-red rounded-pill px-4">
+                                    View Property Details &rarr;
+                                </a>
+                                <a href="{{ url_for('buyer_offers') }}" class="btn btn-outline-dark rounded-pill px-4">
+                                    Manage Offers
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="fs-1 text-muted mb-2">🏡</div>
+                        <h6 class="fw-bold text-dark mb-1">No Future Home Selected Yet</h6>
+                        <p class="text-muted small mb-3">Bookmark your favorite property from your saved list and mark it as your primary target home.</p>
+                        <a href="{{ url_for('saved_properties') }}" class="btn btn-outline-danger btn-sm rounded-pill px-4 fw-bold">
+                            Choose from Saved Properties
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 6. MY TRANSACTIONS (PERMANENT ECOMMERCE-STYLE HISTORY) -->
+        <div class="card odacity-card mb-4 bg-white">
+            <div class="card-header bg-white border-bottom p-4">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-receipt text-danger me-2"></i>My Transactions & History</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if transactions_list %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Transaction Ref</th>
+                                    <th>Property</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tx in transactions_list %}
+                                    <tr>
+                                        <td><code>{{ tx.transaction_reference or '#TX-' ~ tx.transaction_id }}</code></td>
+                                        <td>Property #{{ tx.property_id }}</td>
+                                        <td><span class="badge bg-light text-dark border">{{ tx.transaction_type or 'Sale' }}</span></td>
+                                        <td class="fw-bold">₦{{ "{:,.2f}".format(tx.total_amount or 0) }}</td>
+                                        <td>
+                                            {% if tx.status == 'Completion' %}
+                                                <span class="badge bg-success">COMPLETED</span>
+                                            {% elif tx.status == 'Initiated' %}
+                                                <span class="badge bg-warning text-dark">INITIATED</span>
+                                            {% else %}
+                                                <span class="badge bg-info text-dark">{{ tx.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ tx.created_at.strftime('%d %b %Y') if tx.created_at else 'N/A' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p class="mb-2">No transaction history recorded yet.</p>
+                        <span class="small text-muted">Your formal purchase transactions and milestone details will appear here as your deal progresses.</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 7. MY PROPERTY JOURNEY TABBED SECTIONS -->
+        <div class="card odacity-card mb-4 bg-white">
+            <div class="card-header bg-white border-bottom-0 p-0">
+                <ul class="nav nav-tabs nav-tabs-odacity px-3 pt-2" id="buyerJourneyTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="saved-props-tab" data-bs-toggle="tab" data-bs-target="#saved-props-pane" type="button" role="tab">
+                            ❤️ Saved Properties ({{ saved_props_count or 0 }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="offers-tab" data-bs-toggle="tab" data-bs-target="#offers-pane" type="button" role="tab">
+                            💰 Purchase Offers ({{ offers_count or 0 }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="inspections-tab" data-bs-toggle="tab" data-bs-target="#inspections-pane" type="button" role="tab">
+                            📅 Inspections ({{ inspections_count or 0 }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="searches-tab" data-bs-toggle="tab" data-bs-target="#searches-pane" type="button" role="tab">
+                            🔍 Property Searches ({{ saved_searches_count or 0 }})
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-4 tab-content" id="buyerJourneyTabsContent">
+
+                <!-- SAVED PROPERTIES PANE -->
+                <div class="tab-pane fade show active" id="saved-props-pane" role="tabpanel">
+                    {% if saved_properties_list %}
+                        <div class="row g-3">
+                            {% for sp in saved_properties_list %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 border rounded-3 bg-light h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <h6 class="fw-bold mb-1">Saved Property #{{ sp.property_id }}</h6>
+                                            <span class="text-muted small">Saved on {{ sp.saved_at.strftime('%d %b %Y') if sp.saved_at else '' }}</span>
+                                        </div>
+                                        <div class="mt-3 d-flex gap-2">
+                                            <a href="{{ url_for('property_detail', property_id=sp.property_id) }}" class="btn btn-sm btn-outline-danger rounded-pill flex-fill">View Details</a>
+                                            <form action="{{ url_for('set_future_home', property_id=sp.property_id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-dark rounded-pill">Set Future Home</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-2">No saved properties in your collection.</p>
+                            <a href="{{ url_for('properties', intent='buy') }}" class="btn btn-outline-danger btn-sm rounded-pill fw-bold">Explore Properties</a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- OFFERS PANE -->
+                <div class="tab-pane fade" id="offers-pane" role="tabpanel">
+                    {% if offers_list %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle small mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Offer ID</th>
+                                        <th>Property ID</th>
+                                        <th>Offer Price</th>
+                                        <th>Status</th>
+                                        <th>Submitted</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for off in offers_list %}
+                                        <tr>
+                                            <td>#OFFER-{{ off.offer_id }}</td>
+                                            <td>Property #{{ off.property_id }}</td>
+                                            <td class="fw-bold">₦{{ "{:,.2f}".format(off.offer_amount or 0) }}</td>
+                                            <td><span class="badge bg-primary">{{ off.status }}</span></td>
+                                            <td>{{ off.submitted_at.strftime('%d %b %Y') if off.submitted_at else 'N/A' }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-2">No purchase offers submitted yet.</p>
+                            <a href="{{ url_for('properties', intent='buy') }}" class="btn btn-outline-danger btn-sm rounded-pill fw-bold">Browse Buy Listings</a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- INSPECTIONS PANE -->
+                <div class="tab-pane fade" id="inspections-pane" role="tabpanel">
+                    {% if inspections_list %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle small mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Inspection ID</th>
+                                        <th>Property ID</th>
+                                        <th>Requested Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for insp in inspections_list %}
+                                        <tr>
+                                            <td>#INSP-{{ insp.inspection_id }}</td>
+                                            <td>Property #{{ insp.property_id }}</td>
+                                            <td>{{ insp.requested_at.strftime('%d %b %Y') if insp.requested_at else 'N/A' }}</td>
+                                            <td>
+                                                {% if insp.status == 'Confirmed' %}
+                                                    <span class="badge bg-success">INSPECTION CONFIRMED ✓</span>
+                                                {% elif insp.status == 'Cancelled' %}
+                                                    <span class="badge bg-danger">CANCELLED</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning text-dark">BOOKED (Awaiting Review)</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-0">No property inspection appointments scheduled.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- SEARCHES PANE -->
+                <div class="tab-pane fade" id="searches-pane" role="tabpanel">
+                    {% if saved_searches_list %}
+                        <div class="list-group">
+                            {% for ss in saved_searches_list %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="fw-bold mb-0">{{ ss.name or 'Saved Search Query' }}</h6>
+                                        <span class="text-muted small">{{ ss.created_at.strftime('%d %b %Y') if ss.created_at else '' }}</span>
+                                    </div>
+                                    <a href="{{ url_for('saved_searches') }}" class="btn btn-sm btn-outline-secondary rounded-pill">Manage Search</a>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <p class="mb-0">No saved search criteria recorded.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 8. EARN YOUR NEXT HOME (REWARDS & REFERRALS) -->
+        <div class="card odacity-card mb-4 bg-white">
+            <div class="card-header bg-dark text-white p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                <div>
+                    <h5 class="fw-bold mb-1 text-white"><i class="bi bi-qr-code-scan text-danger me-2"></i>My Referral QR Code & Rewards</h5>
+                    <p class="text-white-50 small mb-0">Share your unique QR code or link to invite buyers and renters to Odacity and earn 5% qualifying rewards.</p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill fw-bold">
+                        🪙 GOLD POINTS: {{ gold_account.current_points if gold_account else 0 }}
+                    </span>
+                    <span class="badge bg-danger fs-6 px-3 py-2 rounded-pill fw-bold">
+                        TOTAL EARNED: ₦{{ "{:,.2f}".format(rewards_total or 0) }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <!-- REFERRAL METRICS SUMMARY CARDS -->
+                <div class="row g-3 text-center mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light border rounded-3">
+                            <span class="text-muted small fw-semibold d-block">Direct Referrals</span>
+                            <span class="fs-4 fw-bold text-dark">{{ direct_referrals_count or 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light border rounded-3">
+                            <span class="text-muted small fw-semibold d-block">Qualified Referrals</span>
+                            <span class="fs-4 fw-bold text-success">{{ qualified_referrals_count or 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light border rounded-3">
+                            <span class="text-muted small fw-semibold d-block">Pending Referrals</span>
+                            <span class="fs-4 fw-bold text-warning">{{ pending_referrals_count or 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light border rounded-3">
+                            <span class="text-muted small fw-semibold d-block">Reward Status</span>
+                            <span class="fs-6 fw-bold text-primary">₦{{ "{:,.2f}".format(rewards_eligible or 0) }} Eligible</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QR CODE & REFERRAL LINK SHARING BLOCK -->
+                <div class="row g-4 align-items-center mb-4 p-3 bg-light rounded-3 border mx-0">
+                    <div class="col-md-3 text-center">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ (referral_link or '')|urlencode }}" alt="My Referral QR Code" class="img-thumbnail rounded-3 shadow-sm" style="width: 140px; height: 140px;" onerror="this.onerror=null; this.src='https://chart.googleapis.com/chart?cht=qr&chs=180x180&chl={{ (referral_link or '')|urlencode }}';">
+                        <span class="d-block text-muted small mt-1 fw-bold"><i class="bi bi-qr-code me-1"></i> Scan to Register</span>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-bold small mb-1"><i class="bi bi-link-45deg me-1"></i>Your Unique Referral Link</label>
+                            <div class="input-group">
+                                <input type="text" id="buyerRefLinkInput" class="form-control form-control-sm fw-bold bg-white" value="{{ referral_link }}" readonly>
+                                <button class="btn btn-primary btn-sm fw-bold" onclick="navigator.clipboard.writeText(document.getElementById('buyerRefLinkInput').value); alert('Referral link copied to clipboard!');">
+                                    <i class="bi bi-clipboard me-1"></i> Copy Link
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="form-label text-dark fw-bold small mb-1"><i class="bi bi-tag me-1"></i>Your Personal Referral Code</label>
+                            <div class="input-group" style="max-width: 340px;">
+                                <input type="text" id="buyerRefCodeInput" class="form-control form-control-sm fw-bold bg-white" value="{{ referral_code }}" readonly>
+                                <button class="btn btn-outline-dark btn-sm fw-bold" onclick="navigator.clipboard.writeText(document.getElementById('buyerRefCodeInput').value); alert('Referral code copied!');">
+                                    <i class="bi bi-clipboard me-1"></i> Copy Code
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- REFERRAL HISTORY TABLE -->
+                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-clock-history me-1"></i>Referral History & Rewards Status</h6>
+                {% if referrals_list %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Referral ID</th>
+                                    <th>Referred Customer</th>
+                                    <th>Code Used</th>
+                                    <th>Status</th>
+                                    <th>Date Joined</th>
+                                    <th>Reward Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ref in referrals_list %}
+                                    <tr>
+                                        <td>#REF-{{ ref.referral_id }}</td>
+                                        <td class="fw-bold">{{ ref.referred.user.full_name if ref.referred and ref.referred.user else ('Customer #' ~ ref.referred_customer_id) }}</td>
+                                        <td><code>{{ ref.referral_code_used or 'STANDARD' }}</code></td>
+                                        <td>
+                                            {% if ref.status in ['Completed', 'Qualified'] %}
+                                                <span class="badge bg-success px-2 py-1">✓ QUALIFIED</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark px-2 py-1">PENDING QUALIFICATION</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ ref.created_at.strftime('%d %b %Y') if ref.created_at else 'N/A' }}</td>
+                                        <td class="fw-bold text-success">
+                                            {% set ref_rew = ref.rewards | first %}
+                                            {% if ref_rew and ref_rew.reward_amount %}
+                                                ₦{{ "{:,.2f}".format(ref_rew.reward_amount) }}
+                                            {% else %}
+                                                ₦0.00
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 bg-light rounded-3 p-4">
+                        <i class="bi bi-people fs-2 text-muted mb-2 d-block"></i>
+                        <h6 class="fw-bold mb-1">No Referrals Yet</h6>
+                        <p class="text-muted small mb-0">Share your QR code or referral link above to invite friends, family, and colleagues to Odacity.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
