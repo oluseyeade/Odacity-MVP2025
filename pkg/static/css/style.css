@@ -201,3 +201,88 @@
     gap: 0.4rem;
 }
 
+/* ==========================================
+   ODACITY ABOUT US CORPORATE PROFILE STYLES
+   ========================================== */
+
+.about-hero-section {
+    background-color: #0F172A;
+    color: #FFFFFF;
+    padding: 4rem 0 3.5rem 0;
+    border-bottom: 3px solid #C11B24;
+}
+
+.about-section-tag {
+    display: inline-block;
+    color: #C11B24;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+}
+
+.about-card-panel {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    height: 100%;
+}
+
+.about-highlight-box {
+    background: #0F172A;
+    color: #FFFFFF;
+    border-left: 4px solid #C11B24;
+    border-radius: 8px;
+    padding: 1.75rem 2rem;
+}
+
+.about-guarantee-box {
+    background: #FEF2F2;
+    border: 1px solid #FCA5A5;
+    border-left: 5px solid #C11B24;
+    border-radius: 10px;
+    padding: 2rem;
+}
+
+.timeline-vertical {
+    position: relative;
+    padding-left: 2.25rem;
+    border-left: 2px solid #E5E7EB;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-badge {
+    position: absolute;
+    left: -2.9rem;
+    top: 0.1rem;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: #C11B24;
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(193, 27, 36, 0.3);
+}
+
+.timeline-content {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+}
+

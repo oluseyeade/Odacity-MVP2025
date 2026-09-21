@@ -1,6 +1,6 @@
 /**
  * ODACITY — Dynamic Intent-Driven Hero Engine
- * Supports 4 Intent Modes: BUY (default), RENT, LISTING, INSTITUTIONAL
+ * Supports 5 Intent Modes: HOME (default cinematic intro), BUY, RENT, LISTING, INSTITUTIONAL
  * Manages background image cross-fading, panel transitions, and sessionStorage persistence.
  */
 
@@ -8,7 +8,7 @@
     'use strict';
 
     function initIntentEngine() {
-        const intents = ['buy', 'rent', 'list', 'institutional'];
+        const intents = ['home', 'buy', 'rent', 'list', 'institutional'];
 
         // Elements lookup maps
         const bgs = {};
@@ -21,13 +21,13 @@
             tabs[intent] = document.getElementById('btn-intent-' + intent);
         });
 
-        // If any core panel is missing, do nothing (not homepage)
+        // If core panels are missing, do nothing (not homepage)
         if (!panels.buy || !panels.rent || !panels.list || !panels.institutional) {
             return;
         }
 
         window.setHomepageIntent = function (targetIntent) {
-            const normalized = intents.includes(targetIntent) ? targetIntent : 'buy';
+            const normalized = intents.includes(targetIntent) ? targetIntent : 'home';
 
             intents.forEach(function (intent) {
                 const isActive = (intent === normalized);
@@ -72,10 +72,10 @@
             }
         });
 
-        // Restore saved intent from sessionStorage or URL query params (default: 'buy')
+        // Restore saved intent from sessionStorage or URL query params (default: 'home')
         const urlParams = new URLSearchParams(window.location.search);
         const urlIntent = urlParams.get('intent');
-        const savedIntent = urlIntent || sessionStorage.getItem('odacity_homepage_intent') || 'buy';
+        const savedIntent = urlIntent || sessionStorage.getItem('odacity_homepage_intent') || 'home';
 
         window.setHomepageIntent(savedIntent);
     }

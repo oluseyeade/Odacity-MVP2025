@@ -3,6 +3,7 @@
 {% block title %}ODACITY — Direct Asset Briefs & Verified Real Estate Platform{% endblock %}
 
 {% block customcss %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cinematic-hero.css') }}">
 <style>
     /* HERO SECTION CONTAINER */
     .hero-container {
@@ -140,31 +141,175 @@
 {% endblock %}
 
 {% block main_content %}
-<!-- FOUR-INTENT HERO SECTION -->
-<section class="hero-container">
-    <!-- BACKGROUND IMAGES (FOR CROSS-FADING DRIVEN BY INTENT-SWITCHER.JS) -->
-    <div id="hero-bg-buy" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/herooffice.jpg') }}'); opacity: 1;"></div>
-    <div id="hero-bg-rent" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/heropage.png.jpg') }}'); opacity: 0;"></div>
-    <div id="hero-bg-list" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/main.png.jpg') }}'); opacity: 0;"></div>
-    <div id="hero-bg-institutional" class="hero-bg" style="background-image: url('{{ url_for('static', filename='img/ikoyi.png.jpg') }}'); opacity: 0;"></div>
+<!-- ONE UNIFIED HOMEPAGE HERO CONTAINER -->
+<section id="homepage-unified-hero" class="hero-container">
+    <!-- BACKGROUND IMAGES (DRIVEN BY INTENT-SWITCHER.JS) -->
+    <div id="hero-bg-home" class="hero-bg" style="background-image: url('{{ url_for('static', filename='images/homepage.png') }}'); opacity: 1;"></div>
+    <div id="hero-bg-buy" class="hero-bg" style="background-image: url('{{ url_for('static', filename='images/main.png') }}'); opacity: 0;"></div>
+    <div id="hero-bg-rent" class="hero-bg" style="background-image: url('{{ url_for('static', filename='images/rent.jpg') }}'); opacity: 0;"></div>
+    <div id="hero-bg-list" class="hero-bg" style="background-image: url('{{ url_for('static', filename='images/list.jpg') }}'); opacity: 0;"></div>
+    <div id="hero-bg-institutional" class="hero-bg" style="background-image: url('{{ url_for('static', filename='images/institutional.jpg') }}'); opacity: 0;"></div>
 
     <div class="container hero-content-wrapper text-center">
-        <!-- INTENT SELECTOR TABS -->
+        <!-- PRIMARY UNIFIED INTENT SELECTOR TABS -->
         <div class="mb-4">
             <div class="intent-tabs-container shadow-sm">
-                <button type="button" id="btn-intent-buy" class="intent-tab-btn active" aria-selected="true">BUY</button>
+                <button type="button" id="btn-intent-home" class="intent-tab-btn active" aria-selected="true">HOME</button>
+                <button type="button" id="btn-intent-buy" class="intent-tab-btn" aria-selected="false">BUY</button>
                 <button type="button" id="btn-intent-rent" class="intent-tab-btn" aria-selected="false">RENT</button>
                 <button type="button" id="btn-intent-list" class="intent-tab-btn" aria-selected="false">LISTING</button>
-                <button type="button" id="btn-intent-institutional" class="intent-tab-btn" aria-selected="false">INSTITUTIONAL</button>
+                <button type="button" id="btn-intent-institutional" class="intent-tab-btn" aria-selected="false">PARTNERS</button>
             </div>
         </div>
 
-        <!-- HERO PANELS CONTAINER -->
+        <!-- HERO PANELS CONTAINER (SINGLE VIEWPORT FOR ALL INTENTS) -->
         <div class="row justify-content-center">
             <div class="col-lg-10 col-xl-9">
 
-                <!-- 1. BUY HERO PANEL (DEFAULT ACTIVE) -->
-                <div id="hero-panel-buy" class="animate__animated animate__fadeIn">
+                <!-- 0. HOME HERO PANEL (CINEMATIC 5-FRAME STORY) -->
+                <div id="hero-panel-home" class="animate__animated animate__fadeIn">
+                    <div id="cinematic-home-hero" class="cinematic-hero-section-embedded">
+                        <!-- Message Frames Stack (Only 1 frame active at a time) -->
+                        <div class="cinematic-frame-stack">
+
+                            <!-- FRAME 01 — DIRECT ACCESS -->
+                            <div class="cinematic-frame active" data-frame="0">
+                                <div class="cinematic-kicker">
+                                    <span>✨ DIRECT ACCESS</span>
+                                </div>
+                                <h1 class="cinematic-title">
+                                    VERIFIED PROPERTIES.<br>
+                                    <span class="highlight-red">DIRECT ASSET BRIEFS.</span>
+                                </h1>
+                                <p class="cinematic-desc">
+                                    Access property opportunities through a more direct and transparent transaction experience.
+                                </p>
+                                <div class="d-flex align-items-center justify-content-center gap-3">
+                                    <a href="#" data-intent-trigger="buy" class="cinematic-cta-btn">
+                                        <span>Find Property</span>
+                                        <i class="bi bi-arrow-right-circle-fill"></i>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- FRAME 02 — SIMPLICITY -->
+                            <div class="cinematic-frame" data-frame="1">
+                                <div class="cinematic-kicker">
+                                    <span>⚡ SIMPLICITY</span>
+                                </div>
+                                <h1 class="cinematic-title">
+                                    DIRECT. COST-EFFICIENT.<br>
+                                    <span class="highlight-red">PROFESSIONAL.</span>
+                                </h1>
+                                <p class="cinematic-desc">
+                                    Buy, rent, lease or sell with less transaction complexity.
+                                </p>
+                                <div class="d-flex align-items-center justify-content-center gap-3">
+                                    <a href="#" data-intent-trigger="buy" class="cinematic-cta-btn">
+                                        <span>Explore Property</span>
+                                        <i class="bi bi-compass"></i>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- FRAME 03 — TRUST -->
+                            <div class="cinematic-frame" data-frame="2">
+                                <div class="cinematic-kicker">
+                                    <span>🛡️ TRUST & DUE DILIGENCE</span>
+                                </div>
+                                <h1 class="cinematic-title">
+                                    VERIFIED ASSETS.<br>
+                                    <span class="highlight-red">PROTECTED TRANSACTIONS.</span>
+                                </h1>
+                                <p class="cinematic-desc">
+                                    Due diligence, inspection, verification and professional transaction management.
+                                </p>
+                                <div class="d-flex align-items-center justify-content-center gap-3">
+                                    <a href="#" data-intent-trigger="buy" class="cinematic-cta-btn">
+                                        <span>Find Property</span>
+                                        <i class="bi bi-shield-check"></i>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- FRAME 04 — PERFORMANCE -->
+                            <div class="cinematic-frame" data-frame="3">
+                                <div class="cinematic-kicker">
+                                    <span>🏆 PERFORMANCE</span>
+                                </div>
+                                <h1 class="cinematic-title">
+                                    MORE THAN PROPERTY.<br>
+                                    <span class="highlight-red">PERFORMANCE ASSURANCE.</span>
+                                </h1>
+                                <p class="cinematic-desc">
+                                    Eligible transactions supported by performance-guarantee instruments.
+                                </p>
+                                <div class="d-flex align-items-center justify-content-center gap-3">
+                                    <a href="{{ url_for('about') }}" class="cinematic-cta-btn">
+                                        <span>Learn More</span>
+                                        <i class="bi bi-arrow-right-circle-fill"></i>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- FRAME 05 — REWARDS -->
+                            <div class="cinematic-frame" data-frame="4">
+                                <div class="cinematic-kicker">
+                                    <span>🎁 REFERRAL REWARDS</span>
+                                </div>
+                                <h1 class="cinematic-title mb-2">
+                                    <span class="highlight-red">EARN YOUR NEXT RENT.</span>
+                                </h1>
+                                <div class="cinematic-subtitle">
+                                    A Referral Rewards System Designed to Keep You Earning.
+                                </div>
+                                <div class="cinematic-journey my-3">
+                                    <span class="cinematic-journey-step">REGISTER</span>
+                                    <i class="bi bi-chevron-right cinematic-journey-arrow"></i>
+                                    <span class="cinematic-journey-step">TRANSACT</span>
+                                    <i class="bi bi-chevron-right cinematic-journey-arrow"></i>
+                                    <span class="cinematic-journey-step highlight">EARN REWARDS</span>
+                                    <i class="bi bi-chevron-right cinematic-journey-arrow"></i>
+                                    <span class="cinematic-journey-step">REFER OTHERS</span>
+                                    <i class="bi bi-chevron-right cinematic-journey-arrow"></i>
+                                    <span class="cinematic-journey-step highlight">EARN AGAIN</span>
+                                </div>
+                                <p class="cinematic-desc mb-4">
+                                    Turn your property transactions and referrals into rewards that can help you earn towards your next rent.
+                                </p>
+                                <div class="d-flex align-items-center justify-content-center gap-3">
+                                    <a href="{{ url_for('register') }}" class="cinematic-cta-btn">
+                                        <span>Get Started</span>
+                                        <i class="bi bi-person-plus-fill"></i>
+                                    </a>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Progress Indicator Bar (01 ● 02 ○ 03 ○ 04 ○ 05 ○) -->
+                        <div class="cinematic-progress-bar" role="tablist" aria-label="Hero Frame Progress">
+                            <button type="button" class="cinematic-progress-dot active" aria-selected="true" aria-label="Frame 1: Direct Access">
+                                <span>01</span> <span class="dot-symbol">●</span>
+                            </button>
+                            <button type="button" class="cinematic-progress-dot" aria-selected="false" aria-label="Frame 2: Simplicity">
+                                <span>02</span> <span class="dot-symbol">○</span>
+                            </button>
+                            <button type="button" class="cinematic-progress-dot" aria-selected="false" aria-label="Frame 3: Trust">
+                                <span>03</span> <span class="dot-symbol">○</span>
+                            </button>
+                            <button type="button" class="cinematic-progress-dot" aria-selected="false" aria-label="Frame 4: Performance">
+                                <span>04</span> <span class="dot-symbol">○</span>
+                            </button>
+                            <button type="button" class="cinematic-progress-dot" aria-selected="false" aria-label="Frame 5: Rewards">
+                                <span>05</span> <span class="dot-symbol">○</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. BUY HERO PANEL -->
+                <div id="hero-panel-buy" class="d-none animate__animated animate__fadeIn">
                     <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
                         🛡️ DIRECT ASSET BRIEFS & OUTRIGHT PURCHASE
                     </span>
@@ -305,7 +450,7 @@
                 <!-- 4. INSTITUTIONAL HERO PANEL -->
                 <div id="hero-panel-institutional" class="d-none animate__animated animate__fadeIn">
                     <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
-                        🏢 INSTITUTIONAL ASSET PLACEMENT
+                        🏢 Global Partners
                     </span>
                     <h1 class="display-5 fw-extrabold text-white mb-3">
                         Structured Real Estate Portfolios & Placement
@@ -317,56 +462,12 @@
                         <a href="{{ url_for('contact') }}" class="btn btn-odacity-red btn-md rounded-pill px-4 py-2 fw-bold shadow-sm">
                             Contact Institutional Desk &rarr;
                         </a>
-                        <a href="{{ url_for('about') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-2 fw-bold">
+                        <a href="{{ url_for('about') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-3 fw-bold">
                             Read Architecture Overview
                         </a>
                     </div>
                 </div>
 
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- TRUST & PLATFORM CAPABILITIES SECTION -->
-<section class="py-5 bg-light border-bottom">
-    <div class="container py-3">
-        <div class="text-center mb-5">
-            <span class="text-odacity-red fw-bold text-uppercase small" style="letter-spacing: 1.5px;">ENTERPRISE INFRASTRUCTURE</span>
-            <h2 class="fw-bold text-dark mt-1 mb-2">The Audacity of Performance</h2>
-            <p class="text-muted lead mx-auto" style="max-width: 680px;">
-                Odacity brings greater transparency, structure, and assurance to real estate transactions in Nigeria.
-            </p>
-        </div>
-
-        <div class="row g-4">
-            <div class="col-md-6 col-lg-3">
-                <div class="card odacity-feature-card h-100 p-4">
-                    <div class="feature-icon-wrapper">📄</div>
-                    <h5 class="fw-bold text-dark mb-2">Verified Title Documents</h5>
-                    <p class="text-muted small mb-0">Every property title document (C of O, Deed of Assignment, Survey) is verified by legal verifiers and locked immutably.</p>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="card odacity-feature-card h-100 p-4">
-                    <div class="feature-icon-wrapper">🛡️</div>
-                    <h5 class="fw-bold text-dark mb-2">Performance Guarantee</h5>
-                    <p class="text-muted small mb-0">Transaction integrity and performance guarantee protection backed by bank guarantee reference numbers.</p>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="card odacity-feature-card h-100 p-4">
-                    <div class="feature-icon-wrapper">🤝</div>
-                    <h5 class="fw-bold text-dark mb-2">Direct Asset Briefs (DAB)</h5>
-                    <p class="text-muted small mb-0">Transact directly with verified property owners and asset brief holders, eliminating middleman price inflation.</p>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="card odacity-feature-card h-100 p-4">
-                    <div class="feature-icon-wrapper">📊</div>
-                    <h5 class="fw-bold text-dark mb-2">Controlled Transactions</h5>
-                    <p class="text-muted small mb-0">Real-time status tracking for inspections, formal purchase offers, rental applications, and legal reviews.</p>
-                </div>
             </div>
         </div>
     </div>
@@ -447,6 +548,50 @@
     </div>
 </section>
 
+<!-- TRUST & PLATFORM CAPABILITIES SECTION -->
+<section class="py-5 bg-light border-bottom">
+    <div class="container py-3">
+        <div class="text-center mb-5">
+            <span class="text-odacity-red fw-bold text-uppercase small" style="letter-spacing: 1.5px;">ENTERPRISE INFRASTRUCTURE</span>
+            <h2 class="fw-bold text-dark mt-1 mb-2">The Audacity of Performance</h2>
+            <p class="text-muted lead mx-auto" style="max-width: 680px;">
+                Odacity brings greater transparency, structure, and assurance to real estate transactions in Nigeria.
+            </p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">🤝</div>
+                    <h5 class="fw-bold text-dark mb-2">Direct Asset Briefs (DAB)</h5>
+                    <p class="text-muted small mb-0">Transact directly with verified property owners and asset brief holders, eliminating middleman price inflation.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">📄</div>
+                    <h5 class="fw-bold text-dark mb-2">Verified Title Documents</h5>
+                    <p class="text-muted small mb-0">Every property title document (C of O, Deed of Assignment, Survey) is verified by legal verifiers and locked immutably.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">🛡️</div>
+                    <h5 class="fw-bold text-dark mb-2">Performance Guarantee</h5>
+                    <p class="text-muted small mb-0">Transaction integrity and performance guarantee protection backed by bank guarantee reference numbers.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card odacity-feature-card h-100 p-4">
+                    <div class="feature-icon-wrapper">📊</div>
+                    <h5 class="fw-bold text-dark mb-2">Controlled Transactions</h5>
+                    <p class="text-muted small mb-0">Real-time status tracking for inspections, formal purchase offers, rental applications, and legal reviews.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- CALL TO ACTION BANNER -->
 <section class="py-5 bg-odacity-dark text-white position-relative overflow-hidden">
     <div class="container py-4 text-center position-relative" style="z-index: 2;">
@@ -467,4 +612,5 @@
         </div>
     </div>
 </section>
+<script src="{{ url_for('static', filename='js/cinematic-hero.js') }}"></script>
 {% endblock %}

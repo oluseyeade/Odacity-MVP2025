@@ -1,19 +1,455 @@
 {% extends "user/layout.html" %}
-{% block title %}About Odacity — Abiom McRich Ltd{% endblock %}
+{% block title %}About Odacity — Corporate Digital Profile{% endblock %}
+
 {% block main_content %}
-<div class="bg-dark text-white py-5 text-center">
-    <div class="container py-3">
-        <h1 class="display-5 fw-bold mb-3">About Odacity</h1>
-        <p class="lead text-light opacity-75">Operating by Abiom McRich Ltd, Onikan, Lagos.</p>
-    </div>
-</div>
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8 text-center">
-            <h3 class="fw-bold mb-4">Performance Guaranteed</h3>
-            <p class="text-muted">**Odacity is a technology-driven real estate infrastructure designed to simplify and bring greater transparency, structure, and assurance to home acquisition in Nigeria.**
-</p>
+<!-- HERO & OPENING SECTION -->
+<section class="about-hero-section">
+    <div class="container text-center text-md-start">
+        <div class="row align-items-center">
+            <div class="col-lg-10 col-xl-9 mx-auto text-center">
+                <span class="about-section-tag">Corporate Profile</span>
+                <h1 class="display-4 fw-extrabold text-white mb-3">ABOUT ODACITY</h1>
+                <p class="fs-5 text-odacity-red fw-semibold mb-3">Operating by Abiom McRich Ltd, Onikan, Lagos.</p>
+                <p class="lead text-light opacity-90 mx-auto" style="max-width: 820px; font-size: 1.15rem; line-height: 1.7;">
+                    Odacity is a technology-driven real estate infrastructure designed to simplify and bring greater transparency, structure, and assurance to home acquisition in Nigeria.
+                </p>
+            </div>
         </div>
     </div>
+</section>
+
+<!-- MAIN CONTAINER -->
+<div class="container py-5">
+
+    <!-- COMPANY OVERVIEW & PORTFOLIO -->
+    <section class="mb-5">
+        <div class="row g-4 align-items-stretch">
+            <div class="col-lg-6">
+                <div class="about-card-panel">
+                    <h3 class="fw-bold text-dark mb-3"><i class="bi bi-building text-odacity-red me-2"></i>Asset Portfolio</h3>
+                    <ul class="list-unstyled mb-4">
+                        <li class="py-2 border-bottom"><i class="bi bi-check-circle-fill text-odacity-red me-2"></i>Luxury residential estates</li>
+                        <li class="py-2 border-bottom"><i class="bi bi-check-circle-fill text-odacity-red me-2"></i>Commercial properties</li>
+                        <li class="py-2 border-bottom"><i class="bi bi-check-circle-fill text-odacity-red me-2"></i>Industrial assets</li>
+                        <li class="py-2"><i class="bi bi-check-circle-fill text-odacity-red me-2"></i>Farmland and strategic land holdings</li>
+                    </ul>
+                    <p class="text-muted fw-semibold mb-0">
+                        We manage the full asset lifecycle — valuation, due diligence, inspections, transaction management, and post-sale services.
+                    </p>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="about-card-panel bg-light border-0">
+                    <h3 class="fw-bold text-dark mb-3"><i class="bi bi-shield-check text-odacity-red me-2"></i>EVERY TRANSACTION IS:</h3>
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-white rounded-3 border shadow-sm h-100">
+                                <h6 class="fw-bold mb-1 text-dark"><i class="bi bi-lock-fill text-odacity-red me-1"></i> Discreet</h6>
+                                <p class="small text-muted mb-0">Confidential asset disposition and buyer anonymity.</p>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-white rounded-3 border shadow-sm h-100">
+                                <h6 class="fw-bold mb-1 text-dark"><i class="bi bi-patch-check-fill text-odacity-red me-1"></i> Verified</h6>
+                                <p class="small text-muted mb-0">100% legal title, deed, and physical site verification.</p>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-white rounded-3 border shadow-sm h-100">
+                                <h6 class="fw-bold mb-1 text-dark"><i class="bi bi-file-earmark-text-fill text-odacity-red me-1"></i> Legally protected</h6>
+                                <p class="small text-muted mb-0">Contractual agreement,backed with our assurance guarantee.</p>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-white rounded-3 border shadow-sm h-100">
+                                <h6 class="fw-bold mb-1 text-dark"><i class="bi bi-bank2 text-odacity-red me-1"></i> Financial institution backed</h6>
+                                <p class="small text-muted mb-0">Performance guarantee supported by institutional partner backstops.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISUALLY EMPHASISED STATEMENT -->
+        <div class="mt-4">
+            <div class="about-highlight-box text-center text-md-start">
+                <p class="fs-5 fw-bold mb-0 text-white">
+                    <i class="bi bi-quote text-odacity-red fs-3 align-middle me-2"></i>At the city of hope; ODACITY, we don’t just sell assets (properties) — we sell assurance and guarantee performance
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <hr class="my-5 border-secondary opacity-25">
+
+    <!-- 01 — OUR PURPOSE -->
+    <section class="mb-5">
+        <span class="about-section-tag">01 — OUR PURPOSE</span>
+        <h2 class="fw-extrabold text-dark mb-4">To create a trusted (backed with prove) environment where:</h2>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="about-card-panel border-start border-4 border-danger">
+                    <h4 class="fw-bold text-dark mb-3"><i class="bi bi-building-up text-odacity-red me-2"></i>OWNERS</h4>
+                    <p class="text-secondary mb-0" style="line-height: 1.7;">
+                        Confidentially hand us their assets to sell ,lease or manage.
+                        
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="about-card-panel border-start border-4 border-dark">
+                    <h4 class="fw-bold text-dark mb-3"><i class="bi bi-person-check-fill text-odacity-red me-2"></i>BUYERS</h4>
+                    <p class="text-secondary mb-0" style="line-height: 1.7;">
+                        To provide buyers, investors, and corporate tenants with 100% verified asset briefs, direct owner access, guaranteed titles, transparent pricing, and financial institution-backed performance guaranteed.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-light rounded-3 border text-center">
+            <p class="fs-5 fw-bold text-dark mb-0">
+                We act as the single, accountable intermediary — handling everything professionally from inspection to closing.
+            </p>
+        </div>
+    </section>
+
+    <hr class="my-5 border-secondary opacity-25">
+
+    <!-- 02 — WHO WE SERVE -->
+    <section class="mb-5">
+        <span class="about-section-tag">02 — WHO WE SERVE</span>
+        <h2 class="fw-extrabold text-dark mb-4">Corporate and private individuals </h2>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="about-card-panel">
+                    <h3 class="fw-bold text-dark mb-3 pb-2 border-bottom">SELLERS / PROPERTY OWNERS</h3>
+                    <ul class="list-unstyled mb-0">
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>High-net-worth property owners seeking discreet asset sales</span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>Real estate developers releasing new residential & commercial phases</span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>Institutional asset managers liquidating corporate real estate holdings</span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>sign directly with property owners </span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>Lease(rent)profitability </span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>Transparent pricing (Lowest in the market)</span></li>
+
+                    </ul>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="about-card-panel">
+                    <h3 class="fw-bold text-dark mb-3 pb-2 border-bottom">BUYERS / INVESTOR/ TENANTS</h3>
+                    <ul class="list-unstyled mb-0">
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>High-net-worth investors acquiring prime real estate assets</span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>Corporate bodies & institutions securing commercial headquarters or staff housing</span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>Minimal transaction stress</span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>verified and genuine properties</span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>who wants peace of mind </span></li>
+                        <li class="py-2.5 border-bottom d-flex align-items-start"><i class="bi bi-check2-square text-odacity-red me-2 fs-5"></i><span>Transparent pricing (Lowest in the market)</span></li>
+
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="my-5 border-secondary opacity-25">
+
+    <!-- 03 — OUR VALUE PROPOSITION -->
+    <section class="mb-5">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+            <div>
+                <span class="about-section-tag">03 — OUR VALUE PROPOSITION</span>
+                <h2 class="fw-extrabold text-dark mb-0">Core Advantages</h2>
+            </div>
+            <div class="mt-2 mt-md-0">
+                <span class="badge bg-dark text-white px-3 py-2 rounded-pill fw-semibold fs-6">● Exclusive and unique to ODACITY</span>
+            </div>
+        </div>
+
+        <h4 class="fw-bold text-dark mb-3">BUYERS / INVESTORS / TENANTS</h4>
+        <div class="row g-4 mb-5">
+            <div class="col-md-6 col-lg-4">
+                <div class="about-card-panel">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">01</span>
+                    <h5 class="fw-bold text-dark mb-2">We Sell Assurance</h5>
+                    <p class="text-muted small mb-0">We don't just list properties; we verify ownership, title authenticity, strict legal status before any brief is published.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="about-card-panel">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">02</span>
+                    <h5 class="fw-bold text-dark mb-2">Direct Brief — No multiple Agent Layer</h5>
+                    <p class="text-muted small mb-0">Direct owner pricing with zero unauthorized middleman markups or multi-tier agent clutter,no multiple mandates, no confusion .</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="about-card-panel">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">03</span>
+                    <h5 class="fw-bold text-dark mb-2">Full Discretion</h5>
+                    <p class="text-muted small mb-0">Private, confidential transaction management protecting buyer identity, transaction value, and transaction details.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-6">
+                <div class="about-card-panel">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">04</span>
+                    <h5 class="fw-bold text-dark mb-2">Verified Deals for Buyers</h5>
+                    <p class="text-muted small mb-0">100% verified legal titles, physical site inspections, and title guarantee indemnity.</p>
+                </div>
+            </div>
+            <div class="col-md-12 col-lg-6">
+                <div class="about-card-panel bg-light">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">05</span>
+                    <h5 class="fw-bold text-dark mb-2">Result: peace of mind.</h5>
+                    <p class="text-muted small mb-0">Total transaction protection, guaranteed performance, and post-sale closing support.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CORPORATE DIVIDER HEADING FOR SELLERS -->
+        <div class="p-3 bg-dark text-white rounded-3 mb-4 text-center text-md-start">
+            <h3 class="fw-bold mb-0">VALUE FOR SELLERS/ PROPERTY OWNER</h3>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="about-card-panel">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">01</span>
+                    <h5 class="fw-bold text-dark mb-3">End to End service</h5>
+                    <ul class="list-unstyled text-muted small mb-0">
+                        <li class="py-1"><i class="bi bi-dot text-odacity-red"></i>Privacy first marketingli>
+                        <li class="py-1"><i class="bi bi-dot text-odacity-red"></i>Professional valuation</li>
+                        <li class="py-1"><i class="bi bi-dot text-odacity-red"></i>Guaranteed sales perfomance(eligible listing)</li>
+                        <li class="py-1"><i class="bi bi-dot text-odacity-red"></i>Full legal handling</li>
+                        <li class="py-1"><i class="bi bi-dot text-odacity-red"></i>KYC validation</li>
+                        <li class="py-1"><i class="bi bi-dot text-odacity-red"></i>Support through closing</li>
+
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <!-- STRONGER VISUAL EMPHASIS FOR SALES GUARANTEE -->
+                <div class="about-guarantee-box h-100">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">02</span>
+                    <h5 class="fw-bold text-dark mb-2"><i class="bi bi-shield-fill-check text-odacity-red me-2"></i>Sales Guarantee </h5>
+                    <p class="text-dark small fw-medium mb-0" style="line-height: 1.6;">
+                        If an approved, verified Direct Asset Brief (DAB) meets all valuation, legal, and title criteria, Odacity guarantees asset transaction execution within 6 months. Non perfomance penalty is backed with financial instruments.
+                    </p>
+                    <p>Each with three(3)months of non- perfomance penalty  :We pay you for every three(3)months of non perfomance</p>
+                    <p>Guarantee backed with fianacial instrument</p>
+                    <p>Guanratee redeemed by cash (terms and condition)</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="about-card-panel">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">03</span>
+                    <h5 class="fw-bold text-dark mb-2">Buyers Assurance | we will find you a property within 3 months </h5>
+                    <p class="text-muted small mb-0">we dont just list properties we take reposibilies for the outcome</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="about-card-panel">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">04</span>
+                    <h5 class="fw-bold text-dark mb-2">Sales Gain & Documentation Protection</h5>
+                    <p class="text-muted small mb-0">Protected capital gains, secure escrow closing, transparent tax & documentation processing, and legal title indemnity.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="about-card-panel bg-light">
+                    <span class="fs-4 fw-extrabold text-odacity-red d-block mb-2">05</span>
+                    <h5 class="fw-bold text-dark mb-2">We don’t just list properties — we take responsibility for outcomes.</h5>
+                    <p class="text-muted small mb-0">Full accountability from listing onboarding to final deed execution and payment settlement.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="my-5 border-secondary opacity-25">
+
+    <!-- 04 — KYC POLICY AND NEXT STEPS -->
+    <section class="mb-5">
+        <span class="about-section-tag">04 — KYC POLICY AND NEXT STEPS</span>
+        <h2 class="fw-extrabold text-dark mb-3">Compliance & Due Diligence Protocol</h2>
+        <p class="lead text-muted mb-4 fs-6">
+            Mandatory identity verification, proof of ownership, title search, and anti-money laundering (AML) compliance checks required for all participating sellers and buyers.
+        </p>
+
+        <h5 class="fw-bold text-dark mb-3">This protects:</h5>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="about-card-panel border-start border-4 border-primary">
+                    <h5 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-check text-primary me-2"></i>Ownership authenticity</h5>
+                    <p class="text-muted small mb-0">Direct deed verification, C of O / Governor's Consent validation, physical site isnpection, and boundary verification.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="about-card-panel border-start border-4 border-success">
+                    <h5 class="fw-bold text-dark mb-2"><i class="bi bi-shield-lock text-success me-2"></i>Buyer confidence</h5>
+                    <p class="text-muted small mb-0">Proof of funds verification, verified buyer identity, transparent transaction capability.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="about-card-panel border-start border-4 border-danger">
+                    <h5 class="fw-bold text-dark mb-2"><i class="bi bi-bank text-danger me-2"></i>Bank and legal compliance</h5>
+                    <p class="text-muted small mb-0">Institutional banking partner integration, escrow compliance, legal title indemnity backstop.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <hr class="my-5 border-secondary opacity-25">
+
+    <!-- 05 — STARTING WITH ODACITY (PROCESS TIMELINES) -->
+    <section class="mb-5">
+        <span class="about-section-tag">05 — STARTING WITH ODACITY</span>
+        <h2 class="fw-extrabold text-dark mb-4">Structured Execution Workflows</h2>
+
+        <div class="row g-5">
+            <!-- SELLERS / PROPERTY OWNERS PROCESS -->
+            <div class="col-lg-6">
+                <div class="p-3 bg-dark text-white rounded-3 mb-4">
+                    <h4 class="fw-bold mb-0"><i class="bi bi-building text-odacity-red me-2"></i>SELLERS/PROPERTY OWNERS</h4>
+                </div>
+
+                <div class="timeline-vertical">
+                    <div class="timeline-item">
+                        <div class="timeline-badge">01</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Visit <a href="http://www.odacity.com/" target="_blank" class="text-odacity-red text-decoration-none">www.odacity.com</a></h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">02</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Fill the new participation form and submit</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">03</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Odacity will communicate acceptance within 24hours</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">04</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">If to proceed, you will receive an authorization to proceed with a code.</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">05</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Complete property detail onboarding & upload property title documents</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">06</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Physical inspection and document verification by Odacity legal & asset audit team</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">07</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Direct Asset Brief (DAB) approval & publication on verified portal</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">08</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Direct matching with verified buyers & institutional investors</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">09</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Confidential offer presentation & contract terms agreement</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">10</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Escrow deposit & legal contract execution</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">11</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Final deed transfer, Governor's Consent filing, and settlement payout</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">12</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Transaction completion with post-sale closing support & indemnity guarantee</h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BUYERS / INVESTORS / TENANTS PROCESS -->
+            <div class="col-lg-6">
+                <div class="p-3 bg-dark text-white rounded-3 mb-4">
+                    <h4 class="fw-bold mb-0"><i class="bi bi-person-check text-odacity-red me-2"></i>Buyers/ Investors/ Tenants</h4>
+                </div>
+
+                <div class="timeline-vertical">
+                    <div class="timeline-item">
+                        <div class="timeline-badge">01</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Visit <a href="http://www.odacity.ng/" target="_blank" class="text-odacity-red text-decoration-none"><www class="odacity ng"></www></a> and create a verified buyer/renter account</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">02</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Browse 100% verified Direct Asset Briefs across residential, commercial, industrial, or land assets</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">03</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-2 text-dark">Select property & complete pre-inspection requirement:</h6>
+                            <ul class="list-unstyled ps-2 mb-0 small text-secondary">
+                                <li class="py-1"><i class="bi bi-chevron-right text-odacity-red me-1"></i><strong>a.</strong> Check pricing details</li>
+                                <li class="py-1"><i class="bi bi-chevron-right text-odacity-red me-1"></i><strong>b.</strong> Inspect online</li>
+                                <li class="py-1"><i class="bi bi-chevron-right text-odacity-red me-1"></i><strong>c.</strong> Fill KYC form</li>
+                                <li class="py-1"><i class="bi bi-chevron-right text-odacity-red me-1"></i><strong>d.</strong> Agree to terms</li>
+                                <li class="py-1"><i class="bi bi-chevron-right text-odacity-red me-1"></i><strong>e.</strong> Sign necessary agreement (as applicable)</li>
+                                <li class="py-1"><i class="bi bi-chevron-right text-odacity-red me-1"></i><strong>f.</strong> Make payment as required</li>
+                                <li class="py-1"><i class="bi bi-chevron-right text-odacity-red me-1"></i><strong>g.</strong> Take possession and Odacity will give you 6month indemnity protection.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">04</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Physical site verification tour guided by Odacity representative</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">05</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Formal offer submission via Odacity platform</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">06</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Escrow funding & contract execution</h6>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-badge">07</div>
+                        <div class="timeline-content">
+                            <h6 class="fw-bold mb-1 text-dark">Key handover, title deed delivery, and activation of 6-month performance indemnity protection.</h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
 </div>
 {% endblock %}

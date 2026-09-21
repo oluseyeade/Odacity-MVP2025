@@ -1,0 +1,363 @@
+/* ==========================================================================
+   ODACITY CINEMATIC HOME HERO — FINAL VISUAL POLISH & TRUE OVERLAPPING CROSSFADE
+   ========================================================================== */
+
+/* Main Hero Section Container */
+.cinematic-hero-section {
+    position: relative;
+    min-height: 78vh;
+    min-height: 560px;
+    max-height: 800px;
+    background-color: #0f172a;
+    color: #ffffff;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Background Image Layer — Crisp, High Clarity Asset */
+.cinematic-hero-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('../images/homepage.png');
+    background-size: cover;
+    background-position: center center;
+    filter: brightness(0.96) contrast(1.03);
+    z-index: 1;
+    transform: scale(1.02);
+    transition: transform 12s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.cinematic-hero-section:hover .cinematic-hero-bg {
+    transform: scale(1.04);
+}
+
+/* Reduced Gradient Overlay — High Image Visibility + Strong Text Contrast */
+.cinematic-hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.32) 0%, rgba(15, 23, 42, 0.62) 75%, rgba(15, 23, 42, 0.82) 100%),
+                linear-gradient(180deg, rgba(15, 23, 42, 0.42) 0%, rgba(15, 23, 42, 0.78) 100%);
+    z-index: 2;
+}
+
+/* Content Container Wrapper */
+.cinematic-hero-container {
+    position: relative;
+    z-index: 3;
+    padding-top: 3.5rem;
+    padding-bottom: 4.5rem;
+    width: 100%;
+}
+
+/* Grid-based Frame Stack: Fixed Bounding Box for Zero Layout Shift */
+.cinematic-frame-stack {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    min-height: 350px;
+    align-items: center;
+    justify-items: center;
+}
+
+/* Frame Stack Items: All frames occupy exact same grid area for true overlap */
+.cinematic-frame {
+    grid-column: 1 / 1;
+    grid-row: 1 / 1;
+    width: 100%;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(5px);
+    transition: opacity 900ms cubic-bezier(0.25, 1, 0.5, 1),
+                transform 900ms cubic-bezier(0.25, 1, 0.5, 1),
+                visibility 900ms step-end;
+    will-change: opacity, transform;
+}
+
+/* Active Incoming Frame (Fade In + 5px Upward Natural Settlement) */
+.cinematic-frame.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+    z-index: 2;
+    transition: opacity 900ms cubic-bezier(0.25, 1, 0.5, 1),
+                transform 900ms cubic-bezier(0.25, 1, 0.5, 1),
+                visibility 0ms ease;
+}
+
+/* Outgoing Frame (True Overlapping Dissolve + Subtle 5px Upward Movement) */
+.cinematic-frame.exiting {
+    opacity: 0;
+    visibility: visible;
+    pointer-events: none;
+    transform: translateY(-5px);
+    z-index: 1;
+    transition: opacity 900ms cubic-bezier(0.25, 1, 0.5, 1),
+                transform 900ms cubic-bezier(0.25, 1, 0.5, 1),
+                visibility 900ms step-end;
+}
+
+/* Eyebrow / Kicker Badge: Exact match to index Buy badge typography */
+.cinematic-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #ffffff;
+    background-color: rgba(193, 27, 36, 0.22);
+    border: 1px solid rgba(193, 27, 36, 0.38);
+    padding: 0.35rem 1.1rem;
+    border-radius: 50px;
+    margin-bottom: 1.25rem;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* Main Hero Heading: Exact match to index display-5 / fw-extrabold */
+.cinematic-title {
+    font-size: clamp(2.2rem, 4.2vw, 3.4rem);
+    font-weight: 800;
+    line-height: 1.18;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    margin-bottom: 1.25rem;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.65);
+}
+
+.cinematic-title .highlight-red {
+    color: #C11B24;
+}
+
+.cinematic-subtitle {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 0.75rem;
+}
+
+/* Supporting Paragraph: Exact match to p.lead on index.html */
+.cinematic-desc {
+    font-size: clamp(1rem, 1.25vw, 1.25rem);
+    font-weight: 400;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.92);
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 2rem;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* Referral Rewards Journey Step Flow (Frame 05) */
+.cinematic-journey {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem 0.6rem;
+    margin-bottom: 1.5rem;
+}
+
+.cinematic-journey-step {
+    font-size: 0.825rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    padding: 0.35rem 0.85rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+}
+
+.cinematic-journey-step.highlight {
+    background: #C11B24;
+    border-color: #C11B24;
+    color: #ffffff !important;
+}
+
+.cinematic-journey-arrow,
+.cinematic-journey-arrow:hover,
+.cinematic-journey-arrow:focus,
+.cinematic-journey-arrow:active,
+.cinematic-journey-arrow:visited {
+    color: #C11B24 !important;
+    font-size: 1.1rem;
+    font-weight: 900;
+    line-height: 1;
+    opacity: 1 !important;
+}
+
+/* CTA Action Button: Exact match to .btn-odacity-red btn-md rounded-pill */
+.cinematic-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    background-color: #C11B24;
+    color: #ffffff !important;
+    font-weight: 700;
+    font-size: 0.98rem;
+    padding: 0.8rem 2.25rem;
+    border-radius: 50px;
+    text-decoration: none !important;
+    box-shadow: 0 4px 16px rgba(193, 27, 36, 0.4);
+    transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.cinematic-cta-btn:hover,
+.cinematic-cta-btn:focus {
+    background-color: #A1141C;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(193, 27, 36, 0.55);
+    color: #ffffff !important;
+}
+
+/* Progress Indicator Bar (01 ● 02 ○ 03 ○ 04 ○ 05 ○) */
+.cinematic-progress-bar {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    margin-top: 2.25rem;
+}
+
+.cinematic-progress-dot {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 0.4rem 0.75rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.cinematic-progress-dot:hover,
+.cinematic-progress-dot:focus {
+    color: #ffffff;
+    outline: none;
+}
+
+.cinematic-progress-dot.active {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.cinematic-progress-dot.active .dot-symbol {
+    color: #C11B24;
+}
+
+/* Smooth Scroll Cue Link */
+.cinematic-scroll-cue {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    margin-top: 1.75rem;
+}
+
+.cinematic-scroll-link {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.825rem;
+    font-weight: 600;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    transition: color 0.25s ease;
+}
+
+.cinematic-scroll-link:hover {
+    color: #ffffff;
+}
+
+.cinematic-scroll-link i {
+    animation: cinematicBounce 2.5s infinite;
+}
+
+@keyframes cinematicBounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(4px); }
+    60% { transform: translateY(2px); }
+}
+
+/* Responsive Scaling */
+@media (max-width: 991.98px) {
+    .cinematic-hero-section {
+        min-height: 72vh;
+        min-height: 520px;
+    }
+    .cinematic-frame-stack {
+        min-height: 380px;
+    }
+    .cinematic-title {
+        font-size: 2.4rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .cinematic-hero-section {
+        min-height: 78vh;
+        min-height: 500px;
+    }
+    .cinematic-hero-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+    .cinematic-frame-stack {
+        min-height: 410px;
+    }
+    .cinematic-title {
+        font-size: 1.85rem;
+        line-height: 1.22;
+    }
+    .cinematic-desc {
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+    }
+    .cinematic-progress-bar {
+        gap: 0.4rem;
+    }
+    .cinematic-progress-dot {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.5rem;
+    }
+}
+
+/* Reduced Motion Compliance */
+@media (prefers-reduced-motion: reduce) {
+    .cinematic-frame,
+    .cinematic-hero-bg,
+    .cinematic-cta-btn,
+    .cinematic-scroll-link i {
+        transition: none !important;
+        animation: none !important;
+        transform: none !important;
+    }
+}
