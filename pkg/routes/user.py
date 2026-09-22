@@ -1,11 +1,14 @@
+import os
+import uuid
 from datetime import datetime
 from urllib.parse import urlparse
 from flask import render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 from pkg import app
-from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification
-from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm
+from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog
+from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm
 
 
 
@@ -184,6 +187,140 @@ def about():
 @app.route('/contact/')
 def contact():
     return render_template('user/contact.html', title='Contact Us')
+
+
+@app.route('/onboarding/intent/')
+@app.route('/intent/')
+def intent_selection():
+    """
+    Odacity Intent & Onboarding Selection Hub.
+    """
+    return render_template('user/intent_selection.html', title='Select Your Intent & Onboarding Pathway — Odacity')
+
+
+@app.route('/enquiry/institution/', methods=['GET', 'POST'])
+def enquiry_institution():
+    """
+    Phase 2 — DAB Institution & Organization Enquiry Form Route with Controlled Persistence & Audit Trail.
+    """
+    form = DabInstitutionEnquiryForm()
+
+    if form.validate_on_submit():
+        file_a = form.inst_cac_cert.data
+        filename_a = getattr(file_a, 'filename', '') if file_a else ''
+        ext_a = filename_a.rsplit('.', 1)[-1].lower() if '.' in filename_a else ''
+
+        if ext_a != 'pdf':
+            flash('Validation error: CAC Registration Certificate must be in PDF format (.pdf only). Non-PDF files are rejected.', 'danger')
+            return render_template('user/enquiry_institution.html', title='DAB Institution & Organization Enquiry', form=form)
+
+        # Controlled Upload Directory Setup
+        upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'cac_certificates')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        now = datetime.utcnow()
+        timestamp_str = now.strftime('%Y%m%d%H%M%S')
+
+        safe_name_a = secure_filename(filename_a) or 'inst_cac_certificate.pdf'
+        file_name_saved_a = f"inst_cac_{uuid.uuid4().hex[:8]}_{timestamp_str}_{safe_name_a}"
+        full_path_a = os.path.join(upload_dir, file_name_saved_a)
+        rel_path_a = f"uploads/cac_certificates/{file_name_saved_a}"
+
+        created_files = []
+
+        try:
+            # 1. Save uploaded CAC Certificate file safely
+            file_a.save(full_path_a)
+            created_files.append(full_path_a)
+
+            user_id = session.get('user_id')
+
+            # 2. Build Structured JSON Payload (Section A Institution Information)
+            payload = {
+                "enquiry_type": "DAB Institution",
+                "enquiry_stage": "Intent / Onboarding",
+                "status": "Submitted",
+                "institution_organization": {
+                    "name": form.inst_name.data.strip(),
+                    "contact_person": form.inst_contact_person.data.strip(),
+                    "official_email": form.inst_official_email.data.strip(),
+                    "phone": form.inst_phone.data.strip(),
+                    "office_address": form.inst_office_address.data.strip(),
+                    "organization_type": form.inst_org_type.data,
+                    "cac_registration_number": form.inst_cac_reg_num.data.strip(),
+                    "cac_certificate_reference": rel_path_a
+                },
+                "submitted_at": now.isoformat()
+            }
+
+            # 3. Create Controlled VerificationCase
+            v_case = VerificationCase(
+                entity_type='dab_institution',
+                verifier_type='owner',
+                verification_type='DAB Institution Onboarding',
+                status='Submitted',
+                notes=f"DAB Institution Enquiry submitted for {form.inst_name.data.strip()}",
+                created_at=now,
+                updated_at=now
+            )
+            db.session.add(v_case)
+            db.session.flush()
+
+            # 4. Create VerificationEvent with Structured JSON Payload
+            v_event = VerificationEvent(
+                verification_case_id=v_case.verification_case_id,
+                event_type='DAB_INSTITUTION_ENQUIRY_SUBMITTED',
+                description=f"DAB Institution & Organization Enquiry submitted by {form.inst_contact_person.data.strip()} ({form.inst_name.data.strip()})",
+                data=payload,
+                status='Submitted',
+                created_by_user_id=user_id,
+                created_at=now
+            )
+            db.session.add(v_event)
+
+            # 5. Create AuditLog Record
+            audit_entry = AuditLog(
+                user_id=user_id,
+                action='DAB_INSTITUTION_ENQUIRY_SUBMITTED',
+                entity_type='dab_institution',
+                entity_id=v_case.verification_case_id,
+                resource_type='VerificationCase',
+                resource_id=v_case.verification_case_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                new_values=payload,
+                created_at=now
+            )
+            db.session.add(audit_entry)
+
+            # 6. Create SecurityEvent Log
+            sec_event = SecurityEvent(
+                user_id=user_id,
+                event_type='DAB_INSTITUTION_ENQUIRY_SUBMITTED',
+                description=f'DAB Institution Enquiry submitted for "{form.inst_name.data.strip()}"',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+
+            db.session.commit()
+
+            flash(f'Thank you! Your DAB Institution & Organization Enquiry for "{form.inst_name.data.strip()}" has been submitted successfully.', 'success')
+            return redirect(url_for('enquiry_institution'))
+
+        except Exception as e:
+            db.session.rollback()
+            # Clean up newly created files on transaction failure
+            for filepath in created_files:
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                    except OSError:
+                        pass
+            flash('An error occurred while saving your enquiry. Please try again or contact support.', 'danger')
+            return render_template('user/enquiry_institution.html', title='DAB Institution & Organization Enquiry', form=form)
+
+    return render_template('user/enquiry_institution.html', title='DAB Institution & Organization Enquiry', form=form)
 
 
 @app.route('/owners/')

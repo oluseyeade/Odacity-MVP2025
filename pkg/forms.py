@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed, FileRequired
 from wtforms import StringField, PasswordField, EmailField, SubmitField, DateField, SelectField, TextAreaField, DecimalField
 from wtforms.validators import DataRequired, Email, Optional
 
@@ -86,6 +87,21 @@ class RespondOfferForm(FlaskForm):
     action = SelectField("Response Action", choices=[('Accepted', 'Accept Offer'), ('Rejected', 'Reject Offer')], validators=[DataRequired()])
     notes = TextAreaField("Response Notes (Optional)", validators=[Optional()])
     submit = SubmitField("Submit Response")
+
+
+class DabInstitutionEnquiryForm(FlaskForm):
+    # INSTITUTION / ORGANIZATION INFORMATION
+    inst_name = StringField("Institution / Organization Name", validators=[DataRequired(message="Institution / Organization Name is required.")])
+    inst_contact_person = StringField("Contact Person", validators=[DataRequired(message="Contact Person is required.")])
+    inst_official_email = EmailField("Official Email", validators=[DataRequired(message="Official Email is required."), Email(message="Please provide a valid official email address.")])
+    inst_phone = StringField("Phone", validators=[DataRequired(message="Phone number is required.")])
+    inst_office_address = TextAreaField("Office Address", validators=[DataRequired(message="Office Address is required.")])
+    inst_org_type = SelectField("Organization Type", choices=[('Real Estate', 'Real Estate')], validators=[DataRequired(message="Organization Type is required.")])
+    inst_cac_reg_num = StringField("CAC Registration Number", validators=[DataRequired(message="CAC Registration Number is required.")])
+    inst_cac_cert = FileField("CAC Registration Certificate", validators=[FileRequired(message="CAC Registration Certificate is required."), FileAllowed(['pdf'], message="Accepted format: PDF only. (.pdf)")])
+
+    submit = SubmitField("Submit DAB Institution Enquiry")
+
 
 
 

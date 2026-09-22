@@ -1,0 +1,146 @@
+/* ==========================================================================
+   ODACITY INTENT & ONBOARDING SELECTION HUB — SCOPED STYLES
+   ========================================================================== */
+
+.intent-hub-section {
+    background-color: #0f172a;
+    color: #ffffff;
+    position: relative;
+    padding: 3.5rem 0 4.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.intent-hub-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #ffffff;
+    background-color: rgba(193, 27, 36, 0.22);
+    border: 1px solid rgba(193, 27, 36, 0.38);
+    padding: 0.35rem 1.1rem;
+    border-radius: 50px;
+    margin-bottom: 1rem;
+}
+
+.intent-card {
+    background: #ffffff;
+    border: 2px solid #E5E7EB;
+    border-radius: 16px;
+    padding: 2rem 1.5rem;
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    cursor: pointer;
+}
+
+.intent-card:hover {
+    transform: translateY(-5px);
+    border-color: #C11B24;
+    box-shadow: 0 14px 30px rgba(193, 27, 36, 0.12);
+}
+
+.intent-card.active {
+    border-color: #C11B24;
+    box-shadow: 0 0 0 4px rgba(193, 27, 36, 0.15);
+}
+
+.intent-icon-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+    background: rgba(193, 27, 36, 0.08);
+    color: #C11B24;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    margin-bottom: 1.25rem;
+    transition: all 0.3s ease;
+}
+
+.intent-card:hover .intent-icon-wrapper {
+    background: #C11B24;
+    color: #ffffff;
+}
+
+.intent-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+}
+
+.intent-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}
+
+.intent-req-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem 0;
+}
+
+.intent-req-item {
+    font-size: 0.825rem;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.intent-req-item i {
+    color: #C11B24;
+    font-size: 0.9rem;
+}
+
+.btn-intent-action {
+    background-color: #0f172a;
+    color: #ffffff !important;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 50px;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    transition: all 0.25s ease;
+}
+
+.btn-intent-action:hover {
+    background-color: #C11B24;
+    color: #ffffff !important;
+    box-shadow: 0 4px 15px rgba(193, 27, 36, 0.35);
+}
+
+.intent-process-flow {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    margin-top: 3rem;
+}
+
+.intent-step-badge {
+    background: #C11B24;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 50px;
+    margin-bottom: 0.75rem;
+    display: inline-block;
+}

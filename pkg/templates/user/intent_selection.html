@@ -1,0 +1,218 @@
+{% extends "user/layout.html" %}
+
+{% block title %}Select Your Intent & Onboarding Pathway — Odacity{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/intent-onboarding.css') }}">
+{% endblock %}
+
+{% block main_content %}
+<!-- INTENT HUB HERO HEADER -->
+<section class="intent-hub-section text-center">
+    <div class="container">
+        <div class="intent-hub-badge">
+            <i class="bi bi-compass-fill me-1"></i> ODACITY ENQUIRY &amp; INTENT HUB
+        </div>
+        <h1 class="display-5 fw-bold text-white mb-3">What are you looking to do with Odacity?</h1>
+        <p class="lead text-light opacity-75 max-width-700 mx-auto mb-0" style="max-width: 720px;">
+            Select your Enquiry Type to begin your onboarding journey. Odacity connects property owners, developers, licensed agents, and buyers directly into verified asset transactions.
+        </p>
+    </div>
+</section>
+
+<!-- INTENT CATEGORIES SELECTION GRID -->
+<section class="py-5 bg-light">
+    <div class="container py-3">
+        <div class="row g-4">
+
+            <!-- INTENT 1: DAB INDIVIDUAL -->
+            <div class="col-md-6 col-lg-3">
+                <div class="intent-card {% if request.args.get('category') == 'individual' %}active{% endif %}" id="card-individual">
+                    <div>
+                        <div class="intent-icon-wrapper">
+                            <i class="bi bi-person-badge-fill"></i>
+                        </div>
+                        <h4 class="intent-title">DAB Individual</h4>
+                        <p class="intent-subtitle">For individual property owners looking to submit Direct Asset Briefs (DAB) for sale, lease, or rental listing.</p>
+                        
+                        <div class="border-top pt-3 mb-3">
+                            <span class="text-uppercase small fw-bold text-muted d-block mb-2">Required Onboarding:</span>
+                            <ul class="intent-req-list">
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Full Name &amp; Contact Info</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Government Issued ID</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Title Document Copy</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('submit_dab') }}" class="btn-intent-action">
+                            <span>Select Individual</span>
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INTENT 2: DAB INSTITUTION -->
+            <div class="col-md-6 col-lg-3">
+                <div class="intent-card {% if request.args.get('category') == 'institution' %}active{% endif %}" id="card-institution">
+                    <div>
+                        <div class="intent-icon-wrapper">
+                            <i class="bi bi-building-fill"></i>
+                        </div>
+                        <h4 class="intent-title">DAB Institution</h4>
+                        <p class="intent-subtitle">For real estate developers, corporate landowners, and institutional asset managers handling commercial briefs.</p>
+                        
+                        <div class="border-top pt-3 mb-3">
+                            <span class="text-uppercase small fw-bold text-muted d-block mb-2">Required Onboarding:</span>
+                            <ul class="intent-req-list">
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Corporate / Business Name</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> CAC RC / Registration Number</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Authorised Rep Identification</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('enquiry_institution') }}" class="btn-intent-action">
+                            <span>Select Institution</span>
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INTENT 3: AGENT -->
+            <div class="col-md-6 col-lg-3">
+                <div class="intent-card {% if request.args.get('category') == 'agent' %}active{% endif %}" id="card-agent">
+                    <div>
+                        <div class="intent-icon-wrapper">
+                            <i class="bi bi-shield-check"></i>
+                        </div>
+                        <h4 class="intent-title">Agent</h4>
+                        <p class="intent-subtitle">For licensed real estate agents, brokers, and registered AEAN/LASRERA practitioners with mandate authority.</p>
+                        
+                        <div class="border-top pt-3 mb-3">
+                            <span class="text-uppercase small fw-bold text-muted d-block mb-2">Required Onboarding:</span>
+                            <ul class="intent-req-list">
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Agent / Agency Particulars</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> AEAN / LASRERA License No.</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Professional Membership Proof</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('submit_dab') }}" class="btn-intent-action">
+                            <span>Select Agent</span>
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INTENT 4: GENERAL ENQUIRY -->
+            <div class="col-md-6 col-lg-3">
+                <div class="intent-card {% if request.args.get('category') == 'general' %}active{% endif %}" id="card-general">
+                    <div>
+                        <div class="intent-icon-wrapper">
+                            <i class="bi bi-chat-left-dots-fill"></i>
+                        </div>
+                        <h4 class="intent-title">General Enquiry</h4>
+                        <p class="intent-subtitle">For prospective buyers, renters, and general inquiries seeking advisory or property search assistance.</p>
+                        
+                        <div class="border-top pt-3 mb-3">
+                            <span class="text-uppercase small fw-bold text-muted d-block mb-2">Required Information:</span>
+                            <ul class="intent-req-list">
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Full Name &amp; Phone Number</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Email Address</li>
+                                <li class="intent-req-item"><i class="bi bi-check-circle-fill"></i> Specific Inquiry Details</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('contact') }}" class="btn-intent-action">
+                            <span>Send Enquiry</span>
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- FULL CONTROLLED PROPERTY CYCLE ARCHITECTURE DISPLAY -->
+        <div class="intent-process-flow">
+            <div class="text-center mb-4">
+                <h4 class="fw-bold text-dark mb-1">Property Lifecycle</h4>
+                <p class="text-muted small mb-0">The controlled property lifecycle guiding every asset brief from initial intent to final completion.</p>
+            </div>
+            
+            <div class="row g-2 text-center align-items-center">
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge" style="font-size: 0.65rem;">STAGE 1</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Intent / Onboarding</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Category Selection</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge" style="font-size: 0.65rem;">STAGE 2</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Intent Approval</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Review &amp; Access</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge bg-dark" style="font-size: 0.65rem;">STAGE 3</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Customised Listing Link</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Controlled Access Mechanism</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge" style="font-size: 0.65rem;">STAGE 4</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Property / Document Submission</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Documents + Pictures</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge bg-warning text-dark" style="font-size: 0.65rem;">STAGE 5</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Verification / Search</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Legal / Title Search</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge bg-info text-dark" style="font-size: 0.65rem;">STAGE 6</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Approved / Declined</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Platform Decision</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge bg-primary" style="font-size: 0.65rem;">STAGE 7</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Private Listing</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">72-Hour Window</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge bg-success" style="font-size: 0.65rem;">STAGE 8</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Public Listing</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Buy / Rent Search</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-white rounded-3 shadow-sm border h-100">
+                        <span class="intent-step-badge bg-secondary" style="font-size: 0.65rem;">STAGE 9</span>
+                        <h6 class="fw-bold text-dark mb-0 small" style="font-size: 0.75rem;">Sold / Unavailable</h6>
+                        <span class="text-muted d-block" style="font-size: 0.68rem;">Final Status</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}
