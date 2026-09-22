@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 from pkg import app
 from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog
-from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm
+from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm
 
 
 
@@ -321,6 +321,163 @@ def enquiry_institution():
             return render_template('user/enquiry_institution.html', title='DAB Institution & Organization Enquiry', form=form)
 
     return render_template('user/enquiry_institution.html', title='DAB Institution & Organization Enquiry', form=form)
+
+
+@app.route('/enquiry/agent/', methods=['GET', 'POST'])
+def enquiry_agent():
+    """
+    Phase 2 — DAB Agent Onboarding Enquiry Form Route with Controlled Persistence & Audit Trail.
+    """
+    form = DabAgentEnquiryForm()
+
+    if form.validate_on_submit():
+        file_id = form.agent_id_document.data
+        file_cac = form.agent_cac_certificate.data
+        file_license = form.agent_license_proof.data
+
+        allowed_exts = {'pdf', 'png', 'jpg', 'jpeg'}
+
+        filename_id = getattr(file_id, 'filename', '') if file_id else ''
+        filename_cac = getattr(file_cac, 'filename', '') if file_cac else ''
+        filename_license = getattr(file_license, 'filename', '') if file_license else ''
+
+        ext_id = filename_id.rsplit('.', 1)[-1].lower() if '.' in filename_id else ''
+        ext_cac = filename_cac.rsplit('.', 1)[-1].lower() if '.' in filename_cac else ''
+        ext_license = filename_license.rsplit('.', 1)[-1].lower() if '.' in filename_license else ''
+
+        if ext_id not in allowed_exts or ext_cac not in allowed_exts or ext_license not in allowed_exts:
+            flash('Validation error: All uploaded documents must be in PDF, PNG, JPG, or JPEG format. Unsupported files are rejected.', 'danger')
+            return render_template('user/enquiry_agent.html', title='DAB Agent Enquiry', form=form)
+
+        # Controlled Upload Directory Setup
+        upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'agent_documents')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        now = datetime.utcnow()
+        timestamp_str = now.strftime('%Y%m%d%H%M%S')
+
+        safe_name_id = secure_filename(filename_id) or 'agent_id_document.pdf'
+        safe_name_cac = secure_filename(filename_cac) or 'agent_cac_certificate.pdf'
+        safe_name_license = secure_filename(filename_license) or 'agent_license_proof.pdf'
+
+        file_name_saved_id = f"agent_id_{uuid.uuid4().hex[:8]}_{timestamp_str}_{safe_name_id}"
+        file_name_saved_cac = f"agent_cac_{uuid.uuid4().hex[:8]}_{timestamp_str}_{safe_name_cac}"
+        file_name_saved_license = f"agent_license_{uuid.uuid4().hex[:8]}_{timestamp_str}_{safe_name_license}"
+
+        full_path_id = os.path.join(upload_dir, file_name_saved_id)
+        full_path_cac = os.path.join(upload_dir, file_name_saved_cac)
+        full_path_license = os.path.join(upload_dir, file_name_saved_license)
+
+        rel_path_id = f"uploads/agent_documents/{file_name_saved_id}"
+        rel_path_cac = f"uploads/agent_documents/{file_name_saved_cac}"
+        rel_path_license = f"uploads/agent_documents/{file_name_saved_license}"
+
+        created_files = []
+
+        try:
+            # 1. Save uploaded document files safely
+            file_id.save(full_path_id)
+            created_files.append(full_path_id)
+
+            file_cac.save(full_path_cac)
+            created_files.append(full_path_cac)
+
+            file_license.save(full_path_license)
+            created_files.append(full_path_license)
+
+            user_id = session.get('user_id')
+
+            # 2. Build Structured JSON Payload (Agent Particulars)
+            payload = {
+                "enquiry_type": "DAB Agent",
+                "enquiry_stage": "Intent / Onboarding",
+                "status": "Submitted",
+                "agent_particulars": {
+                    "name": form.agent_name.data.strip(),
+                    "company_name": form.agent_company_name.data.strip(),
+                    "email": form.agent_email.data.strip(),
+                    "phone": form.agent_phone.data.strip(),
+                    "office_address": form.agent_office_address.data.strip(),
+                    "cac_registration_number": form.agent_cac_reg_num.data.strip(),
+                    "license_membership_number": form.agent_license_number.data.strip(),
+                    "identification_type": form.agent_id_type.data,
+                    "identification_number": form.agent_id_number.data.strip(),
+                    "identification_document_reference": rel_path_id,
+                    "cac_certificate_reference": rel_path_cac,
+                    "license_membership_proof_reference": rel_path_license,
+                    "declaration_accepted": form.agent_declaration.data
+                },
+                "submitted_at": now.isoformat()
+            }
+
+            # 3. Create Controlled VerificationCase
+            v_case = VerificationCase(
+                entity_type='dab_agent',
+                verifier_type='owner',
+                verification_type='DAB Agent Onboarding',
+                status='Submitted',
+                notes=f"DAB Agent Enquiry submitted for {form.agent_name.data.strip()} ({form.agent_company_name.data.strip()})",
+                created_at=now,
+                updated_at=now
+            )
+            db.session.add(v_case)
+            db.session.flush()
+
+            # 4. Create VerificationEvent with Structured JSON Payload
+            v_event = VerificationEvent(
+                verification_case_id=v_case.verification_case_id,
+                event_type='DAB_AGENT_ENQUIRY_SUBMITTED',
+                description=f"DAB Agent Enquiry submitted by {form.agent_name.data.strip()} ({form.agent_company_name.data.strip()})",
+                data=payload,
+                status='Submitted',
+                created_by_user_id=user_id,
+                created_at=now
+            )
+            db.session.add(v_event)
+
+            # 5. Create AuditLog Record
+            audit_entry = AuditLog(
+                user_id=user_id,
+                action='DAB_AGENT_ENQUIRY_SUBMITTED',
+                entity_type='dab_agent',
+                entity_id=v_case.verification_case_id,
+                resource_type='VerificationCase',
+                resource_id=v_case.verification_case_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                new_values=payload,
+                created_at=now
+            )
+            db.session.add(audit_entry)
+
+            # 6. Create SecurityEvent Log
+            sec_event = SecurityEvent(
+                user_id=user_id,
+                event_type='DAB_AGENT_ENQUIRY_SUBMITTED',
+                description=f'DAB Agent Enquiry submitted for "{form.agent_name.data.strip()}" ({form.agent_company_name.data.strip()})',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+
+            db.session.commit()
+
+            flash(f'Thank you! Your DAB Agent Enquiry for "{form.agent_name.data.strip()}" ({form.agent_company_name.data.strip()}) has been submitted successfully.', 'success')
+            return redirect(url_for('enquiry_agent'))
+
+        except Exception as e:
+            db.session.rollback()
+            # Clean up newly created files on transaction failure
+            for filepath in created_files:
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                    except OSError:
+                        pass
+            flash('An error occurred while saving your enquiry. Please try again or contact support.', 'danger')
+            return render_template('user/enquiry_agent.html', title='DAB Agent Enquiry', form=form)
+
+    return render_template('user/enquiry_agent.html', title='DAB Agent Enquiry', form=form)
 
 
 @app.route('/owners/')

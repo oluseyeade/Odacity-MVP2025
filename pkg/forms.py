@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileRequired
-from wtforms import StringField, PasswordField, EmailField, SubmitField, DateField, SelectField, TextAreaField, DecimalField
+from wtforms import StringField, PasswordField, EmailField, SubmitField, DateField, SelectField, TextAreaField, DecimalField, BooleanField
 from wtforms.validators import DataRequired, Email, Optional
 
 class RegisterForm(FlaskForm):
@@ -101,6 +101,48 @@ class DabInstitutionEnquiryForm(FlaskForm):
     inst_cac_cert = FileField("CAC Registration Certificate", validators=[FileRequired(message="CAC Registration Certificate is required."), FileAllowed(['pdf'], message="Accepted format: PDF only. (.pdf)")])
 
     submit = SubmitField("Submit DAB Institution Enquiry")
+
+
+class DabAgentEnquiryForm(FlaskForm):
+    # SECTION A — AGENT INFORMATION
+    agent_name = StringField("Full Name", validators=[DataRequired(message="Full Name is required.")])
+    agent_company_name = StringField("Company / Organization Name", validators=[DataRequired(message="Company / Organization Name is required.")])
+    agent_email = EmailField("Official Email", validators=[DataRequired(message="Official Email is required."), Email(message="Please provide a valid official email address.")])
+    agent_phone = StringField("Phone Number", validators=[DataRequired(message="Phone number is required.")])
+    agent_office_address = TextAreaField("Office Address", validators=[DataRequired(message="Office Address is required.")])
+
+    # SECTION B — PROFESSIONAL REGISTRATION
+    agent_cac_reg_num = StringField("CAC Registration Number", validators=[DataRequired(message="CAC Registration Number is required.")])
+    agent_license_number = StringField("AEAN / LASRERA License / Membership Number", validators=[DataRequired(message="AEAN / LASRERA License / Membership Number is required.")])
+
+    # SECTION C — IDENTIFICATION
+    agent_id_type = SelectField("Identification Type", choices=[
+        ('NIN', 'NIN'),
+        ('Drivers License', "Driver's License"),
+        ('Permanent Voters Card', "Permanent Voter's Card"),
+        ('International Passport', 'International Passport')
+    ], validators=[DataRequired(message="Identification Type is required.")])
+    agent_id_number = StringField("Identification Number", validators=[DataRequired(message="Identification Number is required.")])
+    agent_id_document = FileField("Identification Document", validators=[
+        FileRequired(message="Identification Document is required."),
+        FileAllowed(['pdf', 'png', 'jpg', 'jpeg'], message="Accepted formats: PDF, PNG, JPG, JPEG")
+    ])
+
+    # SECTION D — SUPPORTING DOCUMENTS
+    agent_cac_certificate = FileField("CAC Registration Certificate", validators=[
+        FileRequired(message="CAC Registration Certificate is required."),
+        FileAllowed(['pdf', 'png', 'jpg', 'jpeg'], message="Accepted formats: PDF, PNG, JPG, JPEG")
+    ])
+    agent_license_proof = FileField("AEAN / LASRERA Membership / License Evidence", validators=[
+        FileRequired(message="AEAN / LASRERA Membership / License Evidence is required."),
+        FileAllowed(['pdf', 'png', 'jpg', 'jpeg'], message="Accepted formats: PDF, PNG, JPG, JPEG")
+    ])
+
+    # SECTION E — DECLARATION
+    agent_declaration = BooleanField("I confirm that the information supplied is accurate, the submitted documents belong to the applicant/company, I have authority to act as an agent/practitioner, and Odacity may verify the supplied information and documents.", validators=[DataRequired(message="You must accept the declaration to submit your enquiry.")])
+
+    submit = SubmitField("Submit DAB Agent Enquiry")
+
 
 
 

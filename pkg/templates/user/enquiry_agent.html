@@ -1,0 +1,310 @@
+{% extends "user/layout.html" %}
+
+{% block title %}DAB Agent Enquiry — Odacity{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/intent-onboarding.css') }}">
+<style>
+    .enquiry-form-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+        padding: 2.5rem 2rem;
+        margin-bottom: 2rem;
+    }
+    .section-header-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #C11B24;
+        background-color: rgba(193, 27, 36, 0.08);
+        border: 1px solid rgba(193, 27, 36, 0.2);
+        padding: 0.35rem 1rem;
+        border-radius: 50px;
+        margin-bottom: 0.75rem;
+    }
+    .section-title {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 0.5rem;
+    }
+    .section-subtitle {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin-bottom: 1.5rem;
+    }
+    .form-label-custom {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.4rem;
+    }
+    .file-format-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #065f46;
+        background-color: #d1fae5;
+        border: 1px solid #a7f3d0;
+        padding: 0.25rem 0.65rem;
+        border-radius: 6px;
+        display: inline-block;
+        margin-top: 0.35rem;
+    }
+    .btn-enquiry-submit {
+        background-color: #C11B24;
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 1.05rem;
+        padding: 0.9rem 2.5rem;
+        border-radius: 50px;
+        border: none;
+        box-shadow: 0 8px 20px rgba(193, 27, 36, 0.25);
+        transition: all 0.3s ease;
+    }
+    .btn-enquiry-submit:hover {
+        background-color: #9f131a;
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 12px 25px rgba(193, 27, 36, 0.35);
+    }
+</style>
+{% endblock %}
+
+{% block main_content %}
+<!-- HERO HEADER -->
+<section class="intent-hub-section text-center">
+    <div class="container">
+        <div class="intent-hub-badge">
+            <i class="bi bi-shield-check me-1"></i> DAB AGENT ONBOARDING ENQUIRY
+        </div>
+        <h1 class="display-5 fw-bold text-white mb-3">DAB Agent Enquiry Form</h1>
+        <p class="lead text-light opacity-75 max-width-700 mx-auto mb-0" style="max-width: 720px;">
+            For licensed real estate agents, brokers, and registered AEAN/LASRERA practitioners. Submit your onboarding particulars and credentials to establish direct mandate representation with Odacity.
+        </p>
+    </div>
+</section>
+
+<!-- FORM CONTAINER -->
+<section class="py-5 bg-light">
+    <div class="container py-2" style="max-width: 960px;">
+
+        <!-- FLASH MESSAGES -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                        {% if category == 'success' %}
+                            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                        {% elif category == 'danger' %}
+                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                        {% else %}
+                            <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('enquiry_agent') }}" enctype="multipart/form-data" novalidate>
+            {{ form.csrf_token }}
+
+            <!-- SECTION A: AGENT INFORMATION -->
+            <div class="enquiry-form-card">
+                <div class="section-header-badge">
+                    <i class="bi bi-person-vcard me-1"></i> SECTION A
+                </div>
+                <h3 class="section-title">Agent Information</h3>
+                <p class="section-subtitle">Personal and corporate identity details of the submitting real estate agent or broker.</p>
+                
+                <div class="row g-3">
+                    <!-- 1. Full Name -->
+                    <div class="col-md-6">
+                        <label for="agent_name" class="form-label-custom">{{ form.agent_name.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_name(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_name.errors else ""), id="agent_name", placeholder="e.g. Arc. Tunde Bakare") }}
+                        {% for error in form.agent_name.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 2. Company / Organization Name -->
+                    <div class="col-md-6">
+                        <label for="agent_company_name" class="form-label-custom">{{ form.agent_company_name.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_company_name(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_company_name.errors else ""), id="agent_company_name", placeholder="e.g. Apex Realty Partners Ltd") }}
+                        {% for error in form.agent_company_name.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 3. Official Email -->
+                    <div class="col-md-6">
+                        <label for="agent_email" class="form-label-custom">{{ form.agent_email.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_email(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_email.errors else ""), id="agent_email", placeholder="tunde@apexrealty.com") }}
+                        {% for error in form.agent_email.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 4. Phone Number -->
+                    <div class="col-md-6">
+                        <label for="agent_phone" class="form-label-custom">{{ form.agent_phone.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_phone(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_phone.errors else ""), id="agent_phone", placeholder="+234 800 000 0000") }}
+                        {% for error in form.agent_phone.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 5. Office Address -->
+                    <div class="col-12">
+                        <label for="agent_office_address" class="form-label-custom">{{ form.agent_office_address.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_office_address(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_office_address.errors else ""), id="agent_office_address", rows="3", placeholder="Full corporate office or practice address") }}
+                        {% for error in form.agent_office_address.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION B: PROFESSIONAL REGISTRATION -->
+            <div class="enquiry-form-card">
+                <div class="section-header-badge">
+                    <i class="bi bi-patch-check me-1"></i> SECTION B
+                </div>
+                <h3 class="section-title">Professional Registration</h3>
+                <p class="section-subtitle">Corporate registration and professional real estate association credentials.</p>
+                
+                <div class="row g-3">
+                    <!-- 6. CAC Registration Number -->
+                    <div class="col-md-6">
+                        <label for="agent_cac_reg_num" class="form-label-custom">{{ form.agent_cac_reg_num.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_cac_reg_num(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_cac_reg_num.errors else ""), id="agent_cac_reg_num", placeholder="e.g. RC-1234567 or BN-987654") }}
+                        {% for error in form.agent_cac_reg_num.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 7. AEAN / LASRERA License or Membership Number -->
+                    <div class="col-md-6">
+                        <label for="agent_license_number" class="form-label-custom">{{ form.agent_license_number.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_license_number(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_license_number.errors else ""), id="agent_license_number", placeholder="e.g. AEAN/LAG/2024/0892 or LASRERA/REG/1102") }}
+                        {% for error in form.agent_license_number.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION C: IDENTIFICATION -->
+            <div class="enquiry-form-card">
+                <div class="section-header-badge">
+                    <i class="bi bi-card-heading me-1"></i> SECTION C
+                </div>
+                <h3 class="section-title">Identification</h3>
+                <p class="section-subtitle">Government-issued identity details of the primary operating agent.</p>
+                
+                <div class="row g-3">
+                    <!-- 8. Identification Type -->
+                    <div class="col-md-6">
+                        <label for="agent_id_type" class="form-label-custom">{{ form.agent_id_type.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_id_type(class="form-select rounded-3 p-2.5 " + ("is-invalid" if form.agent_id_type.errors else ""), id="agent_id_type") }}
+                        {% for error in form.agent_id_type.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 9. Identification Number -->
+                    <div class="col-md-6">
+                        <label for="agent_id_number" class="form-label-custom">{{ form.agent_id_number.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_id_number(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_id_number.errors else ""), id="agent_id_number", placeholder="Identity document number") }}
+                        {% for error in form.agent_id_number.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 10. Identification Document Upload -->
+                    <div class="col-12">
+                        <label for="agent_id_document" class="form-label-custom">{{ form.agent_id_document.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_id_document(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_id_document.errors else ""), id="agent_id_document", accept="application/pdf,.pdf,image/png,.png,image/jpeg,.jpg,.jpeg") }}
+                        <div class="file-format-badge">
+                            <i class="bi bi-file-earmark-arrow-up me-1"></i> Accepted formats: PDF, PNG, JPG, JPEG
+                        </div>
+                        {% for error in form.agent_id_document.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION D: SUPPORTING DOCUMENTS -->
+            <div class="enquiry-form-card">
+                <div class="section-header-badge">
+                    <i class="bi bi-paperclip me-1"></i> SECTION D
+                </div>
+                <h3 class="section-title">Supporting Documents</h3>
+                <p class="section-subtitle">Official corporate registration document and professional membership evidence.</p>
+                
+                <div class="row g-3">
+                    <!-- 11. CAC Registration Certificate Upload -->
+                    <div class="col-md-6">
+                        <label for="agent_cac_certificate" class="form-label-custom">{{ form.agent_cac_certificate.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_cac_certificate(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_cac_certificate.errors else ""), id="agent_cac_certificate", accept="application/pdf,.pdf,image/png,.png,image/jpeg,.jpg,.jpeg") }}
+                        <div class="file-format-badge">
+                            <i class="bi bi-file-earmark-check me-1"></i> Accepted formats: PDF, PNG, JPG, JPEG
+                        </div>
+                        {% for error in form.agent_cac_certificate.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 12. AEAN / LASRERA Membership Evidence Upload -->
+                    <div class="col-md-6">
+                        <label for="agent_license_proof" class="form-label-custom">{{ form.agent_license_proof.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.agent_license_proof(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.agent_license_proof.errors else ""), id="agent_license_proof", accept="application/pdf,.pdf,image/png,.png,image/jpeg,.jpg,.jpeg") }}
+                        <div class="file-format-badge">
+                            <i class="bi bi-file-earmark-medical me-1"></i> Accepted formats: PDF, PNG, JPG, JPEG
+                        </div>
+                        {% for error in form.agent_license_proof.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION E: DECLARATION -->
+            <div class="enquiry-form-card">
+                <div class="section-header-badge">
+                    <i class="bi bi-check2-square me-1"></i> SECTION E
+                </div>
+                <h3 class="section-title">Declaration &amp; Consent</h3>
+                <p class="section-subtitle">Please confirm and accept the verification declaration before submitting.</p>
+                
+                <div class="form-check p-3 bg-light rounded-3 border">
+                    {{ form.agent_declaration(class="form-check-input mt-1 ms-0 me-2 " + ("is-invalid" if form.agent_declaration.errors else ""), id="agent_declaration") }}
+                    <label class="form-check-label text-dark fw-semibold small" for="agent_declaration">
+                        I confirm that the information supplied is accurate, the submitted documents belong to the applicant/company, I have authority to act as an agent/practitioner, and Odacity may verify the supplied information and documents. <span class="text-danger">*</span>
+                    </label>
+                    {% for error in form.agent_declaration.errors %}
+                        <div class="invalid-feedback d-block mt-2">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- SUBMIT BUTTON -->
+            <div class="text-center pt-2 pb-4">
+                <button type="submit" class="btn-enquiry-submit">
+                    <span>Submit DAB Agent Enquiry</span>
+                    <i class="bi bi-send-fill ms-2"></i>
+                </button>
+            </div>
+        </form>
+
+    </div>
+</section>
+{% endblock %}
