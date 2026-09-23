@@ -2,7 +2,7 @@ import os
 import json
 import secrets
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from pkg import app
@@ -224,6 +224,11 @@ def admin_intent_detail(case_id):
         except Exception:
             pass
 
+    now = datetime.utcnow()
+    public_eligible_at = None
+    if v_case.dab and v_case.dab.approved_at:
+        public_eligible_at = v_case.dab.approved_at + timedelta(hours=72)
+
     return render_template(
         'admin/intents.html',
         selected_case=v_case,
@@ -234,6 +239,8 @@ def admin_intent_detail(case_id):
         display_name=get_entity_display_name(v_case.entity_type),
         customized_token=customized_token,
         customized_url=customized_url,
+        now=now,
+        public_eligible_at=public_eligible_at,
         title=f'Review Intent #{case_id} — Odacity Admin'
     )
 
@@ -879,8 +886,8 @@ def admin_approve_property(property_id):
     now = datetime.utcnow()
 
     # Idempotency Check: Property already Approved
-    if prop.status == 'Approved' and dab.status == 'Approved' and prop.publication_status == 'Approved':
-        flash(f"Property #{property_id} ('{prop.title}') is already APPROVED. Phase 8 complete.", 'info')
+    if prop.status == 'Approved' and dab.status == 'Approved' and prop.publication_status in ['Approved', 'Private Listing', 'Public Listing']:
+        flash(f"Property #{property_id} ('{prop.title}') is already APPROVED. Phase 8/9 complete.", 'info')
         if case_id:
             return redirect(url_for('admin_intent_detail', case_id=case_id))
         return redirect(url_for('admin_intents'))
@@ -932,12 +939,13 @@ def admin_approve_property(property_id):
 
     try:
         if action == 'approve':
-            # 1. Phase 8 Terminal State Transition
+            # 1. Phase 8/9 State Transition: Approved & Private Listing 72h window
             prop.status = 'Approved'
-            prop.publication_status = 'Approved'
+            prop.publication_status = 'Private Listing'
             prop.updated_at = now
 
             dab.status = 'Approved'
+            dab.approved_at = dab.approved_at or now
             dab.updated_at = now
 
             db.session.flush()
@@ -946,7 +954,7 @@ def admin_approve_property(property_id):
             v_evt = VerificationEvent(
                 verification_case_id=prop_case.verification_case_id,
                 event_type='PROPERTY_APPROVED',
-                description=f"Property #{prop.property_id} ('{prop.title}') approved by Admin #{admin_user_id}. Phase 8 complete.",
+                description=f"Property #{prop.property_id} ('{prop.title}') approved by Admin #{admin_user_id}. Phase 8/9 complete.",
                 data={
                     "action": "PROPERTY_APPROVED",
                     "property_id": prop.property_id,
@@ -954,7 +962,8 @@ def admin_approve_property(property_id):
                     "approved_by_user_id": admin_user_id,
                     "property_status": "Approved",
                     "dab_status": "Approved",
-                    "publication_status": "Approved",
+                    "publication_status": "Private Listing",
+                    "approved_at": dab.approved_at.isoformat(),
                     "timestamp": now.isoformat()
                 },
                 status='Passed',
@@ -975,7 +984,7 @@ def admin_approve_property(property_id):
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent'),
                 previous_values={"status": "Verified", "publication_status": "Under Verification", "dab_status": "Under Verification"},
-                new_values={"status": "Approved", "publication_status": "Approved", "dab_status": "Approved"},
+                new_values={"status": "Approved", "publication_status": "Private Listing", "dab_status": "Approved", "approved_at": dab.approved_at.isoformat()},
                 created_at=now
             )
             db.session.add(audit_entry)
@@ -983,14 +992,14 @@ def admin_approve_property(property_id):
             sec_event = SecurityEvent(
                 user_id=admin_user_id,
                 event_type='PROPERTY_APPROVED',
-                description=f"Property #{prop.property_id} ('{prop.title}') approved by admin #{admin_user_id}. Phase 8 complete.",
+                description=f"Property #{prop.property_id} ('{prop.title}') approved by admin #{admin_user_id}. Phase 8/9 complete.",
                 ip_address=request.remote_addr,
                 created_at=now
             )
             db.session.add(sec_event)
 
             db.session.commit()
-            flash(f"Property #{property_id} ('{prop.title}') has been APPROVED successfully. Phase 8 complete.", 'success')
+            flash(f"Property #{property_id} ('{prop.title}') has been APPROVED successfully. Entered Private Listing (72-Hour Window). Phase 8/9 complete.", 'success')
 
     except Exception as e:
         db.session.rollback()

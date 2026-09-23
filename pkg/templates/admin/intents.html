@@ -285,7 +285,9 @@
 
                                     <dt class="col-sm-3 text-muted">Property Status:</dt>
                                     <dd class="col-sm-9">
-                                        {% if prop.status == 'Verified' %}
+                                        {% if prop.status == 'Approved' %}
+                                            <span class="badge bg-primary fw-bold"><i class="bi bi-check-circle-fill me-1"></i> Approved</span>
+                                        {% elif prop.status == 'Verified' %}
                                             <span class="badge bg-success fw-bold"><i class="bi bi-patch-check-fill me-1"></i> Verified</span>
                                         {% elif prop.status == 'Submitted' %}
                                             <span class="badge bg-warning text-dark fw-bold">Submitted (Pending Verification)</span>
@@ -302,7 +304,15 @@
                                     <dd class="col-sm-9"><span class="badge bg-secondary">{{ selected_case.dab.status }}</span></dd>
 
                                     <dt class="col-sm-3 text-muted">Publication Status:</dt>
-                                    <dd class="col-sm-9"><span class="badge bg-secondary">{{ prop.publication_status }}</span></dd>
+                                    <dd class="col-sm-9">
+                                        {% if prop.publication_status == 'Private Listing' and public_eligible_at and now and now < public_eligible_at %}
+                                            <span class="badge bg-primary"><i class="bi bi-shield-lock-fill me-1"></i> Private Listing (72h Window Active)</span>
+                                        {% elif prop.publication_status == 'Public Listing' or (public_eligible_at and now and now >= public_eligible_at) %}
+                                            <span class="badge bg-success"><i class="bi bi-globe me-1"></i> Public Listing Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ prop.publication_status }}</span>
+                                        {% endif %}
+                                    </dd>
                                 </dl>
                             </div>
 
@@ -443,25 +453,33 @@
                                         <span class="small d-block text-muted mt-1">Property status: <code>Verified</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>{{ prop.publication_status }}</code></span>
                                     </div>
 
-                                    <!-- PHASE 8 ADMINISTRATIVE APPROVAL CONTROL -->
+                                    <!-- PHASE 8 & 9 ADMINISTRATIVE APPROVAL CONTROL -->
                                     <div class="mt-3 pt-3 border-top text-center">
-                                        <h6 class="fw-bold text-dark mb-1">Phase 8: Administrative Property Approval</h6>
+                                        <h6 class="fw-bold text-dark mb-1">Phase 8 & 9: Administrative Property Approval</h6>
                                         <p class="text-muted small mb-3">
-                                            Grant administrative approval for this verified property. Approving sets <strong>Property.status = Approved</strong>, <strong>DAB.status = Approved</strong>, and <strong>Publication.status = Approved</strong>.
+                                            Grant administrative approval for this verified property. Approving sets <strong>Property.status = Approved</strong>, <strong>DAB.status = Approved</strong>, and <strong>Publication.status = Private Listing</strong> (entering 72-Hour Private Listing window before Public Listing).
                                         </p>
                                         <form method="POST" action="{{ url_for('admin_approve_property', property_id=prop.property_id) }}">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <input type="hidden" name="action" value="approve">
-                                            <button type="submit" class="btn btn-primary fw-bold px-4 rounded-pill" onclick="return confirm('Confirm Property Approval? This will transition Property, DAB, and Publication statuses to Approved (Phase 8 Complete).');">
-                                                <i class="bi bi-check-circle-fill me-1"></i> Approve Property (Phase 8)
+                                            <button type="submit" class="btn btn-primary fw-bold px-4 rounded-pill" onclick="return confirm('Confirm Property Approval? This will transition Property & DAB status to Approved and Publication status to Private Listing.');">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Approve Property (Phase 8/9)
                                             </button>
                                         </form>
                                     </div>
                                 {% else %}
-                                    <div class="alert alert-primary mb-0 py-2 px-3 rounded-3 text-start">
-                                        <i class="bi bi-check-all me-1"></i> <strong>Phase 8 Complete: Property Approved.</strong>
-                                        <span class="small d-block text-muted mt-1">Property status: <code>Approved</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>{{ prop.publication_status }}</code></span>
-                                    </div>
+                                    {% if prop.publication_status == 'Private Listing' and public_eligible_at and now and now < public_eligible_at %}
+                                        <div class="alert alert-primary mb-0 py-2 px-3 rounded-3 text-start">
+                                            <i class="bi bi-shield-lock-fill me-1"></i> <strong>Phase 9 Active: Private Listing (72-Hour Window Active).</strong>
+                                            <span class="small d-block text-muted mt-1">Property status: <code>Approved</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>Private Listing</code></span>
+                                            <span class="small d-block text-primary font-monospace mt-1"><i class="bi bi-clock-history me-1"></i> Public Listing Eligible: <strong>{{ public_eligible_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</strong></span>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-success mb-0 py-2 px-3 rounded-3 text-start">
+                                            <i class="bi bi-globe me-1"></i> <strong>Phase 9 Active: Public Listing Active.</strong>
+                                            <span class="small d-block text-muted mt-1">Property status: <code>Approved</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>{{ 'Public Listing' if (public_eligible_at and now and now >= public_eligible_at) else prop.publication_status }}</code></span>
+                                        </div>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                         </div>

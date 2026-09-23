@@ -1,7 +1,7 @@
 import os
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from flask import render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -30,6 +30,73 @@ def internal_error(error):
     db.session.rollback()
     return render_template('user/500.html', title='500 Internal System Error'), 500
 
+def is_publicly_eligible(prop):
+    """
+    Phase 9 Helper: Determines if a property is eligible for public marketplace discovery (past 72h window or explicit Public Listing).
+    """
+    if not prop:
+        return False
+    if prop.publication_status == 'Public Listing':
+        return True
+    if prop.publication_status in ['Private Listing', 'Approved']:
+        dab = prop.dab
+        if dab and dab.approved_at:
+            return datetime.utcnow() >= (dab.approved_at + timedelta(hours=72))
+    return False
+
+
+def is_authorized_for_private_property(prop):
+    """
+    Phase 9 Private Listing Security Gate:
+    Determines if the current request/session is authorized to access a property
+    during its 72-hour Private Listing window.
+
+    Access is granted ONLY for:
+    1. Super Administrators
+    2. The Property Owner (owner of prop.dab)
+    3. Requests carrying a valid customized listing link token matching prop.dab_id (via query ?token= or session).
+    """
+    if not prop or not prop.dab_id:
+        return False
+
+    user_id = session.get('user_id')
+    if user_id:
+        if session.get('is_super_admin') or session.get('user_role') == 'super_admin':
+            return True
+        user = User.query.get(user_id)
+        if user and user.is_super_admin:
+            return True
+
+        owner_prof = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+        if owner_prof and prop.dab and prop.dab.owner_profile_id == owner_prof.owner_profile_id:
+            return True
+
+    v_case = VerificationCase.query.filter_by(dab_id=prop.dab_id).first()
+    if v_case and v_case.result_details:
+        try:
+            parsed = json.loads(v_case.result_details)
+            if isinstance(parsed, dict) and 'customized_listing_link' in parsed:
+                link_info = parsed['customized_listing_link']
+                valid_token = link_info.get('token')
+                if valid_token and link_info.get('status') == 'active':
+                    req_token = request.args.get('token')
+                    if req_token and req_token == valid_token:
+                        customized_tokens = session.get('customized_tokens', {})
+                        customized_tokens[str(prop.dab_id)] = valid_token
+                        session['customized_tokens'] = customized_tokens
+                        return True
+
+                    customized_tokens = session.get('customized_tokens', {})
+                    if customized_tokens.get(str(prop.dab_id)) == valid_token:
+                        return True
+
+                    if session.get('customized_token') == valid_token:
+                        return True
+        except Exception:
+            pass
+
+    return False
+
 
 # ==========================================
 # PHASE 2 — INTENT-DRIVEN PUBLIC WEBSITE ROUTES
@@ -40,9 +107,18 @@ def homepage():
     """
     Odacity Intent-Driven Homepage.
     """
-    featured_props = Property.query.filter_by(publication_status='Approved').limit(6).all()
-    if not featured_props:
-        featured_props = Property.query.limit(6).all()
+    cutoff_time = datetime.utcnow() - timedelta(hours=72)
+    featured_props = Property.query.outerjoin(DirectAssetBrief, Property.dab_id == DirectAssetBrief.dab_id).filter(
+        db.or_(
+            Property.publication_status == 'Public Listing',
+            Property.publication_status == 'Approved',
+            db.and_(
+                Property.publication_status == 'Private Listing',
+                DirectAssetBrief.approved_at != None,
+                DirectAssetBrief.approved_at <= cutoff_time
+            )
+        )
+    ).order_by(Property.created_at.desc()).limit(6).all()
     return render_template('user/index.html', title='Odacity — Direct Asset Briefs & Verified Real Estate', properties=featured_props)
 
 
@@ -78,12 +154,19 @@ def properties():
                     min_price = parts[0]
                 max_price = parts[1]
 
-    # Enforce publication filtering for public discovery (fallback to query if no Approved properties yet)
-    query = Property.query.filter_by(publication_status='Approved')
-    if query.count() == 0:
-        query = Property.query
-
-    query = query.outerjoin(DirectAssetBrief, Property.dab_id == DirectAssetBrief.dab_id)
+    # Enforce publication filtering for public marketplace discovery (72-hour Private Listing window enforcement)
+    cutoff_time = datetime.utcnow() - timedelta(hours=72)
+    query = Property.query.outerjoin(DirectAssetBrief, Property.dab_id == DirectAssetBrief.dab_id).filter(
+        db.or_(
+            Property.publication_status == 'Public Listing',
+            Property.publication_status == 'Approved',
+            db.and_(
+                Property.publication_status == 'Private Listing',
+                DirectAssetBrief.approved_at != None,
+                DirectAssetBrief.approved_at <= cutoff_time
+            )
+        )
+    )
 
     if state:
         query = query.filter(Property.state.ilike(f'%{state}%'))
@@ -124,6 +207,16 @@ def properties():
 def property_detail(property_id):
     intent = request.args.get('intent', '').lower()
     prop = Property.query.get_or_404(property_id)
+
+    if prop.publication_status and prop.publication_status not in ['Approved', 'Private Listing', 'Public Listing']:
+        flash('This property is not currently available for public viewing.', 'danger')
+        return redirect(url_for('properties'))
+
+    # Phase 9 Private Listing Access Control Gate
+    if not is_publicly_eligible(prop):
+        if not is_authorized_for_private_property(prop):
+            flash('This property is currently in a Private Listing period. Controlled customized-listing authorization is required for access.', 'warning')
+            return redirect(url_for('properties'))
 
     is_saved = False
     active_application = None
@@ -1546,9 +1639,14 @@ def apply_property(property_id):
 
     prop = Property.query.get_or_404(property_id)
 
-    if prop.publication_status and prop.publication_status != 'Approved':
+    if prop.publication_status and prop.publication_status not in ['Approved', 'Private Listing', 'Public Listing']:
         flash('This property is not currently available for application.', 'danger')
         return redirect(url_for('properties'))
+
+    if not is_publicly_eligible(prop):
+        if not is_authorized_for_private_property(prop):
+            flash('This property is currently in a Private Listing period. Controlled customized-listing authorization is required for access.', 'warning')
+            return redirect(url_for('properties'))
 
     # Duplicate active application check per customer/property
     existing_app = Application.query.filter(
@@ -1668,9 +1766,14 @@ def request_inspection(property_id):
 
     prop = Property.query.get_or_404(property_id)
 
-    if prop.publication_status and prop.publication_status != 'Approved':
+    if prop.publication_status and prop.publication_status not in ['Approved', 'Private Listing', 'Public Listing']:
         flash('This property is not currently available for inspection.', 'danger')
         return redirect(url_for('properties'))
+
+    if not is_publicly_eligible(prop):
+        if not is_authorized_for_private_property(prop):
+            flash('This property is currently in a Private Listing period. Controlled customized-listing authorization is required for access.', 'warning')
+            return redirect(url_for('properties'))
 
     # Duplicate active inspection check per customer/property
     existing_insp = Inspection.query.filter(
@@ -1805,9 +1908,14 @@ def submit_offer(property_id):
 
     prop = Property.query.get_or_404(property_id)
 
-    if prop.publication_status and prop.publication_status != 'Approved':
+    if prop.publication_status and prop.publication_status not in ['Approved', 'Private Listing', 'Public Listing']:
         flash('This property is not currently available for purchase offers.', 'danger')
         return redirect(url_for('properties'))
+
+    if not is_publicly_eligible(prop):
+        if not is_authorized_for_private_property(prop):
+            flash('This property is currently in a Private Listing period. Controlled customized-listing authorization is required for access.', 'warning')
+            return redirect(url_for('properties'))
 
     # Active duplicate offer check per customer/property
     existing_offer = Offer.query.filter(
@@ -2347,6 +2455,12 @@ def customized_listing_entry(token):
     if target_case.status != 'Passed':
         flash('This Customized Listing Link is not authorized.', 'danger')
         abort(403)
+
+    if target_case.dab_id:
+        customized_tokens = session.get('customized_tokens', {})
+        customized_tokens[str(target_case.dab_id)] = token
+        session['customized_tokens'] = customized_tokens
+    session['customized_token'] = token
 
     from pkg.routes.admin import extract_contact_info, get_entity_display_name
     email, full_name = extract_contact_info(target_case)
