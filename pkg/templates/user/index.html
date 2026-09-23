@@ -157,7 +157,7 @@
                 <button type="button" id="btn-intent-home" class="intent-tab-btn active" aria-selected="true">HOME</button>
                 <button type="button" id="btn-intent-buy" class="intent-tab-btn" aria-selected="false">BUY</button>
                 <button type="button" id="btn-intent-rent" class="intent-tab-btn" aria-selected="false">RENT</button>
-                <button type="button" id="btn-intent-list" class="intent-tab-btn" aria-selected="false">LISTING</button>
+                <button type="button" id="btn-intent-list" class="intent-tab-btn" aria-selected="false">ENQUIRY</button>
                 <button type="button" id="btn-intent-institutional" class="intent-tab-btn" aria-selected="false">PARTNERS</button>
             </div>
         </div>
@@ -426,24 +426,87 @@
                     </div>
                 </div>
 
-                <!-- 3. LISTING HERO PANEL -->
+                <!-- 3. ENQUIRY HERO PANEL -->
                 <div id="hero-panel-list" class="d-none animate__animated animate__fadeIn">
                     <span class="badge bg-danger bg-opacity-20 text-white border border-danger border-opacity-30 px-3 py-2 rounded-pill fw-semibold mb-3">
-                        🏛️ FOR APPROVED PROPERTY OWNERS
+                        📋 ODACITY ENQUIRY
                     </span>
                     <h1 class="display-5 fw-extrabold text-white mb-3">
-                        Submit Direct Asset Brief (DAB) to Verified Buyers
+                        Tell us what you’re looking to do.
                     </h1>
-                    <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 720px;">
-                        List your property directly with Odacity legal verification. Lock in performance guarantee protection ,we have qualified buyers and renters.
+                    <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 760px;">
+                        Whether you’re bringing an asset to Odacity, representing a property owner, working with an institution, or simply need assistance, choose the path that best describes your enquiry.
                     </p>
-                    <div class="d-flex flex-wrap justify-content-center gap-3">
-                        <a href="{{ url_for('submit_dab') }}" class="btn btn-odacity-red btn-md rounded-pill px-4 py-2 fw-bold shadow-sm">
-                            Submit Direct Asset Brief &rarr;
-                        </a>
-                        <a href="{{ url_for('owners') }}" class="btn btn-outline-light btn-md rounded-pill px-4 py-2 fw-bold">
-                            Property Owner Guidelines
-                        </a>
+
+                    <!-- 4 ELEGANT ENQUIRY OPTION CARDS (2x2 GRID ON DESKTOP) -->
+                    <div class="row g-3 text-start mx-auto mb-2" style="max-width: 920px;">
+                        <!-- CARD 1: DAB INDIVIDUAL -->
+                        <div class="col-md-6">
+                            <div class="enquiry-hero-card">
+                                <div>
+                                    <div class="enquiry-hero-cat">DAB INDIVIDUAL</div>
+                                    <h5 class="enquiry-hero-title">Bring a property to Odacity</h5>
+                                    <p class="enquiry-hero-desc">For property owners or individuals who want to submit an asset for consideration through Odacity’s Direct Asset Brief process.</p>
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('enquiry_individual') }}" class="enquiry-hero-cta">
+                                        <span>Start DAB Enquiry</span>
+                                        <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CARD 2: DAB INSTITUTION -->
+                        <div class="col-md-6">
+                            <div class="enquiry-hero-card">
+                                <div>
+                                    <div class="enquiry-hero-cat">DAB INSTITUTION</div>
+                                    <h5 class="enquiry-hero-title">Institutional Property Enquiry</h5>
+                                    <p class="enquiry-hero-desc">For institutions, organisations and corporate property owners seeking to submit or discuss assets with Odacity.</p>
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('enquiry_institution') }}" class="enquiry-hero-cta">
+                                        <span>Start DAB Enquiry</span>
+                                        <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CARD 3: AGENT -->
+                        <div class="col-md-6">
+                            <div class="enquiry-hero-card">
+                                <div>
+                                    <div class="enquiry-hero-cat">AGENT</div>
+                                    <h5 class="enquiry-hero-title">Work With Odacity</h5>
+                                    <p class="enquiry-hero-desc">For property agents who have authority to represent a property owner and want to submit a property or establish an enquiry with Odacity.</p>
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('enquiry_agent') }}" class="enquiry-hero-cta">
+                                        <span>Start Agent Enquiry</span>
+                                        <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CARD 4: GENERAL ENQUIRY -->
+                        <div class="col-md-6">
+                            <div class="enquiry-hero-card">
+                                <div>
+                                    <div class="enquiry-hero-cat">GENERAL ENQUIRY</div>
+                                    <h5 class="enquiry-hero-title">Something Else?</h5>
+                                    <p class="enquiry-hero-desc">For questions, support, information or enquiries that do not fall under the other enquiry categories.</p>
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('contact') }}" class="enquiry-hero-cta">
+                                        <span>Start General Enquiry</span>
+                                        <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

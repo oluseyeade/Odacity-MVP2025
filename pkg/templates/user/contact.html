@@ -1,31 +1,84 @@
 {% extends "user/layout.html" %}
 {% block title %}Contact Us — Odacity{% endblock %}
+
 {% block main_content %}
 <div class="bg-dark text-white py-5 text-center">
     <div class="container py-3">
-        <h1 class="display-5 fw-bold mb-3">Contact Odacity</h1>
+        <div class="mb-3">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="ODACITY Logo" style="height: 48px; width: auto; object-fit: contain;">
+        </div>
+        <h1 class="display-5 fw-bold mb-3">General Enquiry — Contact Odacity</h1>
         <p class="lead text-light opacity-75">16, Ajasa Street, Onikan, Lagos, Nigeria.</p>
     </div>
 </div>
+
 <div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm p-4">
+        <div class="col-md-7 col-lg-6">
+
+            <!-- FLASH MESSAGES -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                            {% if category == 'success' %}
+                                <i class="bi bi-check-circle-fill me-2"></i>
+                            {% elif category == 'danger' %}
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            {% endif %}
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card border-0 shadow-sm p-4 rounded-3">
                 <h4 class="fw-bold mb-3">Send a Message</h4>
-                <form action="#" method="post">
+                <form action="{{ url_for('contact') }}" method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Full Name</label>
-                        <input type="text" class="form-control" placeholder="Your Name" required>
+                        <label for="general_name" class="form-label small fw-bold">{{ form.general_name.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.general_name(class="form-control rounded-3 " + ("is-invalid" if form.general_name.errors else ""), id="general_name", placeholder="Your Full Name") }}
+                        {% for error in form.general_name.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
                     </div>
+
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Email Address</label>
-                        <input type="email" class="form-control" placeholder="name@example.com" required>
+                        <label for="general_email" class="form-label small fw-bold">{{ form.general_email.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.general_email(class="form-control rounded-3 " + ("is-invalid" if form.general_email.errors else ""), id="general_email", placeholder="name@example.com") }}
+                        {% for error in form.general_email.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
                     </div>
+
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Message</label>
-                        <textarea class="form-control" rows="4" placeholder="How can we help you?" required></textarea>
+                        <label for="general_phone" class="form-label small fw-bold">{{ form.general_phone.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.general_phone(class="form-control rounded-3 " + ("is-invalid" if form.general_phone.errors else ""), id="general_phone", placeholder="+234...") }}
+                        {% for error in form.general_phone.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">Send Inquiry</button>
+
+                    <div class="mb-3">
+                        <label for="general_subject" class="form-label small fw-bold">{{ form.general_subject.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.general_subject(class="form-control rounded-3 " + ("is-invalid" if form.general_subject.errors else ""), id="general_subject", placeholder="Subject of your enquiry") }}
+                        {% for error in form.general_subject.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="general_message" class="form-label small fw-bold">{{ form.general_message.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.general_message(class="form-control rounded-3 " + ("is-invalid" if form.general_message.errors else ""), id="general_message", rows=4, placeholder="How can we help you?") }}
+                        {% for error in form.general_message.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold rounded-pill py-2.5">Send Enquiry</button>
                 </form>
             </div>
         </div>

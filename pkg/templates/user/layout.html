@@ -154,15 +154,14 @@
             <div class="collapse navbar-collapse" id="navbarMain">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-lg-1">
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if request.path in ['/about/', '/how-it-works/', '/contact/', '/owners/'] %}active{% endif %}" href="#" id="aboutUsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle fw-semibold {% if request.path in ['/about/', '/how-it-works/', '/contact/'] %}active{% endif %}" href="#" id="aboutUsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             About Us
                         </a>
                         <ul class="dropdown-menu border-0 shadow-lg mt-2 rounded-3" aria-labelledby="aboutUsDropdown">
-                            <li><a class="dropdown-item small {% if request.path == '/about/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('about') }}">About Odacity</a></li>
-                            <li><a class="dropdown-item small {% if request.path == '/how-it-works/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('how_it_works') }}">How Odacity Works</a></li>
-                            <li><a class="dropdown-item small {% if request.path == '/owners/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('owners') }}">Property Owners (DAB)</a></li>
+                            <li><a class="dropdown-item small fw-medium {% if request.path == '/about/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('about') }}">About Odacity</a></li>
+                            <li><a class="dropdown-item small fw-medium {% if request.path == '/how-it-works/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('how_it_works') }}">How Odacity Works</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item small {% if request.path == '/contact/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('contact') }}">Contact Operations</a></li>
+                            <li><a class="dropdown-item small fw-medium {% if request.path == '/contact/' %}fw-bold text-odacity-red{% endif %}" href="{{ url_for('contact') }}">Contact Operators</a></li>
                         </ul>
                     </li>
                 </ul>

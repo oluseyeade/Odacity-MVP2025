@@ -361,3 +361,63 @@
         transform: none !important;
     }
 }
+
+/* ENQUIRY HERO CARDS (ENQUIRY INTENT PANEL) */
+.enquiry-hero-card {
+    background-color: rgba(15, 23, 42, 0.82) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+}
+
+.enquiry-hero-card:hover {
+    transform: translateY(-4px);
+    border-color: #C11B24;
+    box-shadow: 0 10px 25px rgba(193, 27, 36, 0.25);
+}
+
+.enquiry-hero-cat {
+    font-size: 0.725rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #C11B24;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.enquiry-hero-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+}
+
+.enquiry-hero-desc {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}
+
+.enquiry-hero-cta {
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: color 0.2s ease;
+}
+
+.enquiry-hero-card:hover .enquiry-hero-cta {
+    color: #C11B24;
+}

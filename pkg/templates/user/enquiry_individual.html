@@ -1,6 +1,6 @@
 {% extends "user/layout.html" %}
 
-{% block title %}DAB Institution & Organization Enquiry — Odacity{% endblock %}
+{% block title %}DAB Individual Enquiry — Odacity{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/intent-onboarding.css') }}">
@@ -84,11 +84,11 @@
             <img src="{{ url_for('static', filename='img/logo.png') }}" alt="ODACITY Logo" style="height: 48px; width: auto; object-fit: contain;">
         </div>
         <div class="intent-hub-badge">
-            <i class="bi bi-building-fill me-1"></i> DAB INSTITUTION &amp; ORGANIZATION ENQUIRY
+            <i class="bi bi-person-badge-fill me-1"></i> DAB — INDIVIDUAL
         </div>
-        <h1 class="display-5 fw-bold text-white mb-3">DAB Institution &amp; Organization Enquiry Form</h1>
+        <h1 class="display-5 fw-bold text-white mb-3">DAB Individual Enquiry Form</h1>
         <p class="lead text-light opacity-75 max-width-700 mx-auto mb-0" style="max-width: 720px;">
-            Submit your corporate or institutional asset brief enquiry. Provide details for both your submitting organization and the associated property owner organization.
+            Submit your individual asset brief onboarding enquiry. Provide your contact details and government identity verification document to get started.
         </p>
     </div>
 </section>
@@ -116,101 +116,90 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('enquiry_institution') }}" enctype="multipart/form-data" novalidate>
+        <form method="POST" action="{{ url_for('enquiry_individual') }}" enctype="multipart/form-data" novalidate>
             {{ form.csrf_token }}
 
-            <!-- SECTION A: INSTITUTION / ORGANIZATION INFORMATION -->
+            <!-- SECTION A: INDIVIDUAL INFORMATION -->
             <div class="enquiry-form-card">
                 <div class="section-header-badge">
-                    <i class="bi bi-building me-1"></i> SECTION A
+                    <i class="bi bi-person me-1"></i> SECTION A
                 </div>
-                <h3 class="section-title">Institution / Organization Information</h3>
-                <p class="section-subtitle">Information of the institution or corporate entity submitting this enquiry.</p>
+                <h3 class="section-title">Individual Information</h3>
+                <p class="section-subtitle">Identity and contact details of the individual property owner submitting this enquiry.</p>
                 
                 <div class="row g-3">
-                    <!-- 1. Institution / Organization Name -->
+                    <!-- 1. Full Name -->
                     <div class="col-md-6">
-                        <label for="inst_name" class="form-label-custom">{{ form.inst_name.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_name(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_name.errors else ""), id="inst_name", placeholder="e.g. Acme Real Estate Investments Ltd") }}
-                        {% for error in form.inst_name.errors %}
+                        <label for="dab_individual_name" class="form-label-custom">{{ form.dab_individual_name.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.dab_individual_name(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.dab_individual_name.errors else ""), id="dab_individual_name", placeholder="e.g. Chief O. Adeleke") }}
+                        {% for error in form.dab_individual_name.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
 
-                    <!-- 2. Contact Person -->
+                    <!-- 2. Company Name (Optional) -->
                     <div class="col-md-6">
-                        <label for="inst_contact_person" class="form-label-custom">{{ form.inst_contact_person.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_contact_person(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_contact_person.errors else ""), id="inst_contact_person", placeholder="e.g. Chief Operations Officer") }}
-                        {% for error in form.inst_contact_person.errors %}
+                        <label for="dab_individual_company_name" class="form-label-custom">{{ form.dab_individual_company_name.label.text }}</label>
+                        {{ form.dab_individual_company_name(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.dab_individual_company_name.errors else ""), id="dab_individual_company_name", placeholder="e.g. Adeleke Estates (Optional)") }}
+                        {% for error in form.dab_individual_company_name.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
 
-                    <!-- 3. Official Email -->
+                    <!-- 3. Email Address -->
                     <div class="col-md-6">
-                        <label for="inst_official_email" class="form-label-custom">{{ form.inst_official_email.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_official_email(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_official_email.errors else ""), id="inst_official_email", placeholder="corporate@institution.com") }}
-                        {% for error in form.inst_official_email.errors %}
+                        <label for="dab_individual_email" class="form-label-custom">{{ form.dab_individual_email.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.dab_individual_email(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.dab_individual_email.errors else ""), id="dab_individual_email", placeholder="adeleke@example.com") }}
+                        {% for error in form.dab_individual_email.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
 
-                    <!-- 4. Phone -->
+                    <!-- 4. Phone Number -->
                     <div class="col-md-6">
-                        <label for="inst_phone" class="form-label-custom">{{ form.inst_phone.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_phone(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_phone.errors else ""), id="inst_phone", placeholder="+234 800 000 0000") }}
-                        {% for error in form.inst_phone.errors %}
+                        <label for="dab_individual_phone" class="form-label-custom">{{ form.dab_individual_phone.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.dab_individual_phone(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.dab_individual_phone.errors else ""), id="dab_individual_phone", placeholder="+234 800 000 0000") }}
+                        {% for error in form.dab_individual_phone.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
 
-                    <!-- 5. Office Address -->
+                    <!-- 5. Office/Home Address -->
                     <div class="col-12">
-                        <label for="inst_office_address" class="form-label-custom">{{ form.inst_office_address.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_office_address(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_office_address.errors else ""), id="inst_office_address", rows="3", placeholder="Full corporate office address") }}
-                        {% for error in form.inst_office_address.errors %}
+                        <label for="dab_individual_address" class="form-label-custom">{{ form.dab_individual_address.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.dab_individual_address(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.dab_individual_address.errors else ""), id="dab_individual_address", rows="3", placeholder="Full home or office address") }}
+                        {% for error in form.dab_individual_address.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
 
-                    <!-- 6. Organization Type -->
+                    <!-- 6. Government ID Number -->
                     <div class="col-md-6">
-                        <label for="inst_org_type" class="form-label-custom">{{ form.inst_org_type.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_org_type(class="form-select rounded-3 p-2.5 " + ("is-invalid" if form.inst_org_type.errors else ""), id="inst_org_type") }}
-                        {% for error in form.inst_org_type.errors %}
+                        <label for="dab_individual_government_id" class="form-label-custom">{{ form.dab_individual_government_id.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.dab_individual_government_id(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.dab_individual_government_id.errors else ""), id="dab_individual_government_id", placeholder="NIN / Driver's License No / Passport No") }}
+                        {% for error in form.dab_individual_government_id.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
 
-                    <!-- 7. CAC Registration Number -->
+                    <!-- 7. Valid Means of Identification Upload (PDF Only) -->
                     <div class="col-md-6">
-                        <label for="inst_cac_reg_num" class="form-label-custom">{{ form.inst_cac_reg_num.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_cac_reg_num(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_cac_reg_num.errors else ""), id="inst_cac_reg_num", placeholder="RC-XXXXXX") }}
-                        {% for error in form.inst_cac_reg_num.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <!-- 8. CAC Registration Certificate Upload -->
-                    <div class="col-12">
-                        <label for="inst_cac_cert" class="form-label-custom">{{ form.inst_cac_cert.label.text }} <span class="text-danger">*</span></label>
-                        {{ form.inst_cac_cert(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_cac_cert.errors else ""), id="inst_cac_cert", accept="application/pdf,.pdf") }}
+                        <label for="dab_individual_id_document" class="form-label-custom">{{ form.dab_individual_id_document.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.dab_individual_id_document(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.dab_individual_id_document.errors else ""), id="dab_individual_id_document", accept="application/pdf,.pdf") }}
                         <div class="file-format-badge">
-                            <i class="bi bi-file-earmark-pdf me-1"></i> Accepted format: PDF
+                            <i class="bi bi-file-earmark-pdf me-1"></i> Accepted format: PDF only (.pdf)
                         </div>
-                        {% for error in form.inst_cac_cert.errors %}
+                        {% for error in form.dab_individual_id_document.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
                 </div>
             </div>
 
-
-
             <!-- SUBMIT BUTTON -->
             <div class="text-center pt-2 pb-4">
                 <button type="submit" class="btn-enquiry-submit">
-                    <span>Submit DAB Institution Enquiry</span>
+                    <span>Submit DAB Individual Enquiry</span>
                     <i class="bi bi-send-fill ms-2"></i>
                 </button>
             </div>

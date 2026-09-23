@@ -8,7 +8,8 @@ from werkzeug.utils import secure_filename
 
 from pkg import app
 from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog
-from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm
+from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm, DabIndividualEnquiryForm, GeneralEnquiryForm
+from pkg.services.email_service import send_enquiry_acknowledgement
 
 
 
@@ -184,9 +185,100 @@ def about():
     return render_template('user/about.html', title='About Odacity')
 
 
-@app.route('/contact/')
+@app.route('/contact/', methods=['GET', 'POST'])
 def contact():
-    return render_template('user/contact.html', title='Contact Us')
+    """
+    Phase 2 — General Enquiry Form Route with Controlled Persistence & Audit Trail.
+    """
+    form = GeneralEnquiryForm()
+
+    if form.validate_on_submit():
+        now = datetime.utcnow()
+        user_id = session.get('user_id')
+
+        # Build Structured JSON Payload (General Enquiry Information)
+        payload = {
+            "enquiry_type": "General Enquiry",
+            "enquiry_stage": "Intent / Onboarding",
+            "status": "Submitted",
+            "applicant_particulars": {
+                "name": form.general_name.data.strip(),
+                "email": form.general_email.data.strip(),
+                "phone": form.general_phone.data.strip(),
+                "subject": form.general_subject.data.strip(),
+                "message": form.general_message.data.strip()
+            },
+            "submitted_at": now.isoformat()
+        }
+
+        try:
+            # 1. Create Controlled VerificationCase
+            v_case = VerificationCase(
+                entity_type='general_enquiry',
+                verifier_type='owner',
+                verification_type='General Enquiry',
+                status='Submitted',
+                notes=f"General Enquiry submitted by {form.general_name.data.strip()} - Subject: {form.general_subject.data.strip()}",
+                created_at=now,
+                updated_at=now
+            )
+            db.session.add(v_case)
+            db.session.flush()
+
+            # 2. Create VerificationEvent with Structured JSON Payload
+            v_event = VerificationEvent(
+                verification_case_id=v_case.verification_case_id,
+                event_type='GENERAL_ENQUIRY_SUBMITTED',
+                description=f"General Enquiry submitted by {form.general_name.data.strip()} ({form.general_email.data.strip()})",
+                data=payload,
+                status='Submitted',
+                created_by_user_id=user_id,
+                created_at=now
+            )
+            db.session.add(v_event)
+
+            # 3. Create AuditLog Record
+            audit_entry = AuditLog(
+                user_id=user_id,
+                action='GENERAL_ENQUIRY_SUBMITTED',
+                entity_type='general_enquiry',
+                entity_id=v_case.verification_case_id,
+                resource_type='VerificationCase',
+                resource_id=v_case.verification_case_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                new_values=payload,
+                created_at=now
+            )
+            db.session.add(audit_entry)
+
+            # 4. Create SecurityEvent Log
+            sec_event = SecurityEvent(
+                user_id=user_id,
+                event_type='GENERAL_ENQUIRY_SUBMITTED',
+                description=f'General Enquiry submitted by "{form.general_name.data.strip()}"',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+
+            db.session.commit()
+
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            try:
+                send_enquiry_acknowledgement(form.general_email.data.strip(), form.general_name.data.strip(), "General Enquiry")
+            except Exception:
+                pass
+
+            flash(f'Thank you, {form.general_name.data.strip()}! Your General Enquiry has been submitted successfully.', 'success')
+            return redirect(url_for('contact'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while saving your enquiry. Please try again or contact support.', 'danger')
+            return render_template('user/contact.html', title='Contact Us — Odacity', form=form)
+
+    return render_template('user/contact.html', title='Contact Us — Odacity', form=form)
 
 
 @app.route('/onboarding/intent/')
@@ -196,6 +288,137 @@ def intent_selection():
     Odacity Intent & Onboarding Selection Hub.
     """
     return render_template('user/intent_selection.html', title='Select Your Intent & Onboarding Pathway — Odacity')
+
+
+@app.route('/enquiry/individual/', methods=['GET', 'POST'])
+def enquiry_individual():
+    """
+    Phase 2 — DAB Individual Onboarding Enquiry Form Route with Controlled Persistence & Audit Trail.
+    """
+    form = DabIndividualEnquiryForm()
+
+    if form.validate_on_submit():
+        file_id = form.dab_individual_id_document.data
+        filename_id = getattr(file_id, 'filename', '') if file_id else ''
+        ext_id = filename_id.rsplit('.', 1)[-1].lower() if '.' in filename_id else ''
+
+        if ext_id != 'pdf':
+            flash('Validation error: Valid Means of Identification must be in PDF format (.pdf only). Non-PDF files are rejected.', 'danger')
+            return render_template('user/enquiry_individual.html', title='DAB Individual Enquiry', form=form)
+
+        # Controlled Upload Directory Setup
+        upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'dab_individual_documents')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        now = datetime.utcnow()
+        timestamp_str = now.strftime('%Y%m%d%H%M%S')
+
+        safe_name_id = secure_filename(filename_id) or 'dab_individual_id.pdf'
+        file_name_saved_id = f"dab_ind_{uuid.uuid4().hex[:8]}_{timestamp_str}_{safe_name_id}"
+        full_path_id = os.path.join(upload_dir, file_name_saved_id)
+        rel_path_id = f"uploads/dab_individual_documents/{file_name_saved_id}"
+
+        created_files = []
+
+        try:
+            # 1. Save uploaded ID document file safely
+            file_id.save(full_path_id)
+            created_files.append(full_path_id)
+
+            user_id = session.get('user_id')
+
+            # 2. Build Structured JSON Payload (Individual Information)
+            company_name_val = form.dab_individual_company_name.data.strip() if form.dab_individual_company_name.data else ''
+            payload = {
+                "enquiry_type": "DAB Individual",
+                "enquiry_stage": "Intent / Onboarding",
+                "status": "Submitted",
+                "individual_particulars": {
+                    "name": form.dab_individual_name.data.strip(),
+                    "company_name": company_name_val,
+                    "email": form.dab_individual_email.data.strip(),
+                    "phone": form.dab_individual_phone.data.strip(),
+                    "address": form.dab_individual_address.data.strip(),
+                    "government_id_number": form.dab_individual_government_id.data.strip(),
+                    "identification_document_reference": rel_path_id
+                },
+                "submitted_at": now.isoformat()
+            }
+
+            # 3. Create Controlled VerificationCase
+            v_case = VerificationCase(
+                entity_type='dab_individual',
+                verifier_type='owner',
+                verification_type='DAB Individual Onboarding',
+                status='Submitted',
+                notes=f"DAB Individual Enquiry submitted for {form.dab_individual_name.data.strip()}",
+                created_at=now,
+                updated_at=now
+            )
+            db.session.add(v_case)
+            db.session.flush()
+
+            # 4. Create VerificationEvent with Structured JSON Payload
+            v_event = VerificationEvent(
+                verification_case_id=v_case.verification_case_id,
+                event_type='DAB_INDIVIDUAL_ENQUIRY_SUBMITTED',
+                description=f"DAB Individual Enquiry submitted by {form.dab_individual_name.data.strip()}",
+                data=payload,
+                status='Submitted',
+                created_by_user_id=user_id,
+                created_at=now
+            )
+            db.session.add(v_event)
+
+            # 5. Create AuditLog Record
+            audit_entry = AuditLog(
+                user_id=user_id,
+                action='DAB_INDIVIDUAL_ENQUIRY_SUBMITTED',
+                entity_type='dab_individual',
+                entity_id=v_case.verification_case_id,
+                resource_type='VerificationCase',
+                resource_id=v_case.verification_case_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                new_values=payload,
+                created_at=now
+            )
+            db.session.add(audit_entry)
+
+            # 6. Create SecurityEvent Log
+            sec_event = SecurityEvent(
+                user_id=user_id,
+                event_type='DAB_INDIVIDUAL_ENQUIRY_SUBMITTED',
+                description=f'DAB Individual Enquiry submitted for "{form.dab_individual_name.data.strip()}"',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+
+            db.session.commit()
+
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            try:
+                send_enquiry_acknowledgement(form.dab_individual_email.data.strip(), form.dab_individual_name.data.strip(), "DAB Individual")
+            except Exception:
+                pass
+
+            flash(f'Thank you! Your DAB Individual Enquiry for "{form.dab_individual_name.data.strip()}" has been submitted successfully.', 'success')
+            return redirect(url_for('enquiry_individual'))
+
+        except Exception as e:
+            db.session.rollback()
+            # Clean up newly created files on transaction failure
+            for filepath in created_files:
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                    except OSError:
+                        pass
+            flash('An error occurred while saving your enquiry. Please try again or contact support.', 'danger')
+            return render_template('user/enquiry_individual.html', title='DAB Individual Enquiry', form=form)
+
+    return render_template('user/enquiry_individual.html', title='DAB Individual Enquiry', form=form)
 
 
 @app.route('/enquiry/institution/', methods=['GET', 'POST'])
@@ -304,6 +527,12 @@ def enquiry_institution():
             db.session.add(sec_event)
 
             db.session.commit()
+
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            try:
+                send_enquiry_acknowledgement(form.inst_official_email.data.strip(), form.inst_contact_person.data.strip(), "DAB Institution")
+            except Exception:
+                pass
 
             flash(f'Thank you! Your DAB Institution & Organization Enquiry for "{form.inst_name.data.strip()}" has been submitted successfully.', 'success')
             return redirect(url_for('enquiry_institution'))
@@ -461,6 +690,12 @@ def enquiry_agent():
             db.session.add(sec_event)
 
             db.session.commit()
+
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            try:
+                send_enquiry_acknowledgement(form.agent_email.data.strip(), form.agent_name.data.strip(), "DAB Agent")
+            except Exception:
+                pass
 
             flash(f'Thank you! Your DAB Agent Enquiry for "{form.agent_name.data.strip()}" ({form.agent_company_name.data.strip()}) has been submitted successfully.', 'success')
             return redirect(url_for('enquiry_agent'))

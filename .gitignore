@@ -20,3 +20,9 @@ Thumbs.db
 
 # Environment variables
 .env
+
+# Runtime/user-uploaded documents
+/pkg/static/uploads/agent_documents/
+/pkg/static/uploads/cac_certificates/
+/pkg/static/uploads/dab_individual_documents/
+

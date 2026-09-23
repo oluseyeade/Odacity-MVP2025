@@ -144,6 +144,37 @@ class DabAgentEnquiryForm(FlaskForm):
     submit = SubmitField("Submit DAB Agent Enquiry")
 
 
+class DabIndividualEnquiryForm(FlaskForm):
+    # SECTION A — INDIVIDUAL INFORMATION
+    dab_individual_name = StringField("Full Name", validators=[DataRequired(message="Full Name is required.")])
+    dab_individual_company_name = StringField("Company Name (Optional)", validators=[Optional()])
+    dab_individual_email = EmailField("Email Address", validators=[DataRequired(message="Email Address is required."), Email(message="Please provide a valid email address.")])
+    dab_individual_phone = StringField("Phone Number", validators=[DataRequired(message="Phone number is required.")])
+    dab_individual_address = TextAreaField("Office/Home Address", validators=[DataRequired(message="Office/Home Address is required.")])
+    dab_individual_government_id = StringField("Government ID Number", validators=[DataRequired(message="Government ID Number is required.")])
+    dab_individual_id_document = FileField("Valid Means of Identification", validators=[
+        FileRequired(message="Valid Means of Identification is required."),
+        FileAllowed(['pdf'], message="Accepted format: PDF only. (.pdf)")
+    ])
+
+    submit = SubmitField("Submit DAB Individual Enquiry")
+
+
+class GeneralEnquiryForm(FlaskForm):
+    # SECTION A — APPLICANT IDENTITY
+    general_name = StringField("Full Name", validators=[DataRequired(message="Full Name is required.")])
+    general_email = EmailField("Email Address", validators=[DataRequired(message="Email Address is required."), Email(message="Please provide a valid email address.")])
+    general_phone = StringField("Phone Number", validators=[DataRequired(message="Phone number is required.")])
+
+    # SECTION B — ENQUIRY DETAILS
+    general_subject = StringField("Subject", validators=[DataRequired(message="Subject is required.")])
+    general_message = TextAreaField("Message", validators=[DataRequired(message="Message is required.")])
+
+    submit = SubmitField("Send Enquiry")
+
+
+
+
 
 
 
