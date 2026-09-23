@@ -134,8 +134,21 @@ def buy_entry():
 
 @app.route('/properties/')
 def properties():
-    intent = request.args.get('intent', '').lower()
+    raw_intent = request.args.get('intent', '').lower().strip()
+    if raw_intent == 'sale':
+        raw_intent = 'buy'
+    elif raw_intent == 'lease':
+        raw_intent = 'rent'
+
+    # Section 6 Hard Rule: No mixed default search. If intent is missing or invalid, redirect to explicit 'buy' intent
+    if raw_intent not in ['buy', 'rent']:
+        args = request.args.to_dict()
+        args['intent'] = 'buy'
+        return redirect(url_for('properties', **args))
+
+    intent = raw_intent
     state = request.args.get('state', '').strip()
+    location_input = request.args.get('location', '').strip() or state
     property_type = request.args.get('property_type', '').strip()
     min_price = request.args.get('min_price', '').strip()
     max_price = request.args.get('max_price', '').strip()
@@ -168,8 +181,17 @@ def properties():
         )
     )
 
-    if state:
-        query = query.filter(Property.state.ilike(f'%{state}%'))
+    if location_input:
+        pattern = f'%{location_input}%'
+        query = query.filter(
+            db.or_(
+                Property.state.ilike(pattern),
+                Property.city.ilike(pattern),
+                Property.locality.ilike(pattern),
+                Property.location.ilike(pattern),
+                Property.address.ilike(pattern)
+            )
+        )
     if property_type:
         query = query.filter(Property.property_type.ilike(f'%{property_type}%'))
     if min_price:
