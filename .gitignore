@@ -25,4 +25,6 @@ Thumbs.db
 /pkg/static/uploads/agent_documents/
 /pkg/static/uploads/cac_certificates/
 /pkg/static/uploads/dab_individual_documents/
+/pkg/static/uploads/property_documents/
+/pkg/static/uploads/property_media/
 

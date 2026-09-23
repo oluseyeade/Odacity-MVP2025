@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from pkg import app
-from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent
+from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia
 from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification
 
 logger = logging.getLogger(__name__)
@@ -514,3 +514,340 @@ def admin_serve_upload(filename):
     """
     upload_folder = os.path.join(app.root_path, 'static', 'uploads')
     return send_from_directory(upload_folder, filename)
+
+
+@app.route('/admin/documents/<int:document_id>/verify/', methods=['POST'])
+@admin_required
+def admin_verify_document(document_id):
+    """
+    Phase 7 Document Inspection: Verifies or rejects individual title deeds / survey documents.
+    Updates PropertyDocument.review_status to 'Verified' or 'Rejected'.
+    """
+    doc = PropertyDocument.query.get_or_404(document_id)
+    prop = doc.property
+    dab = prop.dab if prop else None
+
+    v_case = VerificationCase.query.filter_by(dab_id=dab.dab_id).first() if dab else None
+    case_id = v_case.verification_case_id if v_case else None
+
+    action = request.form.get('action', 'verify').lower()
+    notes = request.form.get('notes', '').strip()
+    rejection_reason = request.form.get('rejection_reason', '').strip()
+
+    admin_user_id = session.get('user_id')
+    now = datetime.utcnow()
+
+    try:
+        if action == 'verify':
+            doc.review_status = 'Verified'
+            doc.verified_at = now
+            doc.verified_by_user_id = admin_user_id
+            if notes:
+                doc.notes = notes
+            flash(f"Document '{doc.document_type}' for Property #{prop.property_id} has been VERIFIED.", 'success')
+        elif action == 'reject':
+            doc.review_status = 'Rejected'
+            if rejection_reason:
+                doc.rejection_reason = rejection_reason
+            if notes:
+                doc.notes = notes
+            flash(f"Document '{doc.document_type}' for Property #{prop.property_id} has been REJECTED.", 'warning')
+
+        if prop and prop.status == 'Submitted':
+            prop.status = 'Under Verification'
+            prop.publication_status = 'Under Verification'
+        if dab and dab.status == 'Submitted':
+            dab.status = 'Under Verification'
+
+        if v_case:
+            v_evt = VerificationEvent(
+                verification_case_id=v_case.verification_case_id,
+                event_type='PROPERTY_DOCUMENT_VERIFIED' if action == 'verify' else 'PROPERTY_DOCUMENT_REJECTED',
+                description=f"Document #{doc.document_id} ({doc.document_type}) {action}ed by Admin #{admin_user_id}",
+                data={"document_id": doc.document_id, "action": action, "notes": notes, "rejection_reason": rejection_reason},
+                status='Passed' if action == 'verify' else 'Failed',
+                created_by_user_id=admin_user_id,
+                performed_by_user_id=admin_user_id,
+                created_at=now
+            )
+            db.session.add(v_evt)
+
+        audit_entry = AuditLog(
+            user_id=admin_user_id,
+            action='PROPERTY_DOCUMENT_VERIFIED' if action == 'verify' else 'PROPERTY_DOCUMENT_REJECTED',
+            entity_type='PropertyDocument',
+            entity_id=doc.document_id,
+            resource_type='Property',
+            resource_id=prop.property_id if prop else None,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            new_values={"review_status": doc.review_status, "action": action},
+            created_at=now
+        )
+        db.session.add(audit_entry)
+
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error processing document #{document_id}: {e}")
+        flash(f"An error occurred while processing document #{document_id}: {str(e)}", 'danger')
+
+    if case_id:
+        return redirect(url_for('admin_intent_detail', case_id=case_id))
+    return redirect(url_for('admin_intents'))
+
+
+@app.route('/admin/media/<int:media_id>/review/', methods=['POST'])
+@admin_required
+def admin_review_media(media_id):
+    """
+    Phase 7 Media Review: Approves or rejects individual property photographs.
+    Updates PropertyMedia.review_status to 'Approved' or 'Rejected' (asset quality level only).
+    """
+    med = PropertyMedia.query.get_or_404(media_id)
+    prop = med.property
+    dab = prop.dab if prop else None
+
+    v_case = VerificationCase.query.filter_by(dab_id=dab.dab_id).first() if dab else None
+    case_id = v_case.verification_case_id if v_case else None
+
+    action = request.form.get('action', 'approve').lower()
+    rejection_reason = request.form.get('rejection_reason', '').strip()
+
+    admin_user_id = session.get('user_id')
+    now = datetime.utcnow()
+
+    try:
+        if action == 'approve':
+            med.review_status = 'Approved'
+            flash(f"Property photo #{media_id} quality approved.", 'success')
+        elif action == 'reject':
+            med.review_status = 'Rejected'
+            if rejection_reason:
+                med.rejection_reason = rejection_reason
+            flash(f"Property photo #{media_id} rejected.", 'warning')
+
+        audit_entry = AuditLog(
+            user_id=admin_user_id,
+            action='PROPERTY_MEDIA_REVIEWED',
+            entity_type='PropertyMedia',
+            entity_id=med.media_id,
+            resource_type='Property',
+            resource_id=prop.property_id if prop else None,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            new_values={"review_status": med.review_status, "action": action},
+            created_at=now
+        )
+        db.session.add(audit_entry)
+
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error reviewing media #{media_id}: {e}")
+        flash(f"An error occurred while reviewing photo #{media_id}: {str(e)}", 'danger')
+
+    if case_id:
+        return redirect(url_for('admin_intent_detail', case_id=case_id))
+    return redirect(url_for('admin_intents'))
+
+
+@app.route('/admin/properties/<int:property_id>/verify/', methods=['POST'])
+@admin_required
+def admin_verify_property(property_id):
+    """
+    Phase 7 Terminal Gate: Administrative Property Verification.
+    Updates Property.status = 'Verified', DirectAssetBrief.status = 'Under Verification',
+    Property.publication_status = 'Under Verification' (MUST NOT BE 'Approved').
+    Creates/updates distinct Property VerificationCase with status = 'Passed'.
+    """
+    prop = Property.query.get_or_404(property_id)
+    dab = prop.dab
+
+    if not dab:
+        flash(f"Cannot verify Property #{property_id} because no parent DirectAssetBrief is associated.", 'danger')
+        return redirect(url_for('admin_intents'))
+
+    intent_case = VerificationCase.query.filter_by(dab_id=dab.dab_id).first()
+    case_id = intent_case.verification_case_id if intent_case else None
+
+    action = request.form.get('action', 'verify').lower()
+    admin_user_id = session.get('user_id')
+    now = datetime.utcnow()
+
+    try:
+        if action == 'verify':
+            # Prerequisite Gate Validation: Ensure all submitted title documents are verified
+            if prop.documents:
+                unverified_docs = [d for d in prop.documents if d.review_status != 'Verified']
+                if unverified_docs:
+                    rejected_docs = [d for d in unverified_docs if d.review_status == 'Rejected']
+                    if rejected_docs:
+                        flash(f"Cannot verify Property #{property_id}: One or more title documents have been REJECTED. All documents must be VERIFIED.", 'danger')
+                    else:
+                        flash(f"Cannot verify Property #{property_id}: All submitted title documents must be VERIFIED before property verification.", 'danger')
+                    if case_id:
+                        return redirect(url_for('admin_intent_detail', case_id=case_id))
+                    return redirect(url_for('admin_intents'))
+
+            # Prerequisite Gate Validation: Ensure all property media photos are approved
+            if prop.media:
+                unapproved_media = [m for m in prop.media if m.review_status != 'Approved']
+                if unapproved_media:
+                    rejected_media = [m for m in unapproved_media if m.review_status == 'Rejected']
+                    if rejected_media:
+                        flash(f"Cannot verify Property #{property_id}: One or more property photos have been REJECTED. All media must be APPROVED.", 'danger')
+                    else:
+                        flash(f"Cannot verify Property #{property_id}: All property photos must be APPROVED before property verification.", 'danger')
+                    if case_id:
+                        return redirect(url_for('admin_intent_detail', case_id=case_id))
+                    return redirect(url_for('admin_intents'))
+
+            # 1. Terminal Phase 7 Property state transition
+            prop.status = 'Verified'
+            prop.publication_status = 'Under Verification'  # MUST NOT BE 'Approved'
+            prop.updated_at = now
+
+            dab.status = 'Under Verification'  # MUST NOT BE 'Approved'
+            dab.updated_at = now
+
+            # 2. Distinct Property VerificationCase handling
+            prop_case = VerificationCase.query.filter_by(
+                dab_id=dab.dab_id,
+                verifier_type='property'
+            ).first()
+
+            if not prop_case:
+                prop_case = VerificationCase(
+                    dab_id=dab.dab_id,
+                    entity_type='property',
+                    entity_id=prop.property_id,
+                    verifier_type='property',
+                    verification_type='property_verification',
+                    status='Passed',
+                    started_at=now,
+                    completed_at=now,
+                    assigned_to=admin_user_id,
+                    result_details=json.dumps({"action": "PROPERTY_VERIFIED", "verified_by": admin_user_id}),
+                    created_at=now,
+                    updated_at=now
+                )
+                db.session.add(prop_case)
+            else:
+                prop_case.status = 'Passed'
+                prop_case.completed_at = now
+                prop_case.assigned_to = admin_user_id
+                prop_case.updated_at = now
+
+            db.session.flush()
+
+            # 3. Log VerificationEvent: PROPERTY_VERIFIED
+            v_evt = VerificationEvent(
+                verification_case_id=prop_case.verification_case_id,
+                event_type='PROPERTY_VERIFIED',
+                description=f"Property #{prop.property_id} ('{prop.title}') verified by Admin #{admin_user_id}",
+                data={
+                    "action": "PROPERTY_VERIFIED",
+                    "property_id": prop.property_id,
+                    "dab_id": dab.dab_id,
+                    "verified_by_user_id": admin_user_id,
+                    "property_status": "Verified",
+                    "dab_status": "Under Verification",
+                    "publication_status": "Under Verification",
+                    "timestamp": now.isoformat()
+                },
+                status='Passed',
+                created_by_user_id=admin_user_id,
+                performed_by_user_id=admin_user_id,
+                created_at=now
+            )
+            db.session.add(v_evt)
+
+            # 4. Log AuditLog & SecurityEvent
+            audit_entry = AuditLog(
+                user_id=admin_user_id,
+                action='PROPERTY_VERIFIED',
+                entity_type='Property',
+                entity_id=prop.property_id,
+                resource_type='Property',
+                resource_id=prop.property_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                previous_values={"status": "Submitted", "publication_status": "Submitted"},
+                new_values={"status": "Verified", "publication_status": "Under Verification", "dab_status": "Under Verification"},
+                created_at=now
+            )
+            db.session.add(audit_entry)
+
+            sec_event = SecurityEvent(
+                user_id=admin_user_id,
+                event_type='PROPERTY_VERIFIED',
+                description=f"Property #{prop.property_id} ('{prop.title}') verified by admin #{admin_user_id}. Phase 7 complete.",
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+
+            db.session.commit()
+            flash(f"Property #{property_id} ('{prop.title}') has been VERIFIED successfully.", 'success')
+
+        elif action == 'fail':
+            prop.status = 'Rejected'
+            prop.publication_status = 'Under Verification'
+            dab.status = 'Rejected'
+            dab.updated_at = now
+
+            prop_case = VerificationCase.query.filter_by(
+                dab_id=dab.dab_id,
+                verifier_type='property'
+            ).first()
+
+            if not prop_case:
+                prop_case = VerificationCase(
+                    dab_id=dab.dab_id,
+                    entity_type='property',
+                    entity_id=prop.property_id,
+                    verifier_type='property',
+                    verification_type='property_verification',
+                    status='Failed',
+                    started_at=now,
+                    completed_at=now,
+                    assigned_to=admin_user_id,
+                    result_details=json.dumps({"action": "PROPERTY_VERIFICATION_FAILED", "rejected_by": admin_user_id}),
+                    created_at=now,
+                    updated_at=now
+                )
+                db.session.add(prop_case)
+            else:
+                prop_case.status = 'Failed'
+                prop_case.completed_at = now
+                prop_case.assigned_to = admin_user_id
+                prop_case.updated_at = now
+
+            db.session.flush()
+
+            v_evt = VerificationEvent(
+                verification_case_id=prop_case.verification_case_id,
+                event_type='PROPERTY_VERIFICATION_FAILED',
+                description=f"Property verification failed for Property #{prop.property_id} by Admin #{admin_user_id}",
+                data={"action": "PROPERTY_VERIFICATION_FAILED", "property_id": prop.property_id, "dab_id": dab.dab_id},
+                status='Failed',
+                created_by_user_id=admin_user_id,
+                performed_by_user_id=admin_user_id,
+                created_at=now
+            )
+            db.session.add(v_evt)
+
+            db.session.commit()
+            flash(f"Property verification for Property #{property_id} has failed (status: Rejected).", 'warning')
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error verifying property #{property_id}: {e}")
+        flash(f"An error occurred while verifying property #{property_id}: {str(e)}", 'danger')
+
+    if case_id:
+        return redirect(url_for('admin_intent_detail', case_id=case_id))
+    return redirect(url_for('admin_intents'))

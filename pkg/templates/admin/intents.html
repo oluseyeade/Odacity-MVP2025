@@ -263,6 +263,189 @@
                             <i class="bi bi-lock-fill me-1"></i> Decision Completed. Case is currently in <strong>{{ selected_case.status }}</strong> state.
                         </div>
                     {% endif %}
+
+                    {% if selected_case.dab and selected_case.dab.property %}
+                        {% set prop = selected_case.dab.property %}
+                        <div class="mt-4 pt-3 border-top text-start">
+                            <h5 class="fw-bold text-dark mb-3">
+                                <i class="bi bi-building-check text-danger me-2"></i>Phase 7: Property & Document Verification
+                            </h5>
+
+                            <div class="card bg-white border p-3 rounded-3 mb-3">
+                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-2">Submitted Property Summary</h6>
+                                <dl class="row mb-0 small">
+                                    <dt class="col-sm-3 text-muted">Property Title:</dt>
+                                    <dd class="col-sm-9 fw-bold">{{ prop.title }}</dd>
+
+                                    <dt class="col-sm-3 text-muted">Location:</dt>
+                                    <dd class="col-sm-9">{{ prop.address }}, {{ prop.city }}, {{ prop.state }}</dd>
+
+                                    <dt class="col-sm-3 text-muted">Price:</dt>
+                                    <dd class="col-sm-9 fw-bold text-success">NGN {{ "{:,.2f}".format(prop.price) if prop.price else 'N/A' }}</dd>
+
+                                    <dt class="col-sm-3 text-muted">Property Status:</dt>
+                                    <dd class="col-sm-9">
+                                        {% if prop.status == 'Verified' %}
+                                            <span class="badge bg-success fw-bold"><i class="bi bi-patch-check-fill me-1"></i> Verified</span>
+                                        {% elif prop.status == 'Submitted' %}
+                                            <span class="badge bg-warning text-dark fw-bold">Submitted (Pending Verification)</span>
+                                        {% elif prop.status == 'Under Verification' %}
+                                            <span class="badge bg-info text-dark fw-bold">Under Verification</span>
+                                        {% elif prop.status == 'Rejected' %}
+                                            <span class="badge bg-danger fw-bold">Rejected</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ prop.status }}</span>
+                                        {% endif %}
+                                    </dd>
+
+                                    <dt class="col-sm-3 text-muted">DAB Status:</dt>
+                                    <dd class="col-sm-9"><span class="badge bg-secondary">{{ selected_case.dab.status }}</span></dd>
+
+                                    <dt class="col-sm-3 text-muted">Publication Status:</dt>
+                                    <dd class="col-sm-9"><span class="badge bg-secondary">{{ prop.publication_status }}</span></dd>
+                                </dl>
+                            </div>
+
+                            <!-- TITLE DOCUMENTS VERIFICATION -->
+                            {% if prop.documents %}
+                                <div class="card bg-white border p-3 rounded-3 mb-3">
+                                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-file-earmark-lock me-1"></i>Title Documents Verification</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered align-middle mb-0 small">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Document Type</th>
+                                                    <th>File Path</th>
+                                                    <th>Review Status</th>
+                                                    <th>Verified Date</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for doc in prop.documents %}
+                                                    <tr>
+                                                        <td class="fw-bold">{{ doc.document_type }}</td>
+                                                        <td>
+                                                            {% set filename = doc.file_path.split('/')[-1] %}
+                                                            <a href="{{ url_for('admin_serve_upload', filename='property_documents/' + filename) }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2">
+                                                                <i class="bi bi-file-earmark-pdf me-1"></i> Inspect Document
+                                                            </a>
+                                                        </td>
+                                                        <td>
+                                                            {% if doc.review_status == 'Verified' %}
+                                                                <span class="badge bg-success">Verified</span>
+                                                            {% elif doc.review_status == 'Rejected' %}
+                                                                <span class="badge bg-danger">Rejected</span>
+                                                            {% else %}
+                                                                <span class="badge bg-warning text-dark">Pending</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ doc.verified_at.strftime('%Y-%m-%d %H:%M') if doc.verified_at else '-' }}</td>
+                                                        <td>
+                                                            {% if doc.review_status != 'Verified' %}
+                                                                <form method="POST" action="{{ url_for('admin_verify_document', document_id=doc.document_id) }}" class="d-inline">
+                                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                    <input type="hidden" name="action" value="verify">
+                                                                    <button type="submit" class="btn btn-sm btn-success py-0 px-2 fw-bold">
+                                                                        <i class="bi bi-check-lg me-1"></i> Verify
+                                                                    </button>
+                                                                </form>
+                                                            {% endif %}
+                                                            {% if doc.review_status != 'Rejected' %}
+                                                                <form method="POST" action="{{ url_for('admin_verify_document', document_id=doc.document_id) }}" class="d-inline ms-1">
+                                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                    <input type="hidden" name="action" value="reject">
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+                                                                        <i class="bi bi-x-lg me-1"></i> Reject
+                                                                    </button>
+                                                                </form>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <!-- MEDIA QUALITY REVIEW -->
+                            {% if prop.media %}
+                                <div class="card bg-white border p-3 rounded-3 mb-3">
+                                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-images me-1"></i>Property Media Quality Review</h6>
+                                    <div class="row g-2">
+                                        {% for med in prop.media %}
+                                            {% set filename = med.file_path.split('/')[-1] %}
+                                            <div class="col-md-4">
+                                                <div class="border p-2 rounded-3 text-center bg-light">
+                                                    <img src="{{ url_for('admin_serve_upload', filename='property_media/' + filename) }}" alt="Property Media" class="img-fluid rounded mb-2" style="max-height: 120px; object-fit: cover;">
+                                                    <div class="small mb-1">
+                                                        {% if med.is_primary %}<span class="badge bg-primary me-1">Primary</span>{% endif %}
+                                                        {% if med.review_status == 'Approved' %}
+                                                            <span class="badge bg-success">Approved</span>
+                                                        {% elif med.review_status == 'Rejected' %}
+                                                            <span class="badge bg-danger">Rejected</span>
+                                                        {% else %}
+                                                            <span class="badge bg-secondary">{{ med.review_status }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="d-flex justify-content-center gap-1">
+                                                        {% if med.review_status != 'Approved' %}
+                                                            <form method="POST" action="{{ url_for('admin_review_media', media_id=med.media_id) }}">
+                                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                <input type="hidden" name="action" value="approve">
+                                                                <button type="submit" class="btn btn-sm btn-success py-0 px-2">Approve</button>
+                                                            </form>
+                                                        {% endif %}
+                                                        {% if med.review_status != 'Rejected' %}
+                                                            <form method="POST" action="{{ url_for('admin_review_media', media_id=med.media_id) }}">
+                                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                <input type="hidden" name="action" value="reject">
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Reject</button>
+                                                            </form>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <!-- PHASE 7 PROPERTY VERIFICATION TERMINAL DECISION CONTROL -->
+                            <div class="card bg-light border p-3 rounded-3 text-center">
+                                <h6 class="fw-bold text-dark mb-1">Phase 7 Property Verification Decision</h6>
+                                <p class="text-muted small mb-3">
+                                    Completing property verification sets <strong>Property.status = Verified</strong>. Property & DAB publication status remain <strong>Under Verification</strong> pending separate Approval.
+                                </p>
+
+                                {% if prop.status != 'Verified' %}
+                                    <div class="d-flex justify-content-center gap-3">
+                                        <form method="POST" action="{{ url_for('admin_verify_property', property_id=prop.property_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="action" value="verify">
+                                            <button type="submit" class="btn btn-success fw-bold px-4 rounded-pill" onclick="return confirm('Confirm Property Verification? This will set Property.status = Verified. Publication and Brief statuses will remain Under Verification pending separate Approval.');">
+                                                <i class="bi bi-shield-check me-1"></i> Verify Property (Phase 7 Complete)
+                                            </button>
+                                        </form>
+
+                                        <form method="POST" action="{{ url_for('admin_verify_property', property_id=prop.property_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="action" value="fail">
+                                            <button type="submit" class="btn btn-outline-danger fw-bold px-4 rounded-pill" onclick="return confirm('Fail Property Verification?');">
+                                                <i class="bi bi-x-circle me-1"></i> Reject Property Verification
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-success mb-0 py-2 px-3 rounded-3 text-start">
+                                        <i class="bi bi-patch-check-fill me-1"></i> <strong>Property Verified.</strong> Phase 7 complete.
+                                        <span class="small d-block text-muted mt-1">Property status: <code>Verified</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>{{ prop.publication_status }}</code></span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
 
             </div>
