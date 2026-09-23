@@ -1,0 +1,133 @@
+{% extends "user/layout.html" %}
+
+{% block title %}Customized Listing Access — Odacity{% endblock %}
+
+{% block extra_css %}
+<style>
+    .entry-hub-section {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 4rem 1rem 3rem 1rem;
+        color: #ffffff;
+    }
+    .entry-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #10b981;
+        background-color: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        padding: 0.4rem 1.2rem;
+        border-radius: 50px;
+        margin-bottom: 1rem;
+    }
+    .entry-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        padding: 2.5rem 2rem;
+    }
+    .info-summary-box {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block main_content %}
+<!-- HERO HEADER -->
+<section class="entry-hub-section text-center">
+    <div class="container">
+        <div class="mb-3">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="ODACITY Logo" style="height: 48px; width: auto; object-fit: contain;">
+        </div>
+        <div class="entry-badge">
+            <i class="bi bi-shield-check-fill me-1"></i> INTENT APPROVED — CONTROLLED ACCESS
+        </div>
+        <h1 class="display-5 fw-bold text-white mb-3">Customized Listing Link Access</h1>
+        <p class="lead text-light opacity-75 max-width-700 mx-auto mb-0" style="max-width: 720px;">
+            Welcome, <strong>{{ applicant_name }}</strong>. Your onboarding enquiry intent for <strong>{{ display_name }}</strong> has been reviewed and APPROVED by Odacity administration.
+        </p>
+    </div>
+</section>
+
+<!-- MAIN CONTENT CONTAINER -->
+<section class="py-5 bg-light">
+    <div class="container py-2" style="max-width: 900px;">
+
+        <div class="entry-card">
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle mb-3" style="width: 64px; height: 64px;">
+                    <i class="bi bi-check-lg fs-1"></i>
+                </div>
+                <h2 class="h3 fw-bold text-dark mb-2">Controlled Entry Landing Page</h2>
+                <p class="text-muted mb-0">Your customized authorization token has been successfully verified.</p>
+            </div>
+
+            <!-- SUMMARY BOX -->
+            <div class="info-summary-box mb-4">
+                <h5 class="fw-bold text-dark mb-3 border-bottom pb-2">
+                    <i class="bi bi-info-circle-fill me-2 text-primary"></i>Approved Intent Summary
+                </h5>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted">Case Identifier:</dt>
+                    <dd class="col-sm-8 fw-bold">VerificationCase #{{ case.verification_case_id }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Entity Type:</dt>
+                    <dd class="col-sm-8 fw-semibold">{{ display_name }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Applicant / Contact:</dt>
+                    <dd class="col-sm-8 fw-semibold">{{ applicant_name }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Contact Email:</dt>
+                    <dd class="col-sm-8">{{ applicant_email or 'On File' }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Intent Status:</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge bg-success text-white px-3 py-1 rounded-pill fw-bold">
+                            <i class="bi bi-patch-check-fill me-1"></i> Intent Approved (Passed)
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted">Token Status:</dt>
+                    <dd class="col-sm-8 text-success fw-bold">Active & Verified</dd>
+                </dl>
+            </div>
+
+            <!-- NOTICE BOX -->
+            <div class="alert alert-info border-0 shadow-sm rounded-3 p-3 mb-4">
+                <div class="d-flex align-items-start">
+                    <i class="bi bi-shield-lock-fill fs-4 text-info me-3 mt-1"></i>
+                    <div>
+                        <h6 class="fw-bold mb-1">Controlled Access Notice</h6>
+                        <p class="small mb-0 opacity-90">
+                            This Customized Listing Link is your secure access credential following administrative Intent Approval. The controlled property & document submission stage will open through this link in the next phase.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTION CONTROL (PHASE 5 STOPS CLEAN HERE) -->
+            <div class="text-center pt-2">
+                <a href="{{ url_for('controlled_property_submission', token=request.view_args.get('token')) }}" class="btn btn-danger btn-lg rounded-pill px-5 py-2.5 fw-bold shadow-sm">
+                    <span>Proceed to Property & Document Submission</span>
+                    <i class="bi bi-arrow-right-circle-fill ms-2"></i>
+                </a>
+                <div class="mt-3">
+                    <a href="{{ url_for('homepage') }}" class="btn btn-link text-decoration-none text-muted small">
+                        <i class="bi bi-house-door-fill me-1"></i> Return to Odacity Home Page
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</section>
+{% endblock %}

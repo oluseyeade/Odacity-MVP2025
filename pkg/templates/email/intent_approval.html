@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Your Enquiry Intent Has Been Approved — Odacity</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #0f172a; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h2 style="color: #ffffff; margin: 0; font-size: 24px;">ODACITY</h2>
+    </div>
+    
+    <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+        <p>Dear {{ full_name }},</p>
+
+        <p>We are pleased to inform you that your <strong>{{ enquiry_type }}</strong> onboarding enquiry intent has been reviewed and <strong>APPROVED</strong> by our administration team.</p>
+
+        <p>Your application has successfully completed the initial intent review phase. You are now authorized to proceed to the next controlled stage of the Odacity onboarding process.</p>
+
+        {% if customized_link_url %}
+        <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
+            <p style="margin-0 0 10px 0; font-weight: bold; color: #0f172a;">Your Customized Listing Link:</p>
+            <a href="{{ customized_link_url }}" target="_blank" style="display: inline-block; background-color: #C11B24; color: #ffffff; text-decoration: none; padding: 10px 24px; border-radius: 50px; font-weight: bold; font-size: 14px;">Access Controlled Entry</a>
+            <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b; word-break: break-all;">{{ customized_link_url }}</p>
+        </div>
+        {% else %}
+        <p>Our team will provide you with the next authorized submission access details shortly.</p>
+        {% endif %}
+
+        <p>For immediate assistance or further enquiries, you may reach us via:</p>
+
+        <p style="margin-left: 20px; font-weight: bold;">
+            Phone: {{ phone }}<br>
+            WhatsApp: {{ whatsapp }}
+        </p>
+
+        <p>We appreciate your partnership with Odacity.</p>
+
+        <p style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+            Best regards,<br>
+            <strong>Odacity Team</strong><br>
+            <em style="color: #64748b;">Property Ownership Without the Stress</em>
+        </p>
+    </div>
+</body>
+</html>

@@ -1,14 +1,15 @@
 import os
+import json
 import uuid
 from datetime import datetime
 from urllib.parse import urlparse
-from flask import render_template, request, redirect, url_for, flash, session
+from flask import render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 from pkg import app
 from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog
-from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm, DabIndividualEnquiryForm, GeneralEnquiryForm
+from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm, DabIndividualEnquiryForm, GeneralEnquiryForm, ControlledPropertySubmissionForm
 from pkg.services.email_service import send_enquiry_acknowledgement
 
 
@@ -2309,6 +2310,303 @@ def notifications():
         db.session.commit()
 
     return render_template('user/notifications.html', title='My Notifications — ODACITY', user=user, notifications=notifs)
+
+
+@app.route('/onboarding/customized-listing/<token>/')
+def customized_listing_entry(token):
+    """
+    Controlled Entry Endpoint for Phase 5:
+    Receives an opaque token, resolves it against VerificationCase.result_details,
+    confirms that the case exists and has status == 'Passed' (Intent Approved).
+    Rejects invalid/unapproved tokens with 404/403.
+    """
+    if not token or len(token) < 10:
+        abort(404)
+
+    # Search for matching VerificationCase containing token in result_details
+    all_cases = VerificationCase.query.all()
+    target_case = None
+
+    for c in all_cases:
+        if c.result_details:
+            try:
+                parsed = json.loads(c.result_details)
+                if isinstance(parsed, dict) and 'customized_listing_link' in parsed:
+                    link_info = parsed['customized_listing_link']
+                    if link_info.get('token') == token and link_info.get('status') == 'active':
+                        target_case = c
+                        break
+            except Exception:
+                pass
+
+    if not target_case:
+        flash('Invalid or expired Customized Listing Link.', 'danger')
+        abort(404)
+
+    # Confirm status is strictly Passed
+    if target_case.status != 'Passed':
+        flash('This Customized Listing Link is not authorized.', 'danger')
+        abort(403)
+
+    from pkg.routes.admin import extract_contact_info, get_entity_display_name
+    email, full_name = extract_contact_info(target_case)
+
+    return render_template(
+        'user/customized_listing_entry.html',
+        case=target_case,
+        applicant_name=full_name,
+        applicant_email=email,
+        display_name=get_entity_display_name(target_case.entity_type),
+        title='Customized Listing Access — Odacity'
+    )
+
+
+@app.route('/onboarding/customized-listing/<token>/submit/', methods=['GET', 'POST'])
+def controlled_property_submission(token):
+    """
+    Controlled Property / DAB Submission Endpoint for Phase 6:
+    Receives token, validates against VerificationCase (status == 'Passed').
+    Provides a controlled multi-step submission workflow for property location, details, photos, and title deeds.
+    Saves DirectAssetBrief (status='Submitted'), Property (publication_status='Submitted', status='Submitted'),
+    PropertyMedia (review_status='Uploaded'), and PropertyDocument (review_status='Pending').
+    STOPS CLEAN AT SUBMITTED.
+    """
+    if not token or len(token) < 10:
+        abort(404)
+
+    # Resolve VerificationCase containing token in result_details
+    all_cases = VerificationCase.query.all()
+    target_case = None
+
+    for c in all_cases:
+        if c.result_details:
+            try:
+                parsed = json.loads(c.result_details)
+                if isinstance(parsed, dict) and 'customized_listing_link' in parsed:
+                    link_info = parsed['customized_listing_link']
+                    if link_info.get('token') == token and link_info.get('status') == 'active':
+                        target_case = c
+                        break
+            except Exception:
+                pass
+
+    if not target_case:
+        flash('Invalid or expired Customized Listing Link token.', 'danger')
+        abort(404)
+
+    if target_case.status != 'Passed':
+        flash('This Customized Listing Link is not authorized for submission.', 'danger')
+        abort(403)
+
+    from pkg.routes.admin import extract_contact_info, get_entity_display_name
+    email, full_name = extract_contact_info(target_case)
+
+    # Check for existing submitted DAB to prevent duplicate submissions
+    existing_dab = None
+    if target_case.dab_id:
+        existing_dab = DirectAssetBrief.query.get(target_case.dab_id)
+
+    form = ControlledPropertySubmissionForm()
+
+    if form.validate_on_submit():
+        now = datetime.utcnow()
+        user_id = session.get('user_id')
+
+        # 1. Resolve or create PropertyOwnerProfile
+        owner_prof = None
+        if user_id:
+            owner_prof = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+        
+        if not owner_prof:
+            if user_id:
+                owner_prof = PropertyOwnerProfile(user_id=user_id, created_at=now)
+                db.session.add(owner_prof)
+                db.session.flush()
+            else:
+                u = User.query.filter_by(email=email).first() if email else None
+                if u:
+                    owner_prof = PropertyOwnerProfile.query.filter_by(user_id=u.user_id).first()
+                    if not owner_prof:
+                        owner_prof = PropertyOwnerProfile(user_id=u.user_id, created_at=now)
+                        db.session.add(owner_prof)
+                        db.session.flush()
+                else:
+                    fallback_user = User.query.first()
+                    if fallback_user:
+                        owner_prof = PropertyOwnerProfile.query.filter_by(user_id=fallback_user.user_id).first()
+                        if not owner_prof:
+                            owner_prof = PropertyOwnerProfile(user_id=fallback_user.user_id, created_at=now)
+                            db.session.add(owner_prof)
+                            db.session.flush()
+
+        owner_profile_id = owner_prof.owner_profile_id if owner_prof else 1
+
+        try:
+            # 2. Resolve or create DirectAssetBrief (status = 'Submitted')
+            if not existing_dab:
+                dab = DirectAssetBrief(
+                    owner_profile_id=owner_profile_id,
+                    title=form.title.data.strip(),
+                    service_type=form.service_type.data,
+                    property_type=form.property_type.data,
+                    location=f"{form.address.data.strip()}, {form.city.data.strip()}, {form.state.data.strip()}",
+                    budget_range=str(form.price.data) if form.price.data else None,
+                    brief_details=form.description.data.strip() if form.description.data else None,
+                    status='Submitted',
+                    submitted_at=now,
+                    created_at=now
+                )
+                db.session.add(dab)
+                db.session.flush()
+                target_case.dab_id = dab.dab_id
+            else:
+                dab = existing_dab
+                dab.title = form.title.data.strip()
+                dab.service_type = form.service_type.data
+                dab.property_type = form.property_type.data
+                dab.location = f"{form.address.data.strip()}, {form.city.data.strip()}, {form.state.data.strip()}"
+                dab.budget_range = str(form.price.data) if form.price.data else None
+                dab.brief_details = form.description.data.strip() if form.description.data else None
+                dab.status = 'Submitted'
+                dab.submitted_at = now
+
+            # 3. Resolve or create Property (publication_status = 'Submitted', status = 'Submitted')
+            prop = Property.query.filter_by(dab_id=dab.dab_id).first()
+            if not prop:
+                prop = Property(
+                    dab_id=dab.dab_id,
+                    title=form.title.data.strip(),
+                    description=form.description.data.strip() if form.description.data else None,
+                    property_type=form.property_type.data,
+                    price=form.price.data,
+                    currency='NGN',
+                    address=form.address.data.strip(),
+                    city=form.city.data.strip(),
+                    state=form.state.data.strip(),
+                    locality=form.locality.data.strip() if form.locality.data else None,
+                    location=f"{form.address.data.strip()}, {form.city.data.strip()}, {form.state.data.strip()}",
+                    bedroom_count=int(form.bedroom_count.data) if form.bedroom_count.data else None,
+                    bathroom_count=int(form.bathroom_count.data) if form.bathroom_count.data else None,
+                    land_area_sq_m=form.land_area_sq_m.data if form.land_area_sq_m.data else None,
+                    amenities=form.amenities.data.split(',') if form.amenities.data else [],
+                    publication_status='Submitted',
+                    status='Submitted',
+                    created_at=now,
+                    updated_at=now
+                )
+                db.session.add(prop)
+                db.session.flush()
+            else:
+                prop.title = form.title.data.strip()
+                prop.description = form.description.data.strip() if form.description.data else None
+                prop.property_type = form.property_type.data
+                prop.price = form.price.data
+                prop.address = form.address.data.strip()
+                prop.city = form.city.data.strip()
+                prop.state = form.state.data.strip()
+                prop.publication_status = 'Submitted'
+                prop.status = 'Submitted'
+                prop.updated_at = now
+
+            # 4. Handle Property Photographs (PropertyMedia - review_status = 'Uploaded')
+            media_upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'property_media')
+            os.makedirs(media_upload_dir, exist_ok=True)
+
+            photo_fields = [
+                (form.primary_photo, True, 1),
+                (form.photo_2, False, 2),
+                (form.photo_3, False, 3)
+            ]
+
+            for field_obj, is_primary, order in photo_fields:
+                if field_obj.data and hasattr(field_obj.data, 'filename') and field_obj.data.filename:
+                    ext = os.path.splitext(field_obj.data.filename)[1].lower()
+                    unique_name = f"{uuid.uuid4().hex}{ext}"
+                    save_path = os.path.join(media_upload_dir, unique_name)
+                    field_obj.data.save(save_path)
+                    rel_path = f"pkg/static/uploads/property_media/{unique_name}"
+
+                    media_rec = PropertyMedia(
+                        property_id=prop.property_id,
+                        type='image',
+                        media_type='image',
+                        file_path=rel_path,
+                        alt_text=f"Property Photo {order}",
+                        display_order=order,
+                        is_primary=is_primary,
+                        review_status='Uploaded',
+                        created_at=now
+                    )
+                    db.session.add(media_rec)
+
+            # 5. Handle Property Title Documents (PropertyDocument - review_status = 'Pending')
+            doc_upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'property_documents')
+            os.makedirs(doc_upload_dir, exist_ok=True)
+
+            doc_fields = [
+                (form.title_deed, 'title_deed'),
+                (form.survey_plan, 'survey')
+            ]
+
+            for doc_field_obj, doc_type in doc_fields:
+                if doc_field_obj.data and hasattr(doc_field_obj.data, 'filename') and doc_field_obj.data.filename:
+                    ext = os.path.splitext(doc_field_obj.data.filename)[1].lower()
+                    unique_name = f"{uuid.uuid4().hex}{ext}"
+                    save_path = os.path.join(doc_upload_dir, unique_name)
+                    doc_field_obj.data.save(save_path)
+                    rel_path = f"pkg/static/uploads/property_documents/{unique_name}"
+
+                    doc_rec = PropertyDocument(
+                        property_id=prop.property_id,
+                        document_type=doc_type,
+                        file_path=rel_path,
+                        review_status='Pending',
+                        submitted_at=now,
+                        created_at=now
+                    )
+                    db.session.add(doc_rec)
+
+            # 6. Log SecurityEvent
+            sec_event = SecurityEvent(
+                user_id=user_id or (owner_prof.user_id if owner_prof else None),
+                event_type='PROPERTY_SUBMISSION_RECEIVED',
+                description=f'Property brief "{form.title.data.strip()}" submitted via Customized Listing Link (Case #{target_case.verification_case_id})',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+
+            # 7. Commit Transaction
+            db.session.commit()
+
+            flash('Your property brief and submitted documents have been received. They are now pending administrative review.', 'success')
+            return render_template(
+                'user/controlled_property_submission.html',
+                submission_complete=True,
+                case=target_case,
+                dab=dab,
+                property=prop,
+                applicant_name=full_name,
+                display_name=get_entity_display_name(target_case.entity_type),
+                title='Property Brief Submitted — Odacity'
+            )
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'An error occurred during submission: {str(e)}', 'danger')
+
+    return render_template(
+        'user/controlled_property_submission.html',
+        form=form,
+        case=target_case,
+        existing_dab=existing_dab,
+        applicant_name=full_name,
+        applicant_email=email,
+        display_name=get_entity_display_name(target_case.entity_type),
+        title='Controlled Property Submission — Odacity'
+    )
+
+
 
 
 

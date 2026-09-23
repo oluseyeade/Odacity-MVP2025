@@ -1,0 +1,500 @@
+{% extends "user/layout.html" %}
+
+{% block title %}{{ title or "Controlled Property Submission — Odacity" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sub-hub-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 3.5rem 1rem 2.5rem 1rem;
+        color: #ffffff;
+    }
+    .sub-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+        padding: 2.5rem 2rem;
+    }
+    .step-progress-bar {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2.5rem;
+        position: relative;
+    }
+    .step-progress-bar::before {
+        content: '';
+        position: absolute;
+        top: 18px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background-color: #e2e8f0;
+        z-index: 1;
+    }
+    .step-item {
+        position: relative;
+        z-index: 2;
+        text-align: center;
+        background: #ffffff;
+        padding: 0 0.5rem;
+    }
+    .step-circle {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background-color: #f1f5f9;
+        color: #64748b;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: justify-content;
+        justify-content: center;
+        border: 2px solid #cbd5e1;
+        margin-bottom: 0.35rem;
+        transition: all 0.3s ease;
+    }
+    .step-item.active .step-circle {
+        background-color: #C11B24;
+        color: #ffffff;
+        border-color: #C11B24;
+    }
+    .step-item.completed .step-circle {
+        background-color: #10b981;
+        color: #ffffff;
+        border-color: #10b981;
+    }
+    .step-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+    }
+    .step-item.active .step-label {
+        color: #0f172a;
+    }
+    .form-step-panel {
+        display: none;
+    }
+    .form-step-panel.active {
+        display: block;
+    }
+    .btn-step-nav {
+        border-radius: 50px;
+        padding: 0.6rem 1.8rem;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block main_content %}
+<!-- HERO HEADER -->
+<section class="sub-hub-header text-center">
+    <div class="container">
+        <div class="mb-3">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="ODACITY Logo" style="height: 44px; width: auto; object-fit: contain;">
+        </div>
+        <span class="badge bg-success text-white text-uppercase px-3 py-2 rounded-pill fw-bold mb-2">
+            <i class="bi bi-shield-check me-1"></i> Intent Approved — Controlled Submission
+        </span>
+        <h1 class="display-6 fw-bold text-white mb-2">Property Brief & Document Submission</h1>
+        <p class="lead text-light opacity-75 max-width-700 mx-auto mb-0" style="max-width: 700px; font-size: 1rem;">
+            Applicant: <strong>{{ applicant_name }}</strong> ({{ display_name }}) — VerificationCase #{{ case.verification_case_id }}
+        </p>
+    </div>
+</section>
+
+<section class="py-5 bg-light">
+    <div class="container py-2" style="max-width: 920px;">
+
+        <!-- FLASH MESSAGES -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                        {% if category == 'success' %}
+                            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                        {% elif category == 'danger' %}
+                            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                        {% else %}
+                            <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if submission_complete %}
+            <!-- SUCCESS CONFIRMATION PANEL -->
+            <div class="sub-card text-center py-5">
+                <div class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle mb-3" style="width: 72px; height: 72px;">
+                    <i class="bi bi-check-lg fs-1"></i>
+                </div>
+                <h2 class="h3 fw-bold text-dark mb-2">Property Brief Received</h2>
+                <p class="lead text-muted mb-4" style="max-width: 640px; margin: 0 auto;">
+                    Your property brief and submitted documents have been received by Odacity administration. They are now pending administrative review.
+                </p>
+
+                <div class="bg-light p-4 rounded-3 text-start mb-4 mx-auto" style="max-width: 600px;">
+                    <h6 class="fw-bold border-bottom pb-2 mb-3">Submission Summary</h6>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted">DAB Reference:</dt>
+                        <dd class="col-sm-8 fw-bold">DAB #{{ dab.dab_id }}</dd>
+
+                        <dt class="col-sm-4 text-muted">Property Title:</dt>
+                        <dd class="col-sm-8 fw-semibold">{{ property.title }}</dd>
+
+                        <dt class="col-sm-4 text-muted">Property Type:</dt>
+                        <dd class="col-sm-8">{{ property.property_type }}</dd>
+
+                        <dt class="col-sm-4 text-muted">DAB Status:</dt>
+                        <dd class="col-sm-8"><span class="badge bg-warning text-dark fw-bold">Submitted (Pending Review)</span></dd>
+
+                        <dt class="col-sm-4 text-muted">Title Documents:</dt>
+                        <dd class="col-sm-8"><span class="badge bg-secondary">Pending Review</span></dd>
+
+                        <dt class="col-sm-4 text-muted">Media Uploads:</dt>
+                        <dd class="col-sm-8"><span class="badge bg-secondary">Uploaded</span></dd>
+                    </dl>
+                </div>
+
+                <div class="alert alert-info border-0 shadow-sm rounded-3 p-3 max-width-600 mx-auto mb-4" style="max-width: 600px;">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    Our platform administrators will inspect your submitted property details and title documents. You will receive an update once review is complete.
+                </div>
+
+                <div>
+                    <a href="{{ url_for('homepage') }}" class="btn btn-outline-danger rounded-pill px-4 me-2">
+                        <i class="bi bi-house-door-fill me-1"></i> Return Home
+                    </a>
+                </div>
+            </div>
+
+        {% else %}
+
+            <!-- CONTROLLED MULTI-STEP SUBMISSION FORM -->
+            <div class="sub-card">
+
+                <!-- STEP PROGRESS INDICATOR -->
+                <div class="step-progress-bar">
+                    <div class="step-item active" id="step-nav-1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Location & Details</div>
+                    </div>
+                    <div class="step-item" id="step-nav-2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Photos & Media</div>
+                    </div>
+                    <div class="step-item" id="step-nav-3">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Pricing & Intent</div>
+                    </div>
+                    <div class="step-item" id="step-nav-4">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Title Documents</div>
+                    </div>
+                    <div class="step-item" id="step-nav-5">
+                        <div class="step-circle">5</div>
+                        <div class="step-label">Review & Submit</div>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('controlled_property_submission', token=request.view_args.get('token')) }}" enctype="multipart/form-data" novalidate id="propertySubmissionForm">
+                    {{ form.csrf_token }}
+
+                    <!-- STEP 1: LOCATION & PROPERTY DETAILS -->
+                    <div class="form-step-panel active" id="step-panel-1">
+                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-geo-alt-fill text-danger me-2"></i>Step 1: Property Location & Details</h4>
+                        <p class="text-muted small mb-4">Provide the title, location, type, and physical characteristics of the property.</p>
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label for="title" class="form-label fw-bold text-dark">{{ form.title.label.text }} <span class="text-danger">*</span></label>
+                                {{ form.title(class="form-control p-2.5 rounded-3 " + ("is-invalid" if form.title.errors else ""), id="title", placeholder="e.g. Luxury 4 Bedroom Detached Duplex in Lekki Phase 1") }}
+                                {% for err in form.title.errors %}
+                                    <div class="invalid-feedback d-block">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="address" class="form-label fw-bold text-dark">{{ form.address.label.text }} <span class="text-danger">*</span></label>
+                                {{ form.address(class="form-control p-2.5 rounded-3 " + ("is-invalid" if form.address.errors else ""), id="address", placeholder="Street name and plot number") }}
+                                {% for err in form.address.errors %}
+                                    <div class="invalid-feedback d-block">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="city" class="form-label fw-bold text-dark">{{ form.city.label.text }} <span class="text-danger">*</span></label>
+                                {{ form.city(class="form-control p-2.5 rounded-3 " + ("is-invalid" if form.city.errors else ""), id="city", placeholder="City / LGA") }}
+                                {% for err in form.city.errors %}
+                                    <div class="invalid-feedback d-block">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="state" class="form-label fw-bold text-dark">{{ form.state.label.text }} <span class="text-danger">*</span></label>
+                                {{ form.state(class="form-control p-2.5 rounded-3 " + ("is-invalid" if form.state.errors else ""), id="state", placeholder="State") }}
+                                {% for err in form.state.errors %}
+                                    <div class="invalid-feedback d-block">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="locality" class="form-label fw-bold text-dark">{{ form.locality.label.text }}</label>
+                                {{ form.locality(class="form-control p-2.5 rounded-3", id="locality", placeholder="Estate / Locality / Landmark") }}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="property_type" class="form-label fw-bold text-dark">{{ form.property_type.label.text }} <span class="text-danger">*</span></label>
+                                {{ form.property_type(class="form-select p-2.5 rounded-3 " + ("is-invalid" if form.property_type.errors else ""), id="property_type") }}
+                                {% for err in form.property_type.errors %}
+                                    <div class="invalid-feedback d-block">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="bedroom_count" class="form-label fw-bold text-dark">{{ form.bedroom_count.label.text }}</label>
+                                {{ form.bedroom_count(class="form-control p-2.5 rounded-3", id="bedroom_count", type="number", placeholder="e.g. 4") }}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="bathroom_count" class="form-label fw-bold text-dark">{{ form.bathroom_count.label.text }}</label>
+                                {{ form.bathroom_count(class="form-control p-2.5 rounded-3", id="bathroom_count", type="number", placeholder="e.g. 4") }}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="land_area_sq_m" class="form-label fw-bold text-dark">{{ form.land_area_sq_m.label.text }}</label>
+                                {{ form.land_area_sq_m(class="form-control p-2.5 rounded-3", id="land_area_sq_m", placeholder="e.g. 650") }}
+                            </div>
+
+                            <div class="col-12">
+                                <label for="amenities" class="form-label fw-bold text-dark">{{ form.amenities.label.text }}</label>
+                                {{ form.amenities(class="form-control p-2.5 rounded-3", id="amenities", placeholder="Swimming Pool, 24/7 Security, Solar Inverter, Water Treatment") }}
+                            </div>
+
+                            <div class="col-12">
+                                <label for="description" class="form-label fw-bold text-dark">{{ form.description.label.text }}</label>
+                                {{ form.description(class="form-control p-2.5 rounded-3", id="description", rows="3", placeholder="Comprehensive description of property features, condition, and highlights") }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                            <button type="button" class="btn btn-danger btn-step-nav" onclick="nextStep(2)">
+                                Next: Photos & Media <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: PHOTOS & MEDIA -->
+                    <div class="form-step-panel" id="step-panel-2">
+                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-images text-danger me-2"></i>Step 2: Property Photographs</h4>
+                        <p class="text-muted small mb-4">Upload clear photographs of the property exterior and interior (JPG, PNG, JPEG).</p>
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="card p-3 bg-light border-0 rounded-3 mb-2">
+                                    <label for="primary_photo" class="form-label fw-bold text-dark mb-1">{{ form.primary_photo.label.text }}</label>
+                                    {{ form.primary_photo(class="form-control", id="primary_photo", accept="image/*") }}
+                                    <span class="small text-muted mt-1">Primary photo will be featured as the main thumbnail.</span>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card p-3 bg-light border-0 rounded-3">
+                                    <label for="photo_2" class="form-label fw-bold text-dark mb-1">{{ form.photo_2.label.text }}</label>
+                                    {{ form.photo_2(class="form-control", id="photo_2", accept="image/*") }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card p-3 bg-light border-0 rounded-3">
+                                    <label for="photo_3" class="form-label fw-bold text-dark mb-1">{{ form.photo_3.label.text }}</label>
+                                    {{ form.photo_3(class="form-control", id="photo_3", accept="image/*") }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <button type="button" class="btn btn-outline-secondary btn-step-nav" onclick="prevStep(1)">
+                                <i class="bi bi-arrow-left me-1"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-danger btn-step-nav" onclick="nextStep(3)">
+                                Next: Pricing & Terms <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: PRICING & TRANSACTION INTENT -->
+                    <div class="form-step-panel" id="step-panel-3">
+                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-tag-fill text-danger me-2"></i>Step 3: Pricing & Transaction Intent</h4>
+                        <p class="text-muted small mb-4">Specify the listing transaction type and asking price.</p>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="service_type" class="form-label fw-bold text-dark">{{ form.service_type.label.text }} <span class="text-danger">*</span></label>
+                                {{ form.service_type(class="form-select p-2.5 rounded-3 " + ("is-invalid" if form.service_type.errors else ""), id="service_type") }}
+                                {% for err in form.service_type.errors %}
+                                    <div class="invalid-feedback d-block">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="price" class="form-label fw-bold text-dark">{{ form.price.label.text }} <span class="text-danger">*</span></label>
+                                {{ form.price(class="form-control p-2.5 rounded-3 " + ("is-invalid" if form.price.errors else ""), id="price", placeholder="e.g. 150000000") }}
+                                {% for err in form.price.errors %}
+                                    <div class="invalid-feedback d-block">{{ err }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <button type="button" class="btn btn-outline-secondary btn-step-nav" onclick="prevStep(2)">
+                                <i class="bi bi-arrow-left me-1"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-danger btn-step-nav" onclick="nextStep(4)">
+                                Next: Title Documents <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 4: TITLE DOCUMENTS -->
+                    <div class="form-step-panel" id="step-panel-4">
+                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-file-earmark-lock-fill text-danger me-2"></i>Step 4: Property Title Documents</h4>
+                        <p class="text-muted small mb-4">Upload property title deeds and survey plans for administrative verification (PDF, PNG, JPG).</p>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="card p-3 bg-light border-0 rounded-3 h-100">
+                                    <label for="title_deed" class="form-label fw-bold text-dark mb-1">{{ form.title_deed.label.text }}</label>
+                                    {{ form.title_deed(class="form-control", id="title_deed", accept=".pdf,.png,.jpg,.jpeg") }}
+                                    <span class="small text-muted mt-1">Certificate of Occupancy (C of O), Governor's Consent, Deed of Assignment, etc.</span>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card p-3 bg-light border-0 rounded-3 h-100">
+                                    <label for="survey_plan" class="form-label fw-bold text-dark mb-1">{{ form.survey_plan.label.text }}</label>
+                                    {{ form.survey_plan(class="form-control", id="survey_plan", accept=".pdf,.png,.jpg,.jpeg") }}
+                                    <span class="small text-muted mt-1">Registered Survey Plan or Land Use Authorization Document.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <button type="button" class="btn btn-outline-secondary btn-step-nav" onclick="prevStep(3)">
+                                <i class="bi bi-arrow-left me-1"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-danger btn-step-nav" onclick="nextStep(5)">
+                                Next: Review & Submit <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 5: REVIEW & SUBMIT -->
+                    <div class="form-step-panel" id="step-panel-5">
+                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-check2-square text-danger me-2"></i>Step 5: Review & Submit Brief</h4>
+                        <p class="text-muted small mb-4">Confirm your entered information before submitting your property brief for administrative review.</p>
+
+                        <div class="card bg-light border-0 p-3 rounded-3 mb-4">
+                            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Property Brief Summary</h6>
+                            <dl class="row mb-0 small">
+                                <dt class="col-sm-4 text-muted">Title:</dt>
+                                <dd class="col-sm-8 fw-bold" id="summary-title">-</dd>
+
+                                <dt class="col-sm-4 text-muted">Location:</dt>
+                                <dd class="col-sm-8" id="summary-location">-</dd>
+
+                                <dt class="col-sm-4 text-muted">Property Type:</dt>
+                                <dd class="col-sm-8" id="summary-type">-</dd>
+
+                                <dt class="col-sm-4 text-muted">Asking Price:</dt>
+                                <dd class="col-sm-8 fw-bold text-success" id="summary-price">-</dd>
+
+                                <dt class="col-sm-4 text-muted">Intent:</dt>
+                                <dd class="col-sm-8" id="summary-intent">-</dd>
+                            </dl>
+                        </div>
+
+                        <div class="alert alert-warning border-0 shadow-sm rounded-3 p-3 mb-4">
+                            <i class="bi bi-shield-exclamation me-2"></i>
+                            Submitting this brief creates a <strong>Submitted</strong> record pending review by Odacity platform administrators.
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <button type="button" class="btn btn-outline-secondary btn-step-nav" onclick="prevStep(4)">
+                                <i class="bi bi-arrow-left me-1"></i> Back
+                            </button>
+                            <button type="submit" class="btn btn-success btn-step-nav px-5 fs-6">
+                                <i class="bi bi-send-fill me-2"></i> Submit Property Brief
+                            </button>
+                        </div>
+                    </div>
+
+                </form>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentStep = 1;
+
+    function showStep(step) {
+        document.querySelectorAll('.form-step-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.step-item').forEach((item, idx) => {
+            if (idx + 1 === step) {
+                item.classList.add('active');
+                item.classList.remove('completed');
+            } else if (idx + 1 < step) {
+                item.classList.remove('active');
+                item.classList.add('completed');
+            } else {
+                item.classList.remove('active', 'completed');
+            }
+        });
+
+        const activePanel = document.getElementById(`step-panel-${step}`);
+        if (activePanel) {
+            activePanel.classList.add('active');
+        }
+
+        if (step === 5) {
+            updateSummary();
+        }
+
+        currentStep = step;
+        window.scrollTo({ top: 250, behavior: 'smooth' });
+    }
+
+    function nextStep(step) {
+        showStep(step);
+    }
+
+    function prevStep(step) {
+        showStep(step);
+    }
+
+    function updateSummary() {
+        const title = document.getElementById('title')?.value || '-';
+        const address = document.getElementById('address')?.value || '';
+        const city = document.getElementById('city')?.value || '';
+        const state = document.getElementById('state')?.value || '';
+        const propType = document.getElementById('property_type')?.value || '-';
+        const price = document.getElementById('price')?.value || '-';
+        const intent = document.getElementById('service_type')?.value || '-';
+
+        document.getElementById('summary-title').innerText = title;
+        document.getElementById('summary-location').innerText = `${address}, ${city}, ${state}`.replace(/^,\s*|,\s*$/g, '') || '-';
+        document.getElementById('summary-type').innerText = propType;
+        document.getElementById('summary-price').innerText = price !== '-' ? `NGN ${Number(price).toLocaleString()}` : '-';
+        document.getElementById('summary-intent').innerText = intent.toUpperCase();
+    }
+</script>
+{% endblock %}

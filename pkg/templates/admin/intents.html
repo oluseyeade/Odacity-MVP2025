@@ -1,0 +1,372 @@
+{% extends "user/layout.html" %}
+
+{% block title %}{{ title or "Admin Intent Management — Odacity" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-stats-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    }
+    .admin-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+        padding: 1.5rem;
+    }
+    .badge-submitted {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+        font-weight: 700;
+    }
+    .badge-approved {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+        font-weight: 700;
+    }
+    .badge-declined {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+        font-weight: 700;
+    }
+    .btn-approve-intent {
+        background-color: #059669;
+        color: #ffffff;
+        font-weight: 700;
+        border-radius: 50px;
+        padding: 0.5rem 1.5rem;
+        border: none;
+    }
+    .btn-approve-intent:hover {
+        background-color: #047857;
+        color: #ffffff;
+    }
+    .btn-decline-intent {
+        background-color: #dc2626;
+        color: #ffffff;
+        font-weight: 700;
+        border-radius: 50px;
+        padding: 0.5rem 1.5rem;
+        border: none;
+    }
+    .btn-decline-intent:hover {
+        background-color: #b91c1c;
+        color: #ffffff;
+    }
+</style>
+{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark py-4 text-white">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge bg-danger mb-2 text-uppercase" style="letter-spacing: 1px;">Admin Portal</span>
+                <h1 class="h3 fw-bold mb-0 text-white"><i class="bi bi-shield-lock-fill me-2"></i>Intent Approval & Partner Authorization</h1>
+            </div>
+            <div>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i> Return to Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-4">
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    {% if category == 'success' %}
+                        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                    {% elif category == 'danger' %}
+                        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                    {% endif %}
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if selected_case %}
+        <!-- DETAIL REVIEW VIEW -->
+        <div class="mb-4">
+            <a href="{{ url_for('admin_intents') }}" class="btn btn-outline-secondary btn-sm rounded-pill mb-3">
+                <i class="bi bi-arrow-left me-1"></i> Back to All Intents List
+            </a>
+            
+            <div class="admin-table-card">
+                <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-4">
+                    <div>
+                        <span class="badge bg-primary text-uppercase mb-2">{{ display_name }}</span>
+                        <h2 class="h4 fw-bold mb-1">Intent Case #{{ selected_case.verification_case_id }}</h2>
+                        <p class="text-muted small mb-0">Submitted on: {{ selected_case.created_at.strftime('%B %d, %Y at %H:%M UTC') }}</p>
+                    </div>
+                    <div>
+                        {% if selected_case.status == 'Submitted' %}
+                            <span class="badge badge-submitted p-2 fs-6"><i class="bi bi-hourglass-split me-1"></i> Submitted (Pending Review)</span>
+                        {% elif selected_case.status == 'Passed' %}
+                            <span class="badge badge-approved p-2 fs-6"><i class="bi bi-check-circle-fill me-1"></i> Intent Approved</span>
+                        {% elif selected_case.status == 'Failed' %}
+                            <span class="badge badge-declined p-2 fs-6"><i class="bi bi-x-circle-fill me-1"></i> Intent Declined</span>
+                        {% else %}
+                            <span class="badge bg-secondary p-2 fs-6">{{ selected_case.status }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <!-- Applicant Contact & Info -->
+                    <div class="col-md-6">
+                        <div class="card h-100 border-0 bg-light rounded-3 p-3">
+                            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-person-bounding-box me-2 text-danger"></i>Applicant & Onboarding Summary</h5>
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4 text-muted">Entity Type:</dt>
+                                <dd class="col-sm-8 fw-semibold">{{ display_name }}</dd>
+
+                                <dt class="col-sm-4 text-muted">Applicant Name:</dt>
+                                <dd class="col-sm-8 fw-semibold">{{ applicant_name or 'N/A' }}</dd>
+
+                                <dt class="col-sm-4 text-muted">Contact Email:</dt>
+                                <dd class="col-sm-8">{{ applicant_email or 'N/A' }}</dd>
+
+                                <dt class="col-sm-4 text-muted">Case Notes:</dt>
+                                <dd class="col-sm-8 small text-secondary">{{ selected_case.notes or 'None' }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!-- Submitted Payload Data -->
+                    <div class="col-md-6">
+                        <div class="card h-100 border-0 bg-light rounded-3 p-3">
+                            <h5 class="fw-bold text-dark mb-3"><i class="bi bi-file-earmark-text me-2 text-danger"></i>Submission Details</h5>
+                            {% if payload_data %}
+                                <ul class="list-group list-group-flush bg-transparent small">
+                                    {% for key, val in payload_data.items() %}
+                                        {% if val is mapping %}
+                                            {% for sub_k, sub_v in val.items() %}
+                                                <li class="list-group-item bg-transparent d-flex justify-content-between py-1 border-0">
+                                                    <strong class="text-secondary">{{ sub_k|replace('_', ' ')|capitalize }}:</strong>
+                                                    {% if 'reference' in sub_k and sub_v %}
+                                                        <a href="{{ url_for('admin_serve_upload', filename=sub_v.replace('pkg/static/uploads/', '').replace('static/uploads/', '')) }}" target="_blank" class="badge bg-danger text-white text-decoration-none">
+                                                            <i class="bi bi-file-earmark-pdf-fill me-1"></i> View Secure PDF
+                                                        </a>
+                                                    {% else %}
+                                                        <span>{{ sub_v }}</span>
+                                                    {% endif %}
+                                                </li>
+                                            {% endfor %}
+                                        {% else %}
+                                            <li class="list-group-item bg-transparent d-flex justify-content-between py-1 border-0">
+                                                <strong class="text-secondary">{{ key|replace('_', ' ')|capitalize }}:</strong>
+                                                <span>{{ val }}</span>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="text-muted small mb-0">No detailed payload JSON found for this case.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event History Audit Log -->
+                <div class="mt-4 pt-3 border-top">
+                    <h5 class="fw-bold text-dark mb-3"><i class="bi bi-journal-text me-2 text-danger"></i>Case Audit & Event History</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Event Type</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Performed By User</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for evt in events %}
+                                    <tr>
+                                        <td class="small">{{ evt.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                        <td><span class="badge bg-secondary">{{ evt.event_type }}</span></td>
+                                        <td class="small">{{ evt.description }}</td>
+                                        <td><span class="badge bg-info text-dark">{{ evt.status }}</span></td>
+                                        <td class="small">User #{{ evt.performed_by_user_id or evt.created_by_user_id or 'System' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ADMIN APPROVAL / DECLINE ACTION CONTROLS -->
+                <div class="mt-4 pt-3 border-top bg-light p-3 rounded-3 text-center">
+                    <h5 class="fw-bold text-dark mb-2">Administrative Intent Decision</h5>
+                    <p class="text-muted small mb-3">Authorize or decline this enquiry intent. Approving transitions the status to <strong>Passed</strong> and dispatches Email 2 notification.</p>
+
+                    {% if selected_case.status == 'Submitted' %}
+                        <div class="d-flex justify-content-center gap-3">
+                            <!-- APPROVE INTENT FORM -->
+                            <form method="POST" action="{{ url_for('admin_intent_approve', case_id=selected_case.verification_case_id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-approve-intent px-4" onclick="return confirm('Are you sure you want to APPROVE this enquiry intent? This will dispatch Email 2 notification to the applicant.');">
+                                    <i class="bi bi-check-circle-fill me-1"></i> Approve Intent
+                                </button>
+                            </form>
+
+                            <!-- DECLINE INTENT FORM -->
+                            <form method="POST" action="{{ url_for('admin_intent_decline', case_id=selected_case.verification_case_id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-decline-intent px-4" onclick="return confirm('Are you sure you want to DECLINE this enquiry intent? This will dispatch an intent decline notification.');">
+                                    <i class="bi bi-x-circle-fill me-1"></i> Decline Intent
+                                </button>
+                            </form>
+                        </div>
+                    {% elif selected_case.status == 'Passed' %}
+                        <div class="alert alert-success d-inline-block w-100 mb-0 py-3 px-4 rounded-3 text-start">
+                            <h6 class="fw-bold mb-2"><i class="bi bi-link-45deg me-1"></i>Customized Listing Link (Phase 5)</h6>
+                            {% if customized_url %}
+                                <p class="small text-muted mb-2">Active, tokenized access link for this approved intent:</p>
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control form-control-sm bg-white" value="{{ customized_url }}" readonly id="customizedLinkInput">
+                                    <button class="btn btn-outline-success btn-sm fw-bold" type="button" onclick="navigator.clipboard.writeText(document.getElementById('customizedLinkInput').value); alert('Customized Listing Link copied to clipboard!');">
+                                        <i class="bi bi-clipboard me-1"></i> Copy Link
+                                    </button>
+                                    <a href="{{ customized_url }}" target="_blank" class="btn btn-success btn-sm fw-bold">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Controlled Entry
+                                    </a>
+                                </div>
+                            {% else %}
+                                <p class="small text-muted mb-2">No active Customized Listing Link generated yet for this approved intent.</p>
+                                <form method="POST" action="{{ url_for('admin_generate_customized_link', case_id=selected_case.verification_case_id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold rounded-pill px-4">
+                                        <i class="bi bi-key-fill me-1"></i> Generate Customized Listing Link
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-secondary d-inline-block mb-0 py-2 px-4 rounded-pill">
+                            <i class="bi bi-lock-fill me-1"></i> Decision Completed. Case is currently in <strong>{{ selected_case.status }}</strong> state.
+                        </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+    {% else %}
+
+        <!-- DASHBOARD STATS SUMMARY -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="admin-stats-card text-center">
+                    <span class="text-uppercase text-muted fw-bold small">Total Enquiries</span>
+                    <h3 class="fw-bold mb-0 text-dark">{{ stats.total }}</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="admin-stats-card text-center border-warning">
+                    <span class="text-uppercase text-warning fw-bold small">Pending Review</span>
+                    <h3 class="fw-bold mb-0 text-warning">{{ stats.pending }}</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="admin-stats-card text-center border-success">
+                    <span class="text-uppercase text-success fw-bold small">Intents Approved</span>
+                    <h3 class="fw-bold mb-0 text-success">{{ stats.approved }}</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="admin-stats-card text-center border-danger">
+                    <span class="text-uppercase text-danger fw-bold small">Intents Declined</span>
+                    <h3 class="fw-bold mb-0 text-danger">{{ stats.declined }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIST TABLE CARD -->
+        <div class="admin-table-card">
+            <!-- Filter Bar -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 pb-3 border-bottom">
+                <h2 class="h5 fw-bold mb-0"><i class="bi bi-card-checklist me-2 text-danger"></i>Submitted Enquiry Intents</h2>
+                
+                <div class="d-flex gap-2">
+                    <!-- Status Filter -->
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="{{ url_for('admin_intents', status='all', type=current_type) }}" class="btn {{ 'btn-dark' if current_status == 'all' else 'btn-outline-dark' }}">All</a>
+                        <a href="{{ url_for('admin_intents', status='Submitted', type=current_type) }}" class="btn {{ 'btn-warning text-dark fw-bold' if current_status == 'Submitted' else 'btn-outline-warning' }}">Pending (Submitted)</a>
+                        <a href="{{ url_for('admin_intents', status='Passed', type=current_type) }}" class="btn {{ 'btn-success fw-bold' if current_status == 'Passed' else 'btn-outline-success' }}">Approved (Passed)</a>
+                        <a href="{{ url_for('admin_intents', status='Failed', type=current_type) }}" class="btn {{ 'btn-danger fw-bold' if current_status == 'Failed' else 'btn-outline-danger' }}">Declined (Failed)</a>
+                    </div>
+                </div>
+            </div>
+
+            {% if case_list %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Case ID</th>
+                                <th>Enquiry Type</th>
+                                <th>Applicant Name</th>
+                                <th>Email</th>
+                                <th>Submitted Date</th>
+                                <th>Status</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in case_list %}
+                                <tr>
+                                    <td class="fw-bold">#{{ item.case.verification_case_id }}</td>
+                                    <td><span class="badge bg-secondary">{{ item.display_name }}</span></td>
+                                    <td class="fw-semibold">{{ item.applicant_name or 'N/A' }}</td>
+                                    <td class="small">{{ item.applicant_email or 'N/A' }}</td>
+                                    <td class="small text-muted">{{ item.case.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        {% if item.case.status == 'Submitted' %}
+                                            <span class="badge badge-submitted">Submitted (Pending)</span>
+                                        {% elif item.case.status == 'Passed' %}
+                                            <span class="badge badge-approved">Intent Approved</span>
+                                        {% elif item.case.status == 'Failed' %}
+                                            <span class="badge badge-declined">Intent Declined</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ item.case.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{{ url_for('admin_intent_detail', case_id=item.case.verification_case_id) }}" class="btn btn-outline-danger btn-sm rounded-pill fw-bold">
+                                            <i class="bi bi-eye-fill me-1"></i> Review Intent
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+                    <p class="mb-0">No enquiry intents found matching the selected filter criteria.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    {% endif %}
+
+</div>
+{% endblock %}

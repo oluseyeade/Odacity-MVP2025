@@ -173,6 +173,60 @@ class GeneralEnquiryForm(FlaskForm):
     submit = SubmitField("Send Enquiry")
 
 
+class ControlledPropertySubmissionForm(FlaskForm):
+    # SECTION A — PROPERTY LOCATION
+    title = StringField("Property Listing Title", validators=[DataRequired(message="Property title is required.")])
+    address = StringField("Street Address / Location", validators=[DataRequired(message="Address is required.")])
+    city = StringField("City", validators=[DataRequired(message="City is required.")])
+    state = StringField("State", validators=[DataRequired(message="State is required.")])
+    locality = StringField("Locality / Neighborhood", validators=[Optional()])
+
+    # SECTION B — PROPERTY DETAILS
+    property_type = SelectField("Property Type", choices=[
+        ('House', 'House / Detached'),
+        ('Flat', 'Flat / Apartment'),
+        ('Commercial', 'Commercial / Office'),
+        ('Land', 'Land / Plot'),
+        ('Industrial', 'Industrial / Warehouse'),
+        ('Other', 'Other Property Type')
+    ], validators=[DataRequired(message="Property type is required.")])
+    bedroom_count = DecimalField("Bedrooms", validators=[Optional()])
+    bathroom_count = DecimalField("Bathrooms", validators=[Optional()])
+    land_area_sq_m = DecimalField("Land Area (sqm)", validators=[Optional()])
+    amenities = StringField("Amenities / Key Features (comma-separated)", validators=[Optional()])
+    description = TextAreaField("Description & Brief Details", validators=[Optional()])
+
+    # SECTION C — TRANSACTION / PRICING
+    service_type = SelectField("Transaction Intent", choices=[
+        ('sale', 'Outright Sale'),
+        ('lease', 'Leasehold'),
+        ('rent', 'Rental Listing')
+    ], validators=[DataRequired(message="Transaction intent is required.")])
+    price = DecimalField("Asking Price / Budget (NGN)", validators=[DataRequired(message="Asking price is required.")])
+
+    # SECTION D — PROPERTY PHOTOS / MEDIA
+    primary_photo = FileField("Primary Property Photograph", validators=[
+        FileAllowed(['jpg', 'png', 'jpeg'], message="Accepted image formats: JPG, PNG, JPEG")
+    ])
+    photo_2 = FileField("Additional Photograph 2", validators=[
+        FileAllowed(['jpg', 'png', 'jpeg'], message="Accepted image formats: JPG, PNG, JPEG")
+    ])
+    photo_3 = FileField("Additional Photograph 3", validators=[
+        FileAllowed(['jpg', 'png', 'jpeg'], message="Accepted image formats: JPG, PNG, JPEG")
+    ])
+
+    # SECTION E — PROPERTY DOCUMENTS
+    title_deed = FileField("Property Title Deed / Certificate of Occupancy", validators=[
+        FileAllowed(['pdf', 'png', 'jpg', 'jpeg'], message="Accepted document formats: PDF, PNG, JPG, JPEG")
+    ])
+    survey_plan = FileField("Survey Plan / Land Use Document", validators=[
+        FileAllowed(['pdf', 'png', 'jpg', 'jpeg'], message="Accepted document formats: PDF, PNG, JPG, JPEG")
+    ])
+
+    submit = SubmitField("Submit Property Brief")
+
+
+
 
 
 
