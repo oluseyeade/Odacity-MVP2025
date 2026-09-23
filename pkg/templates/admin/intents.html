@@ -305,7 +305,11 @@
 
                                     <dt class="col-sm-3 text-muted">Publication Status:</dt>
                                     <dd class="col-sm-9">
-                                        {% if prop.publication_status == 'Private Listing' and public_eligible_at and now and now < public_eligible_at %}
+                                        {% if prop.publication_status == 'Sold' or prop.status == 'Sold' %}
+                                            <span class="badge bg-dark"><i class="bi bi-tag-fill me-1"></i> Sold</span>
+                                        {% elif prop.publication_status == 'Unavailable' %}
+                                            <span class="badge bg-secondary"><i class="bi bi-dash-circle-fill me-1"></i> Unavailable</span>
+                                        {% elif prop.publication_status == 'Private Listing' and public_eligible_at and now and now < public_eligible_at %}
                                             <span class="badge bg-primary"><i class="bi bi-shield-lock-fill me-1"></i> Private Listing (72h Window Active)</span>
                                         {% elif prop.publication_status == 'Public Listing' or (public_eligible_at and now and now >= public_eligible_at) %}
                                             <span class="badge bg-success"><i class="bi bi-globe me-1"></i> Public Listing Active</span>
@@ -468,7 +472,17 @@
                                         </form>
                                     </div>
                                 {% else %}
-                                    {% if prop.publication_status == 'Private Listing' and public_eligible_at and now and now < public_eligible_at %}
+                                    {% if prop.publication_status == 'Sold' or prop.status == 'Sold' %}
+                                        <div class="alert alert-dark mb-0 py-2 px-3 rounded-3 text-start">
+                                            <i class="bi bi-tag-fill me-1"></i> <strong>Phase 10 Terminal State: Property Marked as SOLD.</strong>
+                                            <span class="small d-block text-white-50 mt-1">Property status: <code>Sold</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>Sold</code></span>
+                                        </div>
+                                    {% elif prop.publication_status == 'Unavailable' %}
+                                        <div class="alert alert-secondary mb-0 py-2 px-3 rounded-3 text-start">
+                                            <i class="bi bi-dash-circle-fill me-1"></i> <strong>Phase 10 State: Property Marked as UNAVAILABLE.</strong>
+                                            <span class="small d-block text-muted mt-1">Property status: <code>{{ prop.status }}</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>Unavailable</code></span>
+                                        </div>
+                                    {% elif prop.publication_status == 'Private Listing' and public_eligible_at and now and now < public_eligible_at %}
                                         <div class="alert alert-primary mb-0 py-2 px-3 rounded-3 text-start">
                                             <i class="bi bi-shield-lock-fill me-1"></i> <strong>Phase 9 Active: Private Listing (72-Hour Window Active).</strong>
                                             <span class="small d-block text-muted mt-1">Property status: <code>Approved</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>Private Listing</code></span>
@@ -478,6 +492,35 @@
                                         <div class="alert alert-success mb-0 py-2 px-3 rounded-3 text-start">
                                             <i class="bi bi-globe me-1"></i> <strong>Phase 9 Active: Public Listing Active.</strong>
                                             <span class="small d-block text-muted mt-1">Property status: <code>Approved</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>{{ 'Public Listing' if (public_eligible_at and now and now >= public_eligible_at) else prop.publication_status }}</code></span>
+                                        </div>
+                                    {% endif %}
+
+                                    <!-- PHASE 10 ADMINISTRATIVE AVAILABILITY & SOLD CONTROLS -->
+                                    {% if prop.publication_status != 'Sold' and prop.status != 'Sold' %}
+                                        <div class="mt-3 pt-3 border-top text-center">
+                                            <h6 class="fw-bold text-dark mb-1">Phase 10: Administrative Availability & Sold Control</h6>
+                                            <p class="text-muted small mb-2">
+                                                Transition an approved/listed property to <strong>Sold</strong> or <strong>Unavailable</strong> state.
+                                            </p>
+                                            <div class="d-flex justify-content-center gap-2">
+                                                <form method="POST" action="{{ url_for('admin_update_property_status', property_id=prop.property_id) }}">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="action" value="sold">
+                                                    <button type="submit" class="btn btn-sm btn-dark fw-bold px-3 rounded-pill" onclick="return confirm('Mark Property as SOLD? This is a terminal state transition.');">
+                                                        <i class="bi bi-tag-fill me-1"></i> Mark as Sold
+                                                    </button>
+                                                </form>
+
+                                                {% if prop.publication_status != 'Unavailable' %}
+                                                    <form method="POST" action="{{ url_for('admin_update_property_status', property_id=prop.property_id) }}">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <input type="hidden" name="action" value="unavailable">
+                                                        <button type="submit" class="btn btn-sm btn-secondary fw-bold px-3 rounded-pill" onclick="return confirm('Mark Property as UNAVAILABLE?');">
+                                                            <i class="bi bi-dash-circle-fill me-1"></i> Mark as Unavailable
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     {% endif %}
                                 {% endif %}

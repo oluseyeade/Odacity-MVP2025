@@ -1009,3 +1009,189 @@ def admin_approve_property(property_id):
     if case_id:
         return redirect(url_for('admin_intent_detail', case_id=case_id))
     return redirect(url_for('admin_intents'))
+
+
+@app.route('/admin/properties/<int:property_id>/update-status/', methods=['POST'])
+@admin_required
+def admin_update_property_status(property_id):
+    """
+    Phase 10 Administrative Property Status Transition (Sold / Unavailable).
+    Allows super administrators to transition an approved/listed property to:
+    - 'Sold': Terminal state.
+    - 'Unavailable': Owner/Platform availability hold.
+    Prerequisites: Property must be in an approved/listing state ('Approved', 'Private Listing', 'Public Listing').
+    Terminal State Protections:
+    - Sold properties CANNOT return to Public Listing, Private Listing, or Unavailable.
+    - Unavailable properties CANNOT be marked Sold directly without being active.
+    - Unapproved properties CANNOT be marked Sold or Unavailable.
+    """
+    prop = Property.query.get_or_404(property_id)
+    dab = prop.dab
+
+    if not dab:
+        flash(f"Cannot update Property #{property_id} status because no parent DirectAssetBrief is associated.", 'danger')
+        return redirect(url_for('admin_intents'))
+
+    intent_case = VerificationCase.query.filter_by(dab_id=dab.dab_id).first()
+    case_id = intent_case.verification_case_id if intent_case else None
+
+    action = request.form.get('action', '').lower().strip()
+    admin_user_id = session.get('user_id')
+    now = datetime.utcnow()
+
+    # 1. Terminal State Protection: Property is already Sold
+    if prop.publication_status == 'Sold' or prop.status == 'Sold':
+        if action == 'sold':
+            flash(f"Property #{property_id} ('{prop.title}') is already marked as SOLD.", 'info')
+        else:
+            flash(f"Cannot change status for Property #{property_id}: Property is SOLD. Sold is a non-reversible terminal state.", 'danger')
+        if case_id:
+            return redirect(url_for('admin_intent_detail', case_id=case_id))
+        return redirect(url_for('admin_intents'))
+
+    # 2. Prerequisite Gate: Property must be in Approved / Listed stage
+    if prop.status not in ['Approved', 'Sold'] and prop.publication_status not in ['Approved', 'Private Listing', 'Public Listing', 'Sold', 'Unavailable']:
+        flash(f"Cannot update status for Property #{property_id}: Property must be APPROVED before changing availability or marking as Sold. Current status is '{prop.status}'.", 'danger')
+        if case_id:
+            return redirect(url_for('admin_intent_detail', case_id=case_id))
+        return redirect(url_for('admin_intents'))
+
+    # 3. Transition: Action = 'sold'
+    if action == 'sold':
+        if prop.publication_status == 'Unavailable':
+            flash(f"Cannot mark Property #{property_id} as Sold: Property is currently Unavailable.", 'danger')
+            if case_id:
+                return redirect(url_for('admin_intent_detail', case_id=case_id))
+            return redirect(url_for('admin_intents'))
+
+        previous_pub_status = prop.publication_status
+        previous_prop_status = prop.status
+
+        prop.publication_status = 'Sold'
+        prop.status = 'Sold'
+        prop.availability_status = 'Sold'
+        prop.updated_at = now
+
+        db.session.flush()
+
+        prop_case = VerificationCase.query.filter_by(dab_id=dab.dab_id, verifier_type='property').first()
+        if prop_case:
+            v_evt = VerificationEvent(
+                verification_case_id=prop_case.verification_case_id,
+                event_type='PROPERTY_SOLD',
+                description=f"Property #{prop.property_id} ('{prop.title}') marked as SOLD by Admin #{admin_user_id}. Phase 10 complete.",
+                data={
+                    "action": "PROPERTY_SOLD",
+                    "property_id": prop.property_id,
+                    "dab_id": dab.dab_id,
+                    "admin_user_id": admin_user_id,
+                    "previous_publication_status": previous_pub_status,
+                    "new_publication_status": "Sold",
+                    "timestamp": now.isoformat()
+                },
+                status='Passed',
+                created_by_user_id=admin_user_id,
+                performed_by_user_id=admin_user_id,
+                created_at=now
+            )
+            db.session.add(v_evt)
+
+        audit_entry = AuditLog(
+            user_id=admin_user_id,
+            action='PROPERTY_SOLD',
+            entity_type='Property',
+            entity_id=prop.property_id,
+            resource_type='Property',
+            resource_id=prop.property_id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            previous_values={"status": previous_prop_status, "publication_status": previous_pub_status},
+            new_values={"status": "Sold", "publication_status": "Sold", "availability_status": "Sold"},
+            created_at=now
+        )
+        db.session.add(audit_entry)
+
+        sec_event = SecurityEvent(
+            user_id=admin_user_id,
+            event_type='PROPERTY_SOLD',
+            description=f"Property #{prop.property_id} ('{prop.title}') marked as SOLD by admin #{admin_user_id}.",
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(sec_event)
+
+        db.session.commit()
+        flash(f"Property #{property_id} ('{prop.title}') has been marked as SOLD. Phase 10 terminal state active.", 'success')
+
+    # 4. Transition: Action = 'unavailable'
+    elif action == 'unavailable':
+        if prop.publication_status == 'Unavailable':
+            flash(f"Property #{property_id} ('{prop.title}') is already marked as UNAVAILABLE.", 'info')
+            if case_id:
+                return redirect(url_for('admin_intent_detail', case_id=case_id))
+            return redirect(url_for('admin_intents'))
+
+        previous_pub_status = prop.publication_status
+        previous_prop_status = prop.status
+
+        prop.publication_status = 'Unavailable'
+        prop.availability_status = 'Unavailable'
+        prop.updated_at = now
+
+        db.session.flush()
+
+        prop_case = VerificationCase.query.filter_by(dab_id=dab.dab_id, verifier_type='property').first()
+        if prop_case:
+            v_evt = VerificationEvent(
+                verification_case_id=prop_case.verification_case_id,
+                event_type='PROPERTY_UNAVAILABLE',
+                description=f"Property #{prop.property_id} ('{prop.title}') marked as UNAVAILABLE by Admin #{admin_user_id}.",
+                data={
+                    "action": "PROPERTY_UNAVAILABLE",
+                    "property_id": prop.property_id,
+                    "dab_id": dab.dab_id,
+                    "admin_user_id": admin_user_id,
+                    "previous_publication_status": previous_pub_status,
+                    "new_publication_status": "Unavailable",
+                    "timestamp": now.isoformat()
+                },
+                status='Passed',
+                created_by_user_id=admin_user_id,
+                performed_by_user_id=admin_user_id,
+                created_at=now
+            )
+            db.session.add(v_evt)
+
+        audit_entry = AuditLog(
+            user_id=admin_user_id,
+            action='PROPERTY_UNAVAILABLE',
+            entity_type='Property',
+            entity_id=prop.property_id,
+            resource_type='Property',
+            resource_id=prop.property_id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            previous_values={"status": previous_prop_status, "publication_status": previous_pub_status},
+            new_values={"status": prop.status, "publication_status": "Unavailable", "availability_status": "Unavailable"},
+            created_at=now
+        )
+        db.session.add(audit_entry)
+
+        sec_event = SecurityEvent(
+            user_id=admin_user_id,
+            event_type='PROPERTY_UNAVAILABLE',
+            description=f"Property #{prop.property_id} ('{prop.title}') marked as UNAVAILABLE by admin #{admin_user_id}.",
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(sec_event)
+
+        db.session.commit()
+        flash(f"Property #{property_id} ('{prop.title}') has been marked as UNAVAILABLE.", 'warning')
+
+    else:
+        flash(f"Invalid status action specified for Property #{property_id}.", 'danger')
+
+    if case_id:
+        return redirect(url_for('admin_intent_detail', case_id=case_id))
+    return redirect(url_for('admin_intents'))

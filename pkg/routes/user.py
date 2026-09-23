@@ -2067,13 +2067,15 @@ def owner_dashboard():
 
     # Portfolio Metrics
     total_properties_count = len(dabs)
-    available_properties = [p for p in properties if p.publication_status == 'Available']
+    available_properties = [p for p in properties if p.publication_status in ['Available', 'Public Listing', 'Private Listing', 'Approved']]
+    unavailable_properties = [p for p in properties if p.publication_status == 'Unavailable']
     pending_dabs = [d for d in dabs if d.status in ['Submitted', 'Under Verification', 'Draft']]
     approved_dabs = [d for d in dabs if d.status == 'Approved']
     sold_properties = [p for p in properties if p.publication_status == 'Sold']
     rented_properties = [p for p in properties if p.publication_status == 'Rented']
 
     available_count = len(available_properties)
+    unavailable_count = len(unavailable_properties)
     pending_approval_count = len(pending_dabs)
     approved_count = len(approved_dabs)
     sold_count = len(sold_properties)
@@ -2104,11 +2106,13 @@ def owner_dashboard():
         documents=documents,
         perf_guarantees=perf_guarantees,
         available_properties=available_properties,
+        unavailable_properties=unavailable_properties,
         pending_dabs=pending_dabs,
         sold_properties=sold_properties,
         rented_properties=rented_properties,
         total_properties_count=total_properties_count,
         available_count=available_count,
+        unavailable_count=unavailable_count,
         pending_approval_count=pending_approval_count,
         approved_count=approved_count,
         sold_count=sold_count,
@@ -2122,6 +2126,155 @@ def owner_dashboard():
         documents_rejected=documents_rejected,
         recent_events=recent_events
     )
+
+
+@app.route('/owner/properties/<int:property_id>/toggle-availability/', methods=['POST'])
+def owner_toggle_property_availability(property_id):
+    """
+    Phase 10 Owner Property Availability Control.
+    Allows authenticated property owners to mark their own eligible property as:
+    - 'make_unavailable': Transition publication_status to 'Unavailable'.
+    - 'reactivate': Restore publication_status to 'Public Listing' or 'Private Listing' (based on 72h window).
+
+    Security & Ownership Enforcement:
+    - Requires authenticated user session.
+    - Strictly verifies property ownership via PropertyOwnerProfile -> DirectAssetBrief -> Property.
+    - Rejects attempts to modify properties owned by other users.
+    - Rejects Sold properties (terminal state).
+    - Rejects unapproved properties (Draft, Submitted, Under Verification, Verified).
+    - Owners CANNOT mark properties as Sold.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to manage property availability.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    owner_prof = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+    if not owner_prof:
+        flash('Unauthorized access: Property Owner profile required.', 'danger')
+        return redirect(url_for('owner_dashboard'))
+
+    prop = Property.query.get_or_404(property_id)
+    dab = prop.dab
+
+    # 1. Ownership Verification: Property MUST belong to authenticated owner
+    if not dab or dab.owner_profile_id != owner_prof.owner_profile_id:
+        flash('Unauthorized access: You do not own this property brief.', 'danger')
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='UNAUTHORIZED_PROPERTY_ACCESS_ATTEMPT',
+            description=f"User #{user_id} attempted unauthorized availability modification on Property #{property_id}.",
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+        return redirect(url_for('owner_dashboard'))
+
+    action = request.form.get('action', '').lower().strip()
+    now = datetime.utcnow()
+
+    # 2. Terminal State Protection: Property is Sold
+    if prop.publication_status == 'Sold' or prop.status == 'Sold':
+        flash(f"Cannot modify availability for Property #{property_id}: Property is marked as SOLD (Terminal State).", 'danger')
+        return redirect(url_for('owner_dashboard'))
+
+    # 3. Prerequisite Gate: Property must be Approved / Listed stage
+    if prop.status != 'Approved' and prop.publication_status not in ['Approved', 'Private Listing', 'Public Listing', 'Unavailable']:
+        flash(f"Cannot update availability for Property #{property_id}: Property must be APPROVED before changing availability.", 'danger')
+        return redirect(url_for('owner_dashboard'))
+
+    # 4. Action: 'make_unavailable'
+    if action == 'make_unavailable':
+        if prop.publication_status == 'Unavailable':
+            flash(f"Property '{prop.title}' is already marked as Unavailable.", 'info')
+            return redirect(url_for('owner_dashboard'))
+
+        previous_pub_status = prop.publication_status
+        prop.publication_status = 'Unavailable'
+        prop.availability_status = 'Unavailable'
+        prop.updated_at = now
+
+        db.session.flush()
+
+        audit_entry = AuditLog(
+            user_id=user_id,
+            action='OWNER_PROPERTY_UNAVAILABLE',
+            entity_type='Property',
+            entity_id=prop.property_id,
+            resource_type='Property',
+            resource_id=prop.property_id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            previous_values={"publication_status": previous_pub_status},
+            new_values={"publication_status": "Unavailable", "availability_status": "Unavailable"},
+            created_at=now
+        )
+        db.session.add(audit_entry)
+
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='OWNER_PROPERTY_UNAVAILABLE',
+            description=f"Property #{prop.property_id} ('{prop.title}') marked as UNAVAILABLE by owner user #{user_id}.",
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(sec_event)
+
+        db.session.commit()
+        flash(f"Property '{prop.title}' has been marked as UNAVAILABLE.", 'warning')
+
+    # 5. Action: 'reactivate'
+    elif action == 'reactivate':
+        if prop.publication_status != 'Unavailable':
+            flash(f"Property '{prop.title}' is not currently marked as Unavailable.", 'info')
+            return redirect(url_for('owner_dashboard'))
+
+        # Determine prior legitimate listing state based on 72h window
+        new_pub_status = 'Public Listing'
+        if dab and dab.approved_at:
+            cutoff_time = now - timedelta(hours=72)
+            if dab.approved_at > cutoff_time:
+                new_pub_status = 'Private Listing'
+
+        previous_pub_status = prop.publication_status
+        prop.publication_status = new_pub_status
+        prop.availability_status = 'Available'
+        prop.updated_at = now
+
+        db.session.flush()
+
+        audit_entry = AuditLog(
+            user_id=user_id,
+            action='OWNER_PROPERTY_REACTIVATED',
+            entity_type='Property',
+            entity_id=prop.property_id,
+            resource_type='Property',
+            resource_id=prop.property_id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            previous_values={"publication_status": previous_pub_status},
+            new_values={"publication_status": new_pub_status, "availability_status": "Available"},
+            created_at=now
+        )
+        db.session.add(audit_entry)
+
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='OWNER_PROPERTY_REACTIVATED',
+            description=f"Property #{prop.property_id} ('{prop.title}') reactivated to {new_pub_status} by owner user #{user_id}.",
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(sec_event)
+
+        db.session.commit()
+        flash(f"Property '{prop.title}' has been REACTIVATED as {new_pub_status}.", 'success')
+
+    else:
+        flash('Invalid action requested.', 'danger')
+
+    return redirect(url_for('owner_dashboard'))
 
 
 
