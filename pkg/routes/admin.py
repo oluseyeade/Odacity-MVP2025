@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from pkg import app
-from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile
+from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer
 from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification
 
 logger = logging.getLogger(__name__)
@@ -1388,3 +1388,26 @@ def admin_cancel_inspection(inspection_id):
     db.session.commit()
     flash(f'Inspection #{inspection_id} has been administratively CANCELLED.', 'info')
     return redirect(url_for('admin_inspections'))
+
+
+# ==========================================
+# PHASE 13 — ADMIN OFFER MANAGEMENT & AUDIT ROUTE
+# ==========================================
+
+@app.route('/admin/offers/')
+@admin_required
+def admin_offers():
+    status_filter = request.args.get('status', '').strip()
+    query = Offer.query.order_by(Offer.submitted_at.desc())
+
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+
+    offers = query.all()
+
+    return render_template(
+        'admin/offers.html',
+        title='Purchase Offers Audit — Odacity Admin',
+        offers=offers,
+        status_filter=status_filter
+    )

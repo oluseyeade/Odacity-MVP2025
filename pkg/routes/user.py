@@ -1930,6 +1930,10 @@ def submit_offer(property_id):
 
     prop = Property.query.get_or_404(property_id)
 
+    if prop.dab and prop.dab.service_type != 'sale':
+        flash('Purchase offers are only permitted for Sale properties.', 'danger')
+        return redirect(url_for('property_detail', property_id=property_id))
+
     if prop.publication_status and prop.publication_status not in ['Approved', 'Private Listing', 'Public Listing']:
         flash('This property is not currently available for purchase offers.', 'danger')
         return redirect(url_for('properties'))
@@ -2473,10 +2477,11 @@ def respond_offer(offer_id):
     offer_rec.status = action
     offer_rec.responded_at = datetime.utcnow()
 
+    event_type = 'PURCHASE_OFFER_ACCEPTED' if action == 'Accepted' else 'PURCHASE_OFFER_REJECTED'
     sec_event = SecurityEvent(
         user_id=user_id,
-        event_type='SELLER_OFFER_RESPONDED',
-        description=f'Seller responded to purchase offer #{offer_id} with status: {action}',
+        event_type=event_type,
+        description=f'Property owner {action.lower()} purchase offer #{offer_id} for property #{offer_rec.property_id}',
         ip_address=request.remote_addr,
         created_at=datetime.utcnow()
     )

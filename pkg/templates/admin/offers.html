@@ -1,0 +1,139 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ title or "Purchase Offers Audit — Odacity Admin" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-stats-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    }
+    .admin-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    {% if category == 'success' %}
+                        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                    {% elif category == 'danger' %}
+                        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                    {% endif %}
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-cash-stack text-danger me-2"></i>Purchase Offers Audit & Compliance</h2>
+            <p class="text-muted mb-0">Platform-wide audit visibility for buyer purchase offers and seller responses across all properties.</p>
+        </div>
+    </div>
+
+    <!-- STATUS FILTER BAR -->
+    <div class="mb-4 d-flex gap-2">
+        <a href="{{ url_for('admin_offers') }}" class="btn btn-sm {% if not status_filter %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">All Offers</a>
+        <a href="{{ url_for('admin_offers', status='Submitted') }}" class="btn btn-sm {% if status_filter == 'Submitted' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Submitted</a>
+        <a href="{{ url_for('admin_offers', status='Accepted') }}" class="btn btn-sm {% if status_filter == 'Accepted' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Accepted</a>
+        <a href="{{ url_for('admin_offers', status='Rejected') }}" class="btn btn-sm {% if status_filter == 'Rejected' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Rejected</a>
+        <a href="{{ url_for('admin_offers', status='Cancelled') }}" class="btn btn-sm {% if status_filter == 'Cancelled' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Cancelled</a>
+    </div>
+
+    <!-- OFFERS TABLE -->
+    <div class="admin-table-card">
+        {% if offers %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" style="width: 100px;">Offer ID</th>
+                            <th scope="col">Property Details</th>
+                            <th scope="col">Buyer</th>
+                            <th scope="col">Offer Amount</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Submitted Date</th>
+                            <th scope="col">Responded Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for offer in offers %}
+                            <tr>
+                                <td class="fw-bold text-muted">#OFFER-{{ offer.offer_id }}</td>
+                                <td>
+                                    {% if offer.property %}
+                                        <a href="{{ url_for('property_detail', property_id=offer.property_id) }}" class="fw-bold text-dark text-decoration-none">
+                                            {{ offer.property.title }}
+                                        </a>
+                                        <div class="small text-muted">
+                                            ID: #{{ offer.property_id }} | Intent: {{ offer.property.dab.service_type.upper() if offer.property.dab else 'N/A' }}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Property #{{ offer.property_id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if offer.customer %}
+                                        <span class="fw-bold">{{ offer.customer.first_name or 'Buyer' }} {{ offer.customer.last_name or '' }}</span>
+                                        <div class="small text-muted">ID: #{{ offer.customer_id }}</div>
+                                    {% else %}
+                                        <span class="text-muted">Customer #{{ offer.customer_id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold text-success">
+                                    ₦{{ "{:,.2f}".format(offer.offer_amount) if offer.offer_amount else 'N/A' }}
+                                </td>
+                                <td>
+                                    {% if offer.status == 'Submitted' %}
+                                        <span class="badge bg-info text-dark">Submitted</span>
+                                    {% elif offer.status == 'Accepted' %}
+                                        <span class="badge bg-success">Accepted</span>
+                                    {% elif offer.status == 'Rejected' %}
+                                        <span class="badge bg-danger">Rejected</span>
+                                    {% elif offer.status == 'Cancelled' %}
+                                        <span class="badge bg-secondary">Cancelled</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border">{{ offer.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">
+                                    {{ offer.submitted_at.strftime('%Y-%m-%d %H:%M') if offer.submitted_at else 'N/A' }}
+                                </td>
+                                <td class="small text-muted">
+                                    {{ offer.responded_at.strftime('%Y-%m-%d %H:%M') if offer.responded_at else '—' }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-cash-stack text-muted display-4 d-block mb-3"></i>
+                <h5 class="fw-bold text-dark mb-1">No Purchase Offers Found</h5>
+                <p class="text-muted mb-0">No purchase offers match the current filter selection.</p>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
