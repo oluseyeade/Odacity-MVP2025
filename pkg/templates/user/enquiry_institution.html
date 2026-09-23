@@ -125,7 +125,7 @@
                     <i class="bi bi-building me-1"></i> SECTION A
                 </div>
                 <h3 class="section-title">Institution / Organization Information</h3>
-                <p class="section-subtitle">Information of the institution or corporate entity submitting this enquiry.</p>
+                <p class="section-subtitle">Primary identity and contact information for the institution submitting this enquiry.</p>
                 
                 <div class="row g-3">
                     <!-- 1. Institution / Organization Name -->
@@ -172,8 +172,19 @@
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
+                </div>
+            </div>
 
-                    <!-- 6. Organization Type -->
+            <!-- SECTION B: PROPERTY OWNER / ORGANIZATION INFORMATION -->
+            <div class="enquiry-form-card">
+                <div class="section-header-badge">
+                    <i class="bi bi-shield-check me-1"></i> SECTION B
+                </div>
+                <h3 class="section-title">Property Owner / Organization Information</h3>
+                <p class="section-subtitle">Corporate registration and official CAC verification documents.</p>
+                
+                <div class="row g-3">
+                    <!-- 1. Organization Type -->
                     <div class="col-md-6">
                         <label for="inst_org_type" class="form-label-custom">{{ form.inst_org_type.label.text }} <span class="text-danger">*</span></label>
                         {{ form.inst_org_type(class="form-select rounded-3 p-2.5 " + ("is-invalid" if form.inst_org_type.errors else ""), id="inst_org_type") }}
@@ -182,7 +193,7 @@
                         {% endfor %}
                     </div>
 
-                    <!-- 7. CAC Registration Number -->
+                    <!-- 2. CAC Registration Number -->
                     <div class="col-md-6">
                         <label for="inst_cac_reg_num" class="form-label-custom">{{ form.inst_cac_reg_num.label.text }} <span class="text-danger">*</span></label>
                         {{ form.inst_cac_reg_num(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_cac_reg_num.errors else ""), id="inst_cac_reg_num", placeholder="RC-XXXXXX") }}
@@ -191,12 +202,12 @@
                         {% endfor %}
                     </div>
 
-                    <!-- 8. CAC Registration Certificate Upload -->
+                    <!-- 3. CAC Registration Certificate Upload -->
                     <div class="col-12">
                         <label for="inst_cac_cert" class="form-label-custom">{{ form.inst_cac_cert.label.text }} <span class="text-danger">*</span></label>
                         {{ form.inst_cac_cert(class="form-control rounded-3 p-2.5 " + ("is-invalid" if form.inst_cac_cert.errors else ""), id="inst_cac_cert", accept="application/pdf,.pdf") }}
                         <div class="file-format-badge">
-                            <i class="bi bi-file-earmark-pdf me-1"></i> Accepted format: PDF
+                            <i class="bi bi-file-earmark-pdf me-1"></i> CAC Registration Certificate (PDF only)
                         </div>
                         {% for error in form.inst_cac_cert.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
@@ -205,8 +216,6 @@
                 </div>
             </div>
 
-
-
             <!-- SUBMIT BUTTON -->
             <div class="text-center pt-2 pb-4">
                 <button type="submit" class="btn-enquiry-submit">
@@ -214,6 +223,7 @@
                     <i class="bi bi-send-fill ms-2"></i>
                 </button>
             </div>
+
         </form>
 
     </div>
