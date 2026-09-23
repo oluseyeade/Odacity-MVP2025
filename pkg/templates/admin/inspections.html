@@ -1,0 +1,305 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ title or "Inspection Management — Odacity Admin" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-stats-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    }
+    .admin-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    {% if category == 'success' %}
+                        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                    {% elif category == 'danger' %}
+                        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                    {% endif %}
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-calendar-check-fill text-danger me-2"></i>Inspection Management & Scheduling</h2>
+            <p class="text-muted mb-0">Manage customer inspection requests, confirm appointment schedules, and log site visit outcomes.</p>
+        </div>
+    </div>
+
+    <!-- METRICS CARDS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="admin-stats-card">
+                <div class="text-muted small fw-bold text-uppercase">Total Inspections</div>
+                <div class="h2 fw-bold text-dark mb-0">{{ counts.total }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="admin-stats-card border-warning">
+                <div class="text-warning small fw-bold text-uppercase">Pending Requests</div>
+                <div class="h2 fw-bold text-warning mb-0">{{ counts.requested }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="admin-stats-card border-primary">
+                <div class="text-primary small fw-bold text-uppercase">Scheduled Visits</div>
+                <div class="h2 fw-bold text-primary mb-0">{{ counts.scheduled }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="admin-stats-card border-success">
+                <div class="text-success small fw-bold text-uppercase">Completed Visits</div>
+                <div class="h2 fw-bold text-success mb-0">{{ counts.completed }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FILTER TABS -->
+    <ul class="nav nav-tabs mb-4 border-bottom-0">
+        <li class="nav-item">
+            <a class="nav-link fw-bold {% if not active_status %}active{% endif %}" href="{{ url_for('admin_inspections') }}">
+                All ({{ counts.total }})
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link fw-bold {% if active_status == 'Requested' %}active{% endif %}" href="{{ url_for('admin_inspections', status='Requested') }}">
+                Requested ({{ counts.requested }})
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link fw-bold {% if active_status == 'Scheduled' %}active{% endif %}" href="{{ url_for('admin_inspections', status='Scheduled') }}">
+                Scheduled ({{ counts.scheduled }})
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link fw-bold {% if active_status == 'Completed' %}active{% endif %}" href="{{ url_for('admin_inspections', status='Completed') }}">
+                Completed ({{ counts.completed }})
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link fw-bold {% if active_status == 'Cancelled' %}active{% endif %}" href="{{ url_for('admin_inspections', status='Cancelled') }}">
+                Cancelled ({{ counts.cancelled }})
+            </a>
+        </li>
+    </ul>
+
+    <!-- TABLE CARD -->
+    <div class="admin-table-card">
+        {% if inspections %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 90px;">Insp ID</th>
+                        <th>Property Details</th>
+                        <th>Customer</th>
+                        <th>Request Date</th>
+                        <th>Scheduled Date/Time</th>
+                        <th>Status</th>
+                        <th class="text-end">Admin Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for insp in inspections %}
+                    <tr>
+                        <td class="fw-bold text-muted">#INSP-{{ insp.inspection_id }}</td>
+                        <td>
+                            {% if insp.property %}
+                                <a href="{{ url_for('property_detail', property_id=insp.property_id) }}" class="fw-bold text-decoration-none text-dark" target="_blank">
+                                    {{ insp.property.title }}
+                                </a>
+                                <div class="small text-muted">
+                                    <i class="bi bi-geo-alt"></i> {{ insp.property.city or '' }}{% if insp.property.state %}, {{ insp.property.state }}{% endif %}
+                                    <span class="badge bg-light text-dark border ms-1">{{ insp.property.dab.service_type if insp.property.dab else 'N/A' }}</span>
+                                </div>
+                            {% else %}
+                                <span class="text-muted">Property #{{ insp.property_id }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if insp.customer and insp.customer.user %}
+                                <div class="fw-bold">{{ insp.customer.user.full_name }}</div>
+                                <div class="small text-muted">{{ insp.customer.user.email }}</div>
+                            {% else %}
+                                <span class="text-muted">Customer #{{ insp.customer_id }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="small text-muted">
+                            {{ insp.requested_at.strftime('%b %d, %Y %H:%M') if insp.requested_at else 'N/A' }}
+                        </td>
+                        <td class="small fw-semibold text-primary">
+                            {% if insp.scheduled_for %}
+                                {{ insp.scheduled_for.strftime('%b %d, %Y %H:%M') }}
+                            {% else %}
+                                <span class="text-muted italic">Not Scheduled</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if insp.status == 'Requested' %}
+                                <span class="badge bg-warning text-dark">Requested</span>
+                            {% elif insp.status == 'Scheduled' %}
+                                <span class="badge bg-primary">Scheduled</span>
+                            {% elif insp.status == 'Completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% elif insp.status == 'Cancelled' %}
+                                <span class="badge bg-secondary">Cancelled</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">{{ insp.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1">
+                                {% if insp.status == 'Requested' %}
+                                    <!-- SCHEDULE BUTTON FOR REQUESTED -->
+                                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#scheduleModal{{ insp.inspection_id }}">
+                                        Schedule
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold" data-bs-toggle="modal" data-bs-target="#cancelModal{{ insp.inspection_id }}">
+                                        Cancel
+                                    </button>
+                                {% elif insp.status == 'Scheduled' %}
+                                    <!-- COMPLETE & CANCEL BUTTONS FOR SCHEDULED -->
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold" data-bs-toggle="modal" data-bs-target="#completeModal{{ insp.inspection_id }}">
+                                        Complete
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold" data-bs-toggle="modal" data-bs-target="#cancelModal{{ insp.inspection_id }}">
+                                        Cancel
+                                    </button>
+                                {% else %}
+                                    <span class="text-muted small fw-semibold">No Actions</span>
+                                {% endif %}
+                            </div>
+
+                            {% if insp.status == 'Requested' %}
+                            <!-- SCHEDULE MODAL -->
+                            <div class="modal fade text-start" id="scheduleModal{{ insp.inspection_id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="POST" action="{{ url_for('admin_schedule_inspection', inspection_id=insp.inspection_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <div class="modal-header">
+                                                <h5 class="modal-header-title fw-bold">Schedule Visit — #INSP-{{ insp.inspection_id }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="small text-muted mb-3">Confirm inspection appointment date and time for property visit.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">Inspection Date</label>
+                                                    <input type="date" name="scheduled_for" class="form-control" value="{{ insp.scheduled_for.strftime('%Y-%m-%d') if insp.scheduled_for else '' }}" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">Inspection Time</label>
+                                                    <input type="time" name="scheduled_time" class="form-control" value="{{ insp.scheduled_for.strftime('%H:%M') if insp.scheduled_for else '10:00' }}" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">Inspection Notes</label>
+                                                    <textarea name="inspector_notes" class="form-control" rows="3" placeholder="e.g. Site visit arrangements, contact notes...">{{ insp.inspector_notes or '' }}</textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Close</button>
+                                                <button type="submit" class="btn btn-primary btn-sm fw-bold">Confirm & Schedule</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if insp.status == 'Scheduled' %}
+                            <!-- COMPLETE MODAL -->
+                            <div class="modal fade text-start" id="completeModal{{ insp.inspection_id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="POST" action="{{ url_for('admin_complete_inspection', inspection_id=insp.inspection_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <div class="modal-header bg-success text-white">
+                                                <h5 class="modal-header-title fw-bold text-white mb-0">Mark Completed — #INSP-{{ insp.inspection_id }}</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="small text-muted mb-3">Record completion of the physical property inspection visit.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">Inspection Findings / Notes</label>
+                                                    <textarea name="inspector_notes" class="form-control" rows="4" placeholder="e.g. Site visit completed. Property structure and boundaries verified.">{{ insp.inspector_notes or '' }}</textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-success btn-sm fw-bold">Confirm Inspection Completion</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if insp.status in ['Requested', 'Scheduled'] %}
+                            <!-- CANCEL MODAL -->
+                            <div class="modal fade text-start" id="cancelModal{{ insp.inspection_id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="POST" action="{{ url_for('admin_cancel_inspection', inspection_id=insp.inspection_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <div class="modal-header bg-danger text-white">
+                                                <h5 class="modal-header-title fw-bold text-white mb-0">Cancel Inspection — #INSP-{{ insp.inspection_id }}</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="small text-muted mb-3">Are you sure you want to administratively cancel this inspection? The inspection record will be preserved in historical logs.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">Cancellation Reason (Optional)</label>
+                                                    <textarea name="notes" class="form-control" rows="3" placeholder="Reason for cancellation..."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Close</button>
+                                                <button type="submit" class="btn btn-danger btn-sm fw-bold">Confirm Cancellation</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-calendar-x display-4 text-muted mb-3"></i>
+            <h5 class="fw-bold">No Inspection Requests Found</h5>
+            <p class="text-muted mb-0">There are no property inspection appointments matching your filter.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

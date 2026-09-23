@@ -1,0 +1,29 @@
+{% extends "user/layout.html" %}
+
+{% block title %}{{ title or "Admin Portal — Odacity" }}{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark py-3 text-white border-bottom border-secondary">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <span class="badge bg-danger text-uppercase me-2" style="letter-spacing: 1px;">Admin Portal</span>
+                <span class="h5 fw-bold text-white mb-0 align-middle">Odacity Operations Hub</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a href="{{ url_for('admin_intents') }}" class="btn btn-sm {% if request.path == '/admin/intents/' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %} rounded-pill">
+                    <i class="bi bi-shield-lock me-1"></i> Intent Approvals
+                </a>
+                <a href="{{ url_for('admin_inspections') }}" class="btn btn-sm {% if '/admin/inspections/' in request.path %}btn-danger fw-bold{% else %}btn-outline-light{% endif %} rounded-pill">
+                    <i class="bi bi-calendar-check me-1"></i> Inspections
+                </a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-secondary rounded-pill text-light ms-md-2">
+                    <i class="bi bi-box-arrow-right me-1"></i> Return to User View
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block admin_content %}{% endblock %}
+{% endblock %}

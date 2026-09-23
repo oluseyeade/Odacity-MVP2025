@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from pkg import app
-from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia
+from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile
 from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification
 
 logger = logging.getLogger(__name__)
@@ -1195,3 +1195,196 @@ def admin_update_property_status(property_id):
     if case_id:
         return redirect(url_for('admin_intent_detail', case_id=case_id))
     return redirect(url_for('admin_intents'))
+
+
+# ==========================================
+# PHASE 12 — ADMIN INSPECTION MANAGEMENT
+# ==========================================
+
+@app.route('/admin/inspections/')
+@admin_required
+def admin_inspections():
+    status_filter = request.args.get('status', '').strip()
+    query = Inspection.query.order_by(Inspection.requested_at.desc())
+
+    if status_filter in ['Requested', 'Scheduled', 'Completed', 'Cancelled']:
+        query = query.filter_by(status=status_filter)
+
+    inspections_list = query.all()
+
+    counts = {
+        'total': Inspection.query.count(),
+        'requested': Inspection.query.filter_by(status='Requested').count(),
+        'scheduled': Inspection.query.filter_by(status='Scheduled').count(),
+        'completed': Inspection.query.filter_by(status='Completed').count(),
+        'cancelled': Inspection.query.filter_by(status='Cancelled').count(),
+    }
+
+    return render_template(
+        'admin/inspections.html',
+        title='Inspection Management — Odacity Admin',
+        inspections=inspections_list,
+        counts=counts,
+        active_status=status_filter
+    )
+
+
+@app.route('/admin/inspections/<int:inspection_id>/schedule/', methods=['POST'])
+@admin_required
+def admin_schedule_inspection(inspection_id):
+    admin_user_id = session.get('user_id')
+    insp = Inspection.query.get_or_404(inspection_id)
+
+    if insp.status not in ['Requested', 'Scheduled']:
+        flash(f'Cannot schedule an inspection with terminal status "{insp.status}".', 'danger')
+        return redirect(url_for('admin_inspections'))
+
+    date_str = request.form.get('scheduled_for', '').strip()
+    time_str = request.form.get('scheduled_time', '').strip()
+    notes = request.form.get('inspector_notes', '').strip() or None
+
+    if not date_str or not time_str:
+        flash('Please provide both a valid schedule date and time.', 'warning')
+        return redirect(url_for('admin_inspections'))
+
+    try:
+        scheduled_for_dt = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M')
+    except ValueError:
+        flash('Invalid inspection appointment date or time format.', 'danger')
+        return redirect(url_for('admin_inspections'))
+
+    if scheduled_for_dt < datetime.utcnow():
+        flash('Inspection appointment date/time cannot be in the past.', 'danger')
+        return redirect(url_for('admin_inspections'))
+
+    prev_status = insp.status
+    now = datetime.utcnow()
+    insp.status = 'Scheduled'
+    insp.scheduled_for = scheduled_for_dt
+    insp.scheduled_at = now
+    if notes:
+        insp.inspector_notes = notes
+
+    audit_entry = AuditLog(
+        user_id=admin_user_id,
+        action='INSPECTION_SCHEDULED',
+        entity_type='Inspection',
+        entity_id=insp.inspection_id,
+        resource_type='Inspection',
+        resource_id=insp.inspection_id,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        previous_values={"status": prev_status},
+        new_values={"status": "Scheduled", "scheduled_for": scheduled_for_dt.isoformat()},
+        created_at=now
+    )
+    db.session.add(audit_entry)
+
+    sec_event = SecurityEvent(
+        user_id=admin_user_id,
+        event_type='INSPECTION_SCHEDULED',
+        description=f"Inspection #{inspection_id} scheduled for {scheduled_for_dt.strftime('%Y-%m-%d %H:%M')} by admin #{admin_user_id}.",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+
+    db.session.commit()
+    flash(f'Inspection #{inspection_id} has been successfully scheduled for {scheduled_for_dt.strftime("%b %d, %Y %H:%M")}.', 'success')
+    return redirect(url_for('admin_inspections'))
+
+
+@app.route('/admin/inspections/<int:inspection_id>/complete/', methods=['POST'])
+@admin_required
+def admin_complete_inspection(inspection_id):
+    admin_user_id = session.get('user_id')
+    insp = Inspection.query.get_or_404(inspection_id)
+
+    # Correction B: Completion MUST accept ONLY Scheduled -> Completed
+    if insp.status != 'Scheduled':
+        flash(f'Cannot complete an inspection in status "{insp.status}". Inspection must be Scheduled first.', 'danger')
+        return redirect(url_for('admin_inspections'))
+
+    notes = request.form.get('inspector_notes', '').strip() or None
+    prev_status = insp.status
+    now = datetime.utcnow()
+
+    insp.status = 'Completed'
+    insp.completed_at = now
+    if notes:
+        insp.inspector_notes = notes
+
+    audit_entry = AuditLog(
+        user_id=admin_user_id,
+        action='INSPECTION_COMPLETED',
+        entity_type='Inspection',
+        entity_id=insp.inspection_id,
+        resource_type='Inspection',
+        resource_id=insp.inspection_id,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        previous_values={"status": prev_status},
+        new_values={"status": "Completed", "completed_at": now.isoformat()},
+        created_at=now
+    )
+    db.session.add(audit_entry)
+
+    sec_event = SecurityEvent(
+        user_id=admin_user_id,
+        event_type='INSPECTION_COMPLETED',
+        description=f"Inspection #{inspection_id} marked COMPLETED by admin #{admin_user_id}.",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+
+    db.session.commit()
+    flash(f'Inspection #{inspection_id} marked as COMPLETED.', 'success')
+    return redirect(url_for('admin_inspections'))
+
+
+@app.route('/admin/inspections/<int:inspection_id>/cancel/', methods=['POST'])
+@admin_required
+def admin_cancel_inspection(inspection_id):
+    admin_user_id = session.get('user_id')
+    insp = Inspection.query.get_or_404(inspection_id)
+
+    if insp.status in ['Completed', 'Cancelled']:
+        flash(f'Cannot cancel an inspection in terminal status "{insp.status}".', 'warning')
+        return redirect(url_for('admin_inspections'))
+
+    cancel_reason = request.form.get('notes', '').strip() or None
+    prev_status = insp.status
+    now = datetime.utcnow()
+
+    insp.status = 'Cancelled'
+    if cancel_reason:
+        insp.notes = cancel_reason
+
+    audit_entry = AuditLog(
+        user_id=admin_user_id,
+        action='INSPECTION_ADMIN_CANCELLED',
+        entity_type='Inspection',
+        entity_id=insp.inspection_id,
+        resource_type='Inspection',
+        resource_id=insp.inspection_id,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        previous_values={"status": prev_status},
+        new_values={"status": "Cancelled"},
+        created_at=now
+    )
+    db.session.add(audit_entry)
+
+    sec_event = SecurityEvent(
+        user_id=admin_user_id,
+        event_type='INSPECTION_ADMIN_CANCELLED',
+        description=f"Inspection #{inspection_id} administratively CANCELLED by admin #{admin_user_id}.",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+
+    db.session.commit()
+    flash(f'Inspection #{inspection_id} has been administratively CANCELLED.', 'info')
+    return redirect(url_for('admin_inspections'))
