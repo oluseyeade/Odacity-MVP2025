@@ -419,7 +419,7 @@
                                     Completing property verification sets <strong>Property.status = Verified</strong>. Property & DAB publication status remain <strong>Under Verification</strong> pending separate Approval.
                                 </p>
 
-                                {% if prop.status != 'Verified' %}
+                                {% if prop.status != 'Verified' and prop.status != 'Approved' %}
                                     <div class="d-flex justify-content-center gap-3">
                                         <form method="POST" action="{{ url_for('admin_verify_property', property_id=prop.property_id) }}">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -437,10 +437,30 @@
                                             </button>
                                         </form>
                                     </div>
-                                {% else %}
-                                    <div class="alert alert-success mb-0 py-2 px-3 rounded-3 text-start">
-                                        <i class="bi bi-patch-check-fill me-1"></i> <strong>Property Verified.</strong> Phase 7 complete.
+                                {% elif prop.status == 'Verified' %}
+                                    <div class="alert alert-success mb-3 py-2 px-3 rounded-3 text-start">
+                                        <i class="bi bi-patch-check-fill me-1"></i> <strong>Phase 7 Complete: Property Verified.</strong>
                                         <span class="small d-block text-muted mt-1">Property status: <code>Verified</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>{{ prop.publication_status }}</code></span>
+                                    </div>
+
+                                    <!-- PHASE 8 ADMINISTRATIVE APPROVAL CONTROL -->
+                                    <div class="mt-3 pt-3 border-top text-center">
+                                        <h6 class="fw-bold text-dark mb-1">Phase 8: Administrative Property Approval</h6>
+                                        <p class="text-muted small mb-3">
+                                            Grant administrative approval for this verified property. Approving sets <strong>Property.status = Approved</strong>, <strong>DAB.status = Approved</strong>, and <strong>Publication.status = Approved</strong>.
+                                        </p>
+                                        <form method="POST" action="{{ url_for('admin_approve_property', property_id=prop.property_id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="action" value="approve">
+                                            <button type="submit" class="btn btn-primary fw-bold px-4 rounded-pill" onclick="return confirm('Confirm Property Approval? This will transition Property, DAB, and Publication statuses to Approved (Phase 8 Complete).');">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Approve Property (Phase 8)
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-primary mb-0 py-2 px-3 rounded-3 text-start">
+                                        <i class="bi bi-check-all me-1"></i> <strong>Phase 8 Complete: Property Approved.</strong>
+                                        <span class="small d-block text-muted mt-1">Property status: <code>Approved</code> | DAB status: <code>{{ selected_case.dab.status }}</code> | Publication status: <code>{{ prop.publication_status }}</code></span>
                                     </div>
                                 {% endif %}
                             </div>

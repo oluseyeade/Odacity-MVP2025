@@ -851,3 +851,152 @@ def admin_verify_property(property_id):
     if case_id:
         return redirect(url_for('admin_intent_detail', case_id=case_id))
     return redirect(url_for('admin_intents'))
+
+
+@app.route('/admin/properties/<int:property_id>/approve/', methods=['POST'])
+@admin_required
+def admin_approve_property(property_id):
+    """
+    Phase 8 Terminal Gate: Administrative Property Approval.
+    Transitions verified property to Approved state:
+    Property.status = 'Approved', DirectAssetBrief.status = 'Approved',
+    Property.publication_status = 'Approved'.
+    Prerequisites: Property.status must be 'Verified', all title documents Verified,
+    all media Approved, Property VerificationCase status == 'Passed'.
+    """
+    prop = Property.query.get_or_404(property_id)
+    dab = prop.dab
+
+    if not dab:
+        flash(f"Cannot approve Property #{property_id} because no parent DirectAssetBrief is associated.", 'danger')
+        return redirect(url_for('admin_intents'))
+
+    intent_case = VerificationCase.query.filter_by(dab_id=dab.dab_id).first()
+    case_id = intent_case.verification_case_id if intent_case else None
+
+    action = request.form.get('action', 'approve').lower()
+    admin_user_id = session.get('user_id')
+    now = datetime.utcnow()
+
+    # Idempotency Check: Property already Approved
+    if prop.status == 'Approved' and dab.status == 'Approved' and prop.publication_status == 'Approved':
+        flash(f"Property #{property_id} ('{prop.title}') is already APPROVED. Phase 8 complete.", 'info')
+        if case_id:
+            return redirect(url_for('admin_intent_detail', case_id=case_id))
+        return redirect(url_for('admin_intents'))
+
+    # Prerequisite Gate Validation: Property must be Verified
+    if prop.status != 'Verified':
+        flash(f"Cannot approve Property #{property_id}: Property status is currently '{prop.status}'. Property must be VERIFIED in Phase 7 before approval.", 'danger')
+        if case_id:
+            return redirect(url_for('admin_intent_detail', case_id=case_id))
+        return redirect(url_for('admin_intents'))
+
+    # Prerequisite Gate Validation: Property VerificationCase must exist and be Passed
+    prop_case = VerificationCase.query.filter_by(
+        dab_id=dab.dab_id,
+        verifier_type='property'
+    ).first()
+
+    if not prop_case or prop_case.status != 'Passed':
+        flash(f"Cannot approve Property #{property_id}: Property verification case is missing or not PASSED.", 'danger')
+        if case_id:
+            return redirect(url_for('admin_intent_detail', case_id=case_id))
+        return redirect(url_for('admin_intents'))
+
+    # Prerequisite Gate Validation: All submitted title documents must be Verified
+    if prop.documents:
+        unverified_docs = [d for d in prop.documents if d.review_status != 'Verified']
+        if unverified_docs:
+            rejected_docs = [d for d in unverified_docs if d.review_status == 'Rejected']
+            if rejected_docs:
+                flash(f"Cannot approve Property #{property_id}: One or more title documents have been REJECTED. All documents must be VERIFIED.", 'danger')
+            else:
+                flash(f"Cannot approve Property #{property_id}: All submitted title documents must be VERIFIED before approval.", 'danger')
+            if case_id:
+                return redirect(url_for('admin_intent_detail', case_id=case_id))
+            return redirect(url_for('admin_intents'))
+
+    # Prerequisite Gate Validation: All property media photos must be Approved
+    if prop.media:
+        unapproved_media = [m for m in prop.media if m.review_status != 'Approved']
+        if unapproved_media:
+            rejected_media = [m for m in unapproved_media if m.review_status == 'Rejected']
+            if rejected_media:
+                flash(f"Cannot approve Property #{property_id}: One or more property photos have been REJECTED. All media must be APPROVED.", 'danger')
+            else:
+                flash(f"Cannot approve Property #{property_id}: All property photos must be APPROVED before approval.", 'danger')
+            if case_id:
+                return redirect(url_for('admin_intent_detail', case_id=case_id))
+            return redirect(url_for('admin_intents'))
+
+    try:
+        if action == 'approve':
+            # 1. Phase 8 Terminal State Transition
+            prop.status = 'Approved'
+            prop.publication_status = 'Approved'
+            prop.updated_at = now
+
+            dab.status = 'Approved'
+            dab.updated_at = now
+
+            db.session.flush()
+
+            # 2. Log VerificationEvent: PROPERTY_APPROVED
+            v_evt = VerificationEvent(
+                verification_case_id=prop_case.verification_case_id,
+                event_type='PROPERTY_APPROVED',
+                description=f"Property #{prop.property_id} ('{prop.title}') approved by Admin #{admin_user_id}. Phase 8 complete.",
+                data={
+                    "action": "PROPERTY_APPROVED",
+                    "property_id": prop.property_id,
+                    "dab_id": dab.dab_id,
+                    "approved_by_user_id": admin_user_id,
+                    "property_status": "Approved",
+                    "dab_status": "Approved",
+                    "publication_status": "Approved",
+                    "timestamp": now.isoformat()
+                },
+                status='Passed',
+                created_by_user_id=admin_user_id,
+                performed_by_user_id=admin_user_id,
+                created_at=now
+            )
+            db.session.add(v_evt)
+
+            # 3. Log AuditLog & SecurityEvent
+            audit_entry = AuditLog(
+                user_id=admin_user_id,
+                action='PROPERTY_APPROVED',
+                entity_type='Property',
+                entity_id=prop.property_id,
+                resource_type='Property',
+                resource_id=prop.property_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                previous_values={"status": "Verified", "publication_status": "Under Verification", "dab_status": "Under Verification"},
+                new_values={"status": "Approved", "publication_status": "Approved", "dab_status": "Approved"},
+                created_at=now
+            )
+            db.session.add(audit_entry)
+
+            sec_event = SecurityEvent(
+                user_id=admin_user_id,
+                event_type='PROPERTY_APPROVED',
+                description=f"Property #{prop.property_id} ('{prop.title}') approved by admin #{admin_user_id}. Phase 8 complete.",
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+
+            db.session.commit()
+            flash(f"Property #{property_id} ('{prop.title}') has been APPROVED successfully. Phase 8 complete.", 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error approving property #{property_id}: {e}")
+        flash(f"An error occurred while approving property #{property_id}: {str(e)}", 'danger')
+
+    if case_id:
+        return redirect(url_for('admin_intent_detail', case_id=case_id))
+    return redirect(url_for('admin_intents'))
