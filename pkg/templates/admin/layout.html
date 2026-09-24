@@ -20,6 +20,12 @@
                 <a href="{{ url_for('admin_offers') }}" class="btn btn-sm {% if '/admin/offers/' in request.path %}btn-danger fw-bold{% else %}btn-outline-light{% endif %} rounded-pill">
                     <i class="bi bi-cash-stack me-1"></i> Offers
                 </a>
+                <a href="{{ url_for('admin_transactions') }}" class="btn btn-sm {% if '/admin/transactions/' in request.path %}btn-danger fw-bold{% else %}btn-outline-light{% endif %} rounded-pill">
+                    <i class="bi bi-receipt me-1"></i> Transactions
+                </a>
+                <a href="{{ url_for('admin_performance') }}" class="btn btn-sm {% if '/admin/performance/' in request.path %}btn-danger fw-bold{% else %}btn-outline-light{% endif %} rounded-pill">
+                    <i class="bi bi-shield-check me-1"></i> Performance
+                </a>
                 <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-secondary rounded-pill text-light ms-md-2">
                     <i class="bi bi-box-arrow-right me-1"></i> Return to User View
                 </a>

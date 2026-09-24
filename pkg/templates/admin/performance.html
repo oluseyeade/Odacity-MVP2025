@@ -1,0 +1,240 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ title or "Performance Guarantee Engine — Odacity Admin" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-stats-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    }
+    .admin-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    {% if category == 'success' %}
+                        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                    {% elif category == 'danger' %}
+                        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                    {% endif %}
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-shield-check text-danger me-2"></i>Performance Guarantee Engine</h2>
+            <p class="text-muted mb-0">Performance Guarantee clock starts when the eligible DAB property is approved and listed.</p>
+        </div>
+        {% if is_operational %}
+            <div>
+                <form action="{{ url_for('admin_sync_performance_milestones') }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                        <i class="bi bi-arrow-repeat me-1"></i>Sync Milestones
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- STATUS FILTER BAR -->
+    <div class="mb-4 d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('admin_performance') }}" class="btn btn-sm {% if not status_filter %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">All Guarantees</a>
+        <a href="{{ url_for('admin_performance', status='Eligible') }}" class="btn btn-sm {% if status_filter == 'Eligible' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Eligible</a>
+        <a href="{{ url_for('admin_performance', status='Active') }}" class="btn btn-sm {% if status_filter == 'Active' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Active</a>
+        <a href="{{ url_for('admin_performance', status='Completed') }}" class="btn btn-sm {% if status_filter == 'Completed' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Completed</a>
+        <a href="{{ url_for('admin_performance', status='Redeemed_Partial') }}" class="btn btn-sm {% if status_filter == 'Redeemed_Partial' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Redeemed (Partial)</a>
+        <a href="{{ url_for('admin_performance', status='Redeemed_Full') }}" class="btn btn-sm {% if status_filter == 'Redeemed_Full' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Redeemed (Full)</a>
+    </div>
+
+    <!-- GUARANTEES TABLE -->
+    <div class="admin-table-card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Guarantee ID</th>
+                        <th>Type</th>
+                        <th>Property / Owner Profile</th>
+                        <th>Property Approval & Listing</th>
+                        <th>Status</th>
+                        <th>Performance Clock</th>
+                        <th>Milestones & Settlements</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if perf_guarantees %}
+                        {% for g in perf_guarantees %}
+                            <tr>
+                                <td><span class="fw-bold text-dark">#{{ g.guarantee_id }}</span></td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">
+                                        {{ g.guarantee_type or 'owner_guarantee' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        {% if g.property %}
+                                            <i class="bi bi-building me-1 text-secondary"></i>Property #{{ g.property_id }}
+                                        {% endif %}
+                                        {% if g.owner_profile_id %}
+                                            <br><i class="bi bi-person me-1 text-secondary"></i>Owner Profile #{{ g.owner_profile_id }}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if g.property and g.property.dab and g.property.dab.approved_at %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                            <i class="bi bi-check-circle me-1"></i>Approved: {{ g.property.dab.approved_at.strftime('%Y-%m-%d %H:%M') }}
+                                        </span>
+                                    {% elif g.start_at %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                            <i class="bi bi-check-circle me-1"></i>Started: {{ g.start_at.strftime('%Y-%m-%d %H:%M') }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                            <i class="bi bi-hourglass-split me-1"></i>Not Approved & Listed
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if g.status == 'Eligible' %}
+                                        <span class="badge bg-info text-dark">Eligible</span>
+                                    {% elif g.status == 'Active' %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% elif g.status == 'Completed' %}
+                                        <span class="badge bg-primary">Completed</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">{{ g.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if g.status == 'Active' or g.start_at %}
+                                        <div class="small">
+                                            <span class="text-success fw-bold">{{ g.calc_days_elapsed }} days elapsed</span><br>
+                                            {% if g.calc_days_remaining is not none %}
+                                                <span class="text-muted">{{ g.calc_days_remaining }} days remaining</span>
+                                            {% else %}
+                                                <span class="text-muted">No period configured</span>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted small">Clock inactive ({% if g.period_days %}{{ g.period_days }}d period{% else %}Unconfigured{% endif %})</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        {% if g.has_m3 %}
+                                            <span class="badge bg-info-subtle text-info border border-info-subtle me-1"><i class="bi bi-flag me-1"></i>3M Milestone</span>
+                                        {% endif %}
+                                        {% if g.has_m6 %}
+                                            <span class="badge bg-purple-subtle text-purple border border-purple-subtle me-1"><i class="bi bi-flag-fill me-1"></i>6M Milestone</span>
+                                        {% endif %}
+                                        {% if g.pending_settlement %}
+                                            <br><span class="badge bg-warning text-dark border border-warning"><i class="bi bi-clock-history me-1"></i>Pending Settlement ₦{{ "{:,.2f}".format(g.pending_settlement.amount) }}</span>
+                                        {% endif %}
+                                        {% if g.approved_settlement %}
+                                            <br><span class="badge bg-info text-dark border"><i class="bi bi-check-circle me-1"></i>Approved Settlement ₦{{ "{:,.2f}".format(g.approved_settlement.amount) }}</span>
+                                        {% endif %}
+                                        {% if not g.has_m3 and not g.has_m6 and not g.pending_settlement and not g.approved_settlement %}
+                                            <span class="text-muted small">—</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        {% if g.status == 'Eligible' %}
+                                            {% if is_operational %}
+                                                {% if g.property and g.property.dab and g.property.dab.approved_at %}
+                                                    <form action="{{ url_for('admin_activate_performance_guarantee', guarantee_id=g.guarantee_id) }}" method="POST" class="d-inline">
+                                                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3">
+                                                            <i class="bi bi-play-circle me-1"></i>Activate Clock
+                                                        </button>
+                                                    </form>
+                                                {% else %}
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled title="Property Approval & Listing Required">
+                                                        <i class="bi bi-lock me-1"></i>Requires Approval & Listing
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-light text-muted border">Read-Only</span>
+                                            {% endif %}
+                                        {% else %}
+                                            {% if is_operational and g.start_at %}
+                                                <form action="{{ url_for('admin_trigger_guarantee_milestone', guarantee_id=g.guarantee_id) }}" method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-0">
+                                                        <i class="bi bi-flag me-1"></i>Check Milestone
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+
+                                            {% if is_operational and g.status not in ['Redeemed_Full', 'Completed'] and not g.pending_settlement %}
+                                                <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-pill px-2 py-0" data-bs-toggle="collapse" data-bs-target="#claimForm{{ g.guarantee_id }}">
+                                                    <i class="bi bi-cash-stack me-1"></i>Initiate Redemption
+                                                </button>
+                                                <div class="collapse mt-1" id="claimForm{{ g.guarantee_id }}">
+                                                    <form action="{{ url_for('admin_initiate_performance_redemption', guarantee_id=g.guarantee_id) }}" method="POST" class="p-2 border rounded bg-light">
+                                                        <input type="number" step="0.01" name="amount" class="form-control form-control-sm mb-1" placeholder="Claim Amount (₦)" required {% if g.cap_amount %}max="{{ g.cap_amount }}"{% endif %}>
+                                                        <button type="submit" class="btn btn-sm btn-warning w-100 py-0">Submit Claim</button>
+                                                    </form>
+                                                </div>
+                                            {% endif %}
+
+                                            {% if can_approve_settlement and g.pending_settlement %}
+                                                <form action="{{ url_for('admin_approve_guarantee_settlement', settlement_id=g.pending_settlement.id) }}" method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-info rounded-pill px-2 py-0">
+                                                        <i class="bi bi-check2-circle me-1"></i>Approve Settlement
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+
+                                            {% if can_record_payment and g.approved_settlement %}
+                                                <form action="{{ url_for('admin_record_guarantee_settlement_payment', settlement_id=g.approved_settlement.id) }}" method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-2 py-0">
+                                                        <i class="bi bi-currency-dollar me-1"></i>Record Payment
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                <i class="bi bi-shield-x fs-3 d-block mb-2 text-secondary"></i>
+                                No Performance Guarantee records found.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

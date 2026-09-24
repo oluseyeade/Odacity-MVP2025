@@ -1,0 +1,365 @@
+{% extends "user/layout.html" %}
+
+{% block title %}{{ title or "Transaction Detail — Odacity" }}{% endblock %}
+
+{% block main_content %}
+<div class="bg-dark text-white py-3 mb-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('homepage') }}" class="text-light">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}" class="text-light">Dashboard</a></li>
+                <li class="breadcrumb-item active text-info" aria-current="page">Transaction {{ tx.transaction_reference or '#' ~ tx.transaction_id }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="container pb-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <span class="badge bg-danger text-uppercase px-3 py-2 me-2" style="letter-spacing: 1px;">Transaction Record</span>
+            <span class="badge bg-warning text-dark px-3 py-2 fw-bold align-middle">{{ tx.status.upper() if tx.status else 'INITIATED' }}</span>
+            <h2 class="fw-bold mb-1 mt-2"><i class="bi bi-receipt text-danger me-2"></i>{{ tx.transaction_reference or 'Transaction #' ~ tx.transaction_id }}</h2>
+            <p class="text-muted mb-0">Established from Accepted Purchase Offer #{{ tx.offer_id or 'N/A' }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary rounded-pill">
+                <i class="bi bi-arrow-left me-1"></i> Return to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Main Transaction Overview -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
+                <h5 class="fw-bold border-bottom pb-3 mb-3 text-dark"><i class="bi bi-card-checklist me-2 text-primary"></i>Transaction Summary</h5>
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="small text-muted text-uppercase fw-semibold">Transaction Reference</div>
+                        <div class="fw-bold text-dark font-monospace fs-5">{{ tx.transaction_reference or 'TX-' ~ tx.transaction_id }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="small text-muted text-uppercase fw-semibold">Transaction Type</div>
+                        <div class="fw-bold text-dark"><span class="badge bg-light text-dark border px-3 py-2 fs-6">{{ (tx.transaction_type or 'Sale')|upper }}</span></div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="small text-muted text-uppercase fw-semibold">Agreed Transaction Value</div>
+                        <div class="fw-bold text-success fs-4">₦{{ "{:,.2f}".format(tx.transaction_value or tx.total_amount or 0) }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="small text-muted text-uppercase fw-semibold">Current Lifecycle Stage</div>
+                        <div><span class="badge bg-info text-dark px-3 py-2 fw-bold fs-6">{{ tx.status }}</span></div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="small text-muted text-uppercase fw-semibold">Initiation Date</div>
+                        <div class="fw-semibold text-dark">{{ tx.created_at.strftime('%b %d, %Y %H:%M') if tx.created_at else 'N/A' }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="small text-muted text-uppercase fw-semibold">Last Updated</div>
+                        <div class="fw-semibold text-dark">{{ tx.updated_at.strftime('%b %d, %Y %H:%M') if tx.updated_at else 'N/A' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Property Details -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white">
+                <h5 class="fw-bold border-bottom pb-3 mb-3 text-dark"><i class="bi bi-building me-2 text-danger"></i>Property Details</h5>
+                {% if tx.property %}
+                    <div class="d-flex align-items-center gap-3">
+                        <div>
+                            <h5 class="fw-bold mb-1">
+                                <a href="{{ url_for('property_detail', property_id=tx.property_id) }}" class="text-decoration-none text-dark">
+                                    {{ tx.property.title }}
+                                </a>
+                            </h5>
+                            <p class="text-muted small mb-0"><i class="bi bi-geo-alt me-1"></i>{{ tx.property.location or tx.property.city or 'Lagos, Nigeria' }}</p>
+                            <div class="small text-muted mt-1">Listing Status: <span class="badge bg-light text-dark border">{{ tx.property.publication_status }}</span></div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">Property ID #{{ tx.property_id }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Invoices & Payment Section -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Invoices & Billing</h5>
+                    {% if is_operational_admin and not tx.invoices %}
+                        <form action="{{ url_for('admin_generate_invoice', transaction_id=tx.transaction_id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-primary rounded-pill fw-bold">
+                                <i class="bi bi-plus-circle me-1"></i> Issue Invoice (Admin)
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+
+                {% if tx.invoices %}
+                    {% for inv in tx.invoices %}
+                        <div class="border rounded-3 p-3 mb-3 bg-light">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                                <div>
+                                    <span class="fw-bold font-monospace text-dark fs-6">{{ inv.invoice_number }}</span>
+                                    {% if inv.status == 'Paid' %}
+                                        <span class="badge bg-success ms-2">Paid</span>
+                                    {% elif inv.status == 'Partially_Paid' %}
+                                        <span class="badge bg-info text-dark ms-2">Partially Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark ms-2">{{ inv.status }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="small text-muted">
+                                    Issued: {{ inv.issue_date.strftime('%b %d, %Y') if inv.issue_date else 'N/A' }} |
+                                    Due: {{ inv.due_date.strftime('%b %d, %Y') if inv.due_date else 'N/A' }}
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-sm-4">
+                                    <div class="small text-muted">Amount Due</div>
+                                    <div class="fw-bold text-dark">₦{{ "{:,.2f}".format(inv.amount_due) }}</div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="small text-muted">Amount Paid</div>
+                                    <div class="fw-bold text-success">₦{{ "{:,.2f}".format(inv.amount_paid) }}</div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="small text-muted">Balance Outstanding</div>
+                                    <div class="fw-bold text-danger">₦{{ "{:,.2f}".format(inv.amount_due - inv.amount_paid) }}</div>
+                                </div>
+                            </div>
+
+                            <!-- Payment History -->
+                            {% if inv.payments %}
+                                <div class="small fw-semibold text-muted border-top pt-2 mb-2">Recorded Payments:</div>
+                                <ul class="list-group list-group-flush small mb-3">
+                                    {% for p in inv.payments %}
+                                        <li class="list-group-item bg-transparent px-0 py-1 d-flex justify-content-between">
+                                            <span><i class="bi bi-check-circle-fill text-success me-1"></i>{{ p.payment_reference }} ({{ p.method|upper }})</span>
+                                            <span class="fw-bold text-dark">₦{{ "{:,.2f}".format(p.amount) }} — {{ p.created_at.strftime('%b %d, %H:%M') if p.created_at else '' }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+
+                            <!-- Buyer Pay Invoice Control -->
+                            {% if is_buyer and inv.status in ['Issued', 'Partially_Paid'] and (inv.amount_due - inv.amount_paid) > 0 %}
+                                <div class="border-top pt-3">
+                                    <form action="{{ url_for('pay_invoice', transaction_id=tx.transaction_id, invoice_id=inv.invoice_id) }}" method="POST" class="row g-2 align-items-center">
+                                        <div class="col-auto">
+                                            <label for="pay_amt_{{ inv.invoice_id }}" class="visually-hidden">Amount</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">₦</span>
+                                                <input type="number" step="0.01" min="0.01" max="{{ inv.amount_due - inv.amount_paid }}" name="amount" id="pay_amt_{{ inv.invoice_id }}" value="{{ inv.amount_due - inv.amount_paid }}" class="form-control" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-sm btn-success rounded-pill fw-bold">
+                                                <i class="bi bi-credit-card me-1"></i> Pay Invoice (Controlled MVP)
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            {% endif %}
+
+                            <!-- Admin Record Payment Control -->
+                            {% if is_operational_admin and inv.status in ['Issued', 'Partially_Paid'] and (inv.amount_due - inv.amount_paid) > 0 %}
+                                <div class="border-top pt-3 mt-2">
+                                    <div class="small fw-bold text-dark mb-2"><i class="bi bi-shield-lock me-1 text-primary"></i>Admin Record Payment</div>
+                                    <form action="{{ url_for('admin_record_payment', transaction_id=tx.transaction_id, invoice_id=inv.invoice_id) }}" method="POST" class="row g-2 align-items-center">
+                                        <div class="col-auto">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">₦</span>
+                                                <input type="number" step="0.01" min="0.01" max="{{ inv.amount_due - inv.amount_paid }}" name="amount" value="{{ inv.amount_due - inv.amount_paid }}" class="form-control" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <input type="text" name="payment_reference" placeholder="Ref (Optional)" class="form-control form-control-sm">
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-sm btn-outline-dark rounded-pill fw-bold">
+                                                Record Payment
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted small mb-0">No invoices issued for this transaction yet.</p>
+                {% endif %}
+            </div>
+
+            <!-- Transaction Documentation Section -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-file-earmark-check me-2 text-success"></i>Transaction Documents</h5>
+                    <span class="badge bg-light text-dark border">{{ tx.documents|length }} Document(s)</span>
+                </div>
+
+                {% if tx.documents %}
+                    <div class="table-responsive mb-4">
+                        <table class="table align-middle table-hover">
+                            <thead class="table-light">
+                                <tr class="small text-muted text-uppercase">
+                                    <th>Document Type</th>
+                                    <th>Uploaded At</th>
+                                    <th>Status</th>
+                                    <th>Action / View</th>
+                                    {% if is_operational_admin %}
+                                        <th>Admin Review</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in tx.documents %}
+                                    <tr>
+                                        <td class="fw-semibold text-dark">{{ doc.document_type }}</td>
+                                        <td class="small text-muted">{{ doc.uploaded_at.strftime('%b %d, %Y %H:%M') if doc.uploaded_at else 'N/A' }}</td>
+                                        <td>
+                                            {% if doc.status == 'Approved' %}
+                                                <span class="badge bg-success">Approved</span>
+                                            {% elif doc.status == 'Rejected' %}
+                                                <span class="badge bg-danger">Rejected</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">{{ doc.status or 'Submitted' }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('serve_transaction_document', transaction_id=tx.transaction_id, document_id=doc.transaction_document_id) }}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill">
+                                                <i class="bi bi-file-earmark-arrow-down me-1"></i> View Document
+                                            </a>
+                                        </td>
+                                        {% if is_operational_admin %}
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    {% if doc.status != 'Approved' %}
+                                                        <form action="{{ url_for('admin_approve_transaction_document', transaction_id=tx.transaction_id, document_id=doc.transaction_document_id) }}" method="POST" class="d-inline">
+                                                            <button type="submit" class="btn btn-sm btn-success rounded-pill px-2 py-0" style="font-size: 0.75rem;">Approve</button>
+                                                        </form>
+                                                    {% endif %}
+                                                    {% if doc.status != 'Rejected' %}
+                                                        <form action="{{ url_for('admin_reject_transaction_document', transaction_id=tx.transaction_id, document_id=doc.transaction_document_id) }}" method="POST" class="d-inline">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-0" style="font-size: 0.75rem;">Reject</button>
+                                                        </form>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted small mb-4">No documents uploaded for this transaction yet.</p>
+                {% endif %}
+
+                {% if tx.status != 'Completion' %}
+                    <div class="border-top pt-3">
+                        <h6 class="fw-bold mb-2 text-dark"><i class="bi bi-cloud-upload me-1 text-primary"></i> Upload Transaction Document</h6>
+                        <form action="{{ url_for('upload_transaction_document', transaction_id=tx.transaction_id) }}" method="POST" enctype="multipart/form-data" class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted mb-1">Document Type</label>
+                                <select name="document_type" class="form-select form-select-sm" required>
+                                    <option value="Contract of Sale">Contract of Sale</option>
+                                    <option value="Deed of Assignment">Deed of Assignment</option>
+                                    <option value="Payment Receipt">Payment Receipt</option>
+                                    <option value="Identification Document">Identification Document</option>
+                                    <option value="Letter of Authorization">Letter of Authorization</option>
+                                    <option value="Other Transaction Document">Other Transaction Document</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted mb-1">Select File (PDF, PNG, JPG, DOC)</label>
+                                <input type="file" name="document_file" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-sm btn-primary w-100 rounded-pill fw-bold">Upload</button>
+                            </div>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Side: Commission & Financial Breakdown -->
+        <div class="col-lg-4">
+            <!-- Progress Advance Control for Operational Admins -->
+            {% if is_operational_admin %}
+                <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white border-top border-4 border-primary">
+                    <h5 class="fw-bold border-bottom pb-3 mb-3 text-dark"><i class="bi bi-diagram-3 me-2 text-primary"></i>Admin Progress Control</h5>
+                    <form action="{{ url_for('admin_update_transaction_status', transaction_id=tx.transaction_id) }}" method="POST">
+                        <div class="mb-3">
+                            <label for="new_status_select" class="form-label small text-muted font-uppercase fw-semibold">Advance Lifecycle Status</label>
+                            <select name="new_status" id="new_status_select" class="form-select form-select-sm" required>
+                                <option value="" disabled selected>-- Select Status --</option>
+                                {% for st in ['Initiated', 'Mandate', 'Terms_Accepted', 'Inspection', 'Offer', 'Payment', 'Documentation', 'Completion'] %}
+                                    <option value="{{ st }}" {% if st == tx.status %}disabled{% endif %}>{{ st }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary w-100 rounded-pill fw-bold">
+                            <i class="bi bi-arrow-right-circle me-1"></i> Update Status
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white border-top border-4 border-danger">
+                <h5 class="fw-bold border-bottom pb-3 mb-3 text-dark"><i class="bi bi-pie-chart me-2 text-danger"></i>Commission & Fees</h5>
+                <div class="mb-3">
+                    <div class="small text-muted">Odacity Platform Fee %</div>
+                    <div class="fw-bold fs-5 text-dark">{{ "{:,.2f}".format(tx.odacity_commission_percentage or 10.0) }}%</div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted">Odacity Commission Amount</div>
+                    <div class="fw-bold fs-5 text-danger">₦{{ "{:,.2f}".format(tx.odacity_commission_amount or 0) }}</div>
+                </div>
+                <hr>
+                <div class="alert alert-light border small text-muted mb-0">
+                    <i class="bi bi-info-circle me-1 text-primary"></i> <strong>Phase 16 Status:</strong> Transaction progress, invoice issuance, and payment processing active.
+                </div>
+            </div>
+
+            <!-- Customer & Seller Context -->
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                <h5 class="fw-bold border-bottom pb-3 mb-3 text-dark"><i class="bi bi-people me-2 text-primary"></i>Parties Involved</h5>
+                <div class="mb-3">
+                    <div class="small text-muted">Buyer / Customer Profile</div>
+                    <div class="fw-bold text-dark">
+                        {% if tx.customer %}
+                            {{ tx.customer.first_name or 'Buyer' }} {{ tx.customer.last_name or '' }} (ID: #{{ tx.customer_id }})
+                        {% else %}
+                            Customer #{{ tx.customer_id }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    <div class="small text-muted">Property Owner</div>
+                    <div class="fw-bold text-dark">
+                        {% if tx.property and tx.property.dab and tx.property.dab.owner %}
+                            Owner Profile #{{ tx.property.dab.owner_profile_id }}
+                        {% else %}
+                            Property Owner
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

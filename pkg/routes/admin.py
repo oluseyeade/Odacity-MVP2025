@@ -2,14 +2,172 @@ import os
 import json
 import secrets
 import logging
+import uuid
+from decimal import Decimal
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from pkg import app
-from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer
+from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer, Transaction, Invoice, Payment, PerformanceGuarantee, GuaranteeCycle, GuaranteeEvent, GuaranteeSettlement, BankGuaranteeReference, Mandate, TransactionDocument
 from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification
 
 logger = logging.getLogger(__name__)
+
+
+ADMIN_ROLES = {
+    'super admin', 'property admin', 'mandate manager', 'transaction manager',
+    'finance admin', 'compliance admin', 'customer support', 'audit admin',
+    'super_admin', 'property_admin', 'mandate_manager', 'transaction_manager',
+    'finance_admin', 'compliance_admin', 'customer_support', 'audit_admin'
+}
+
+OPERATIONAL_ADMIN_ROLES = {
+    'super admin', 'transaction manager', 'property admin', 'mandate manager',
+    'super_admin', 'transaction_manager', 'property_admin', 'mandate_manager'
+}
+
+PHASE16_OPERATIONAL_ADMIN_ROLES = {
+    'super admin', 'transaction manager', 'finance admin',
+    'super_admin', 'transaction_manager', 'finance_admin'
+}
+
+PERFORMANCE_OPERATIONAL_ADMIN_ROLES = {
+    'super admin', 'mandate manager', 'transaction manager',
+    'super_admin', 'mandate_manager', 'transaction_manager'
+}
+
+SETTLEMENT_APPROVAL_ADMIN_ROLES = {
+    'super admin', 'transaction manager', 'finance admin',
+    'super_admin', 'transaction_manager', 'finance_admin'
+}
+
+SETTLEMENT_PAYMENT_ADMIN_ROLES = {
+    'super admin', 'finance admin',
+    'super_admin', 'finance_admin'
+}
+
+
+def has_admin_permission(user):
+    """
+    Verifies if a user has any of the 8 Master PRD administrative roles or is_super_admin flag.
+    Master PRD Admin Roles:
+    1. Super Admin
+    2. Property Admin
+    3. Mandate Manager
+    4. Transaction Manager
+    5. Finance Admin
+    6. Compliance Admin
+    7. Customer Support
+    8. Audit Admin
+    """
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in ADMIN_ROLES:
+                    return True
+    return False
+
+
+def has_transaction_initiation_permission(user):
+    """
+    Verifies if an administrative user has operational initiation permissions for transactions.
+    Operational Roles: Super Admin, Transaction Manager, Property Admin, Mandate Manager.
+    Audit/Read-Only Roles: Finance Admin, Compliance Admin, Customer Support, Audit Admin (restricted from transaction initiation).
+    """
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in OPERATIONAL_ADMIN_ROLES:
+                    return True
+    return False
+
+
+def has_phase16_operational_permission(user):
+    """
+    Verifies if an administrative user has operational permissions for Phase 16 actions
+    (Invoice Generation, Payment Recording, Transaction Progress Updates).
+    Operational Roles: Super Admin, Transaction Manager, Finance Admin.
+    Read-Only / Non-Operational Roles: Property Admin, Mandate Manager, Compliance Admin, Customer Support, Audit Admin.
+    """
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in PHASE16_OPERATIONAL_ADMIN_ROLES:
+                    return True
+    return False
+
+
+def has_performance_operational_permission(user):
+    """
+    Verifies if an administrative user has operational permissions for Performance Journey actions
+    (Performance Guarantee Activation, Milestone/Event Recording).
+    Operational Roles: Super Admin, Mandate Manager, Transaction Manager.
+    Read-Only / Non-Operational Roles: Property Admin, Finance Admin, Compliance Admin, Customer Support, Audit Admin.
+    """
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in PERFORMANCE_OPERATIONAL_ADMIN_ROLES:
+                    return True
+    return False
+
+
+def has_settlement_approval_permission(user):
+    """
+    Verifies if an administrative user has permission to approve performance guarantee settlements.
+    Operational Roles: Super Admin, Transaction Manager, Finance Admin.
+    Read-Only / Non-Operational Roles: Property Admin, Mandate Manager, Compliance Admin, Customer Support, Audit Admin.
+    """
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in SETTLEMENT_APPROVAL_ADMIN_ROLES:
+                    return True
+    return False
+
+
+def has_settlement_payment_permission(user):
+    """
+    Verifies if an administrative user has permission to record performance guarantee settlement payments.
+    Operational Roles: Super Admin, Finance Admin.
+    Read-Only / Non-Operational Roles: Property Admin, Mandate Manager, Transaction Manager, Compliance Admin, Customer Support, Audit Admin.
+    """
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in SETTLEMENT_PAYMENT_ADMIN_ROLES:
+                    return True
+    return False
 
 
 def admin_required(f):
@@ -31,6 +189,49 @@ def admin_required(f):
         
         return f(*args, **kwargs)
     return decorated_function
+
+
+def transaction_admin_required(f):
+    """
+    Decorator to enforce server-side authorization for the Phase 15 transaction administration route.
+    Allows all 8 Master PRD administrative roles (and Super Admin) to view transaction records.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
+        user = User.query.get(user_id)
+        if not user or not has_admin_permission(user):
+            flash('Access denied. Administrative privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def performance_admin_required(f):
+    """
+    Decorator to enforce server-side authorization for Phase 17 Performance Guarantee admin routes.
+    Allows all 8 Master PRD administrative roles (and Super Admin) to view performance records.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
+        user = User.query.get(user_id)
+        if not user or not has_admin_permission(user):
+            flash('Access denied. Administrative privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 
 def get_entity_display_name(entity_type):
@@ -998,8 +1199,76 @@ def admin_approve_property(property_id):
             )
             db.session.add(sec_event)
 
+            # Phase 17 Corrected Performance Guarantee Clock Trigger:
+            # When DAB Property is Approved & Listed, owner Performance Guarantee activates immediately using dab.approved_at
+            if dab and dab.owner_profile_id:
+                owner_guarantee = PerformanceGuarantee.query.filter_by(
+                    property_id=prop.property_id,
+                    owner_profile_id=dab.owner_profile_id,
+                    guarantee_type='owner_guarantee',
+                    status='Eligible'
+                ).first()
+
+                if not owner_guarantee:
+                    owner_guarantee = PerformanceGuarantee.query.filter_by(
+                        owner_profile_id=dab.owner_profile_id,
+                        guarantee_type='owner_guarantee',
+                        status='Eligible'
+                    ).first()
+                    if owner_guarantee and not owner_guarantee.property_id:
+                        owner_guarantee.property_id = prop.property_id
+
+                if owner_guarantee and owner_guarantee.status == 'Eligible':
+                    if owner_guarantee.period_days is not None:
+                        start_ts = dab.approved_at or now
+                        owner_guarantee.status = 'Active'
+                        owner_guarantee.start_at = start_ts
+                        owner_guarantee.start_date = start_ts
+                        owner_guarantee.end_date = start_ts + timedelta(days=owner_guarantee.period_days)
+
+
+                        if owner_guarantee.cycle_days is not None:
+                            existing_c1 = GuaranteeCycle.query.filter_by(
+                                performance_guarantee_id=owner_guarantee.guarantee_id,
+                                cycle_number=1
+                            ).first()
+                            if not existing_c1:
+                                c1 = GuaranteeCycle(
+                                    performance_guarantee_id=owner_guarantee.guarantee_id,
+                                    cycle_number=1,
+                                    cycle_start=start_ts.date(),
+                                    cycle_end=(start_ts + timedelta(days=owner_guarantee.cycle_days)).date(),
+                                    days_elapsed=0,
+                                    days_remaining=owner_guarantee.cycle_days,
+                                    status='Active',
+                                    created_at=now
+                                )
+                                db.session.add(c1)
+
+                        audit_pg = AuditLog(
+                            user_id=admin_user_id,
+                            action='PERFORMANCE_GUARANTEE_ACTIVATED',
+                            entity_type='PerformanceGuarantee',
+                            entity_id=owner_guarantee.guarantee_id,
+                            previous_values={'status': 'Eligible', 'start_at': None},
+                            new_values={'status': 'Active', 'start_at': start_ts.isoformat()},
+                            ip_address=request.remote_addr,
+                            created_at=now
+                        )
+                        db.session.add(audit_pg)
+
+                        sec_pg = SecurityEvent(
+                            user_id=admin_user_id,
+                            event_type='PERFORMANCE_GUARANTEE_ACTIVATED',
+                            description=f"Performance Guarantee #{owner_guarantee.guarantee_id} activated automatically upon property approval & listing (Approved at {start_ts.isoformat()}).",
+                            ip_address=request.remote_addr,
+                            created_at=now
+                        )
+                        db.session.add(sec_pg)
+
             db.session.commit()
             flash(f"Property #{property_id} ('{prop.title}') has been APPROVED successfully. Entered Private Listing (72-Hour Window). Phase 8/9 complete.", 'success')
+
 
     except Exception as e:
         db.session.rollback()
@@ -1411,3 +1680,982 @@ def admin_offers():
         offers=offers,
         status_filter=status_filter
     )
+
+
+# ==========================================
+# PHASE 15 — ADMIN TRANSACTION AUDIT ROUTE
+# ==========================================
+
+@app.route('/admin/transactions/')
+@transaction_admin_required
+def admin_transactions():
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id) if user_id else None
+    is_operational_admin = user_rec and has_phase16_operational_permission(user_rec)
+
+    status_filter = request.args.get('status', '').strip()
+    query = Transaction.query.order_by(Transaction.created_at.desc())
+
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+
+    transactions = query.all()
+
+    return render_template(
+        'admin/transactions.html',
+        title='Transactions Audit — Odacity Admin',
+        transactions=transactions,
+        status_filter=status_filter,
+        is_operational_admin=is_operational_admin
+    )
+
+
+# ==========================================
+# PHASE 16 — INVOICE, PAYMENT & PROGRESS ADMIN ROUTES
+# ==========================================
+
+@app.route('/admin/transactions/<int:transaction_id>/generate-invoice/', methods=['POST'])
+@transaction_admin_required
+def admin_generate_invoice(transaction_id):
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id)
+    if not user_rec or not has_phase16_operational_permission(user_rec):
+        flash('Access denied. Operational privileges required to generate invoices.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+
+    # Prevent duplicate invoice creation: return existing active invoice if present
+    existing_inv = Invoice.query.filter_by(transaction_id=tx.transaction_id).filter(Invoice.status != 'Cancelled').first()
+    if existing_inv:
+        flash(f'An active invoice ({existing_inv.invoice_number}) already exists for Transaction #{tx.transaction_id}.', 'info')
+        return redirect(url_for('transaction_detail', transaction_id=tx.transaction_id))
+
+    amt_due_dec = Decimal(str(tx.transaction_value or tx.total_amount or 0))
+
+    while True:
+        cand_ref = f"INV-{uuid.uuid4().hex[:8].upper()}"
+        if not Invoice.query.filter_by(invoice_number=cand_ref).first():
+            inv_number = cand_ref
+            break
+
+    now = datetime.utcnow()
+    due_dt = now + timedelta(days=14)
+
+    new_inv = Invoice(
+        transaction_id=tx.transaction_id,
+        invoice_number=inv_number,
+        amount_due=amt_due_dec,
+        amount_paid=Decimal('0.00'),
+        issue_date=now.date(),
+        due_date=due_dt,
+        status='Issued',
+        payment_instructions='Payment via Odacity platform bank transfer or secured gateway.',
+        created_at=now
+    )
+    db.session.add(new_inv)
+    db.session.flush()
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='INVOICE_GENERATED',
+        entity_type='Invoice',
+        entity_id=new_inv.invoice_id,
+        previous_values=None,
+        new_values={
+            'invoice_number': inv_number,
+            'transaction_id': tx.transaction_id,
+            'amount_due': float(amt_due_dec),
+            'status': 'Issued'
+        },
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='INVOICE_GENERATED',
+        description=f"Invoice {inv_number} issued for Transaction #{tx.transaction_id} by admin user #{user_id}",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Invoice {inv_number} successfully issued for Transaction #{tx.transaction_id}.', 'success')
+    return redirect(url_for('transaction_detail', transaction_id=tx.transaction_id))
+
+
+@app.route('/admin/transactions/<int:transaction_id>/invoices/<int:invoice_id>/record-payment/', methods=['POST'])
+@transaction_admin_required
+def admin_record_payment(transaction_id, invoice_id):
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id)
+    if not user_rec or not has_phase16_operational_permission(user_rec):
+        flash('Access denied. Operational privileges required to record payments.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+    inv = Invoice.query.get_or_404(invoice_id)
+
+    if inv.transaction_id != tx.transaction_id:
+        flash('Invoice does not belong to the specified transaction.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    raw_amount = request.form.get('amount', '').strip()
+    raw_ref = request.form.get('payment_reference', '').strip()
+    payment_method = request.form.get('payment_method', 'bank_transfer').strip()
+
+    try:
+        pay_amt = Decimal(raw_amount)
+    except Exception:
+        flash('Invalid payment amount specified.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    if pay_amt <= Decimal('0.00'):
+        flash('Payment amount must be greater than zero.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    amt_due_dec = Decimal(str(inv.amount_due or 0))
+    amt_paid_dec = Decimal(str(inv.amount_paid or 0))
+    outstanding = amt_due_dec - amt_paid_dec
+
+    if pay_amt > outstanding:
+        flash(f'Payment amount (₦{pay_amt:,.2f}) exceeds outstanding invoice balance (₦{outstanding:,.2f}).', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    if raw_ref:
+        pay_ref = raw_ref
+        if Payment.query.filter_by(payment_reference=pay_ref).first():
+            flash(f'Duplicate payment reference {pay_ref} detected.', 'danger')
+            return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+    else:
+        while True:
+            cand_ref = f"PAY-{uuid.uuid4().hex[:8].upper()}"
+            if not Payment.query.filter_by(payment_reference=cand_ref).first():
+                pay_ref = cand_ref
+                break
+
+    now = datetime.utcnow()
+    new_payment = Payment(
+        invoice_id=inv.invoice_id,
+        transaction_id=tx.transaction_id,
+        payment_reference=pay_ref,
+        amount=pay_amt,
+        method=payment_method,
+        payment_method=payment_method,
+        status='Completed',
+        transaction_ref=tx.transaction_reference,
+        paid_at=now,
+        payment_date=now,
+        reconciliation_note=f'Administratively recorded payment by admin #{user_id}',
+        created_at=now
+    )
+    db.session.add(new_payment)
+
+    new_total_paid = amt_paid_dec + pay_amt
+    inv.amount_paid = new_total_paid
+    if new_total_paid >= amt_due_dec:
+        inv.status = 'Paid'
+        inv.paid_at = now
+    else:
+        inv.status = 'Partially_Paid'
+
+    audit_pay = AuditLog(
+        user_id=user_id,
+        action='PAYMENT_RECORDED',
+        entity_type='Payment',
+        entity_id=new_payment.payment_id,
+        previous_values=None,
+        new_values={
+            'payment_reference': pay_ref,
+            'amount': float(pay_amt),
+            'invoice_id': inv.invoice_id,
+            'invoice_status': inv.status
+        },
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit_pay)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='PAYMENT_COMPLETED',
+        description=f"Payment {pay_ref} of ₦{pay_amt:,.2f} recorded for Invoice {inv.invoice_number}",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Payment {pay_ref} of ₦{pay_amt:,.2f} recorded successfully.', 'success')
+    return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+
+@app.route('/admin/transactions/<int:transaction_id>/update-status/', methods=['POST'])
+@transaction_admin_required
+def admin_update_transaction_status(transaction_id):
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id)
+    if not user_rec or not has_phase16_operational_permission(user_rec):
+        flash('Access denied. Operational privileges required to update transaction progress.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+
+    new_status = request.form.get('new_status', '').strip()
+    sequence = [
+        'Initiated', 'Mandate', 'Terms_Accepted', 'Inspection',
+        'Offer', 'Payment', 'Documentation', 'Completion'
+    ]
+
+    if new_status not in sequence:
+        flash(f'Invalid status string: {new_status}', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    prev_status = tx.status
+    curr_idx = sequence.index(prev_status) if prev_status in sequence else 0
+    new_idx = sequence.index(new_status)
+
+    if new_idx <= curr_idx:
+        flash(f'Backward or duplicate transaction status transition from {prev_status} to {new_status} is not allowed.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    if new_status == 'Completion' and prev_status != 'Documentation':
+        flash('Transactions can only reach Completion from the Documentation stage.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    now = datetime.utcnow()
+    tx.status = new_status
+    tx.updated_at = now
+    if new_status == 'Completion':
+        tx.completion_date = now
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='TRANSACTION_PROGRESS_UPDATED',
+        entity_type='Transaction',
+        entity_id=tx.transaction_id,
+        previous_values={'status': prev_status},
+        new_values={'status': new_status},
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='TRANSACTION_PROGRESS_UPDATED',
+        description=f"Transaction #{tx.transaction_id} ({tx.transaction_reference}) status updated from {prev_status} to {new_status}",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Transaction status updated to {new_status}.', 'success')
+    return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+
+DOC_OPERATIONAL_ADMIN_ROLES = {
+    'super admin', 'transaction manager', 'property admin', 'mandate manager',
+    'super_admin', 'transaction_manager', 'property_admin', 'mandate_manager'
+}
+
+def has_doc_operational_permission(user):
+    """
+    Verifies if an administrative user has operational permissions for Transaction Document review/approval.
+    Operational Roles: Super Admin, Transaction Manager, Property Admin, Mandate Manager.
+    Read-Only Roles: Finance Admin, Compliance Admin, Customer Support, Audit Admin.
+    """
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in DOC_OPERATIONAL_ADMIN_ROLES:
+                    return True
+    return False
+
+
+@app.route('/admin/transactions/<int:transaction_id>/documents/<int:document_id>/approve/', methods=['POST'])
+@transaction_admin_required
+def admin_approve_transaction_document(transaction_id, document_id):
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id)
+    if not user_rec or not has_doc_operational_permission(user_rec):
+        flash('Access denied. Operational privileges required to approve transaction documents.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+    doc = TransactionDocument.query.get_or_404(document_id)
+
+    if doc.transaction_id != tx.transaction_id:
+        flash('Document record does not belong to the specified transaction.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    if doc.status == 'Approved':
+        flash(f'Transaction document #{document_id} is already Approved.', 'warning')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    now = datetime.utcnow()
+    prev_status = doc.status or 'Submitted'
+    doc.status = 'Approved'
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='TRANSACTION_DOCUMENT_APPROVED',
+        entity_type='TransactionDocument',
+        entity_id=doc.transaction_document_id,
+        previous_values={'status': prev_status},
+        new_values={'status': 'Approved'},
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='TRANSACTION_DOCUMENT_APPROVED',
+        description=f"Transaction document #{doc.transaction_document_id} ({doc.document_type}) approved for Transaction #{tx.transaction_id} by admin #{user_id}",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Transaction document "{doc.document_type}" (#{document_id}) approved successfully.', 'success')
+    return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+
+@app.route('/admin/transactions/<int:transaction_id>/documents/<int:document_id>/reject/', methods=['POST'])
+@transaction_admin_required
+def admin_reject_transaction_document(transaction_id, document_id):
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id)
+    if not user_rec or not has_doc_operational_permission(user_rec):
+        flash('Access denied. Operational privileges required to reject transaction documents.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+    doc = TransactionDocument.query.get_or_404(document_id)
+
+    if doc.transaction_id != tx.transaction_id:
+        flash('Document record does not belong to the specified transaction.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    now = datetime.utcnow()
+    prev_status = doc.status or 'Submitted'
+    doc.status = 'Rejected'
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='TRANSACTION_DOCUMENT_REJECTED',
+        entity_type='TransactionDocument',
+        entity_id=doc.transaction_document_id,
+        previous_values={'status': prev_status},
+        new_values={'status': 'Rejected'},
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='TRANSACTION_DOCUMENT_REJECTED',
+        description=f"Transaction document #{doc.transaction_document_id} ({doc.document_type}) rejected for Transaction #{tx.transaction_id} by admin #{user_id}",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Transaction document "{doc.document_type}" (#{document_id}) rejected.', 'warning')
+    return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+
+@app.route('/admin/performance/', methods=['GET'])
+@performance_admin_required
+def admin_performance():
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+    is_operational = has_performance_operational_permission(user)
+    can_approve_settlement = has_settlement_approval_permission(user)
+    can_record_payment = has_settlement_payment_permission(user)
+
+    status_filter = request.args.get('status', '').strip()
+
+    query = PerformanceGuarantee.query
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+
+    perf_guarantees = query.order_by(PerformanceGuarantee.created_at.desc()).all()
+
+    now = datetime.utcnow()
+    for g in perf_guarantees:
+        if g.start_at:
+            elapsed = (now - g.start_at).days
+            g.calc_days_elapsed = max(0, elapsed)
+            if g.period_days is not None:
+                g.calc_days_remaining = max(0, g.period_days - g.calc_days_elapsed)
+            else:
+                g.calc_days_remaining = None
+        else:
+            g.calc_days_elapsed = 0
+            g.calc_days_remaining = g.period_days
+
+        event_types = [e.event_type for e in g.events] if g.events else []
+        g.has_m3 = 'Milestone_3_Months' in event_types
+        g.has_m6 = 'Milestone_6_Months' in event_types
+        g.pending_settlement = next((s for s in g.settlements if s.status == 'Pending'), None) if g.settlements else None
+        g.approved_settlement = next((s for s in g.settlements if s.status == 'Approved'), None) if g.settlements else None
+
+    return render_template(
+        'admin/performance.html',
+        title='Performance Guarantee Engine — Odacity Admin',
+        perf_guarantees=perf_guarantees,
+        status_filter=status_filter,
+        is_operational=is_operational,
+        can_approve_settlement=can_approve_settlement,
+        can_record_payment=can_record_payment
+    )
+
+
+@app.route('/admin/performance/<int:guarantee_id>/activate/', methods=['POST'])
+@performance_admin_required
+def admin_activate_performance_guarantee(guarantee_id):
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user or not has_performance_operational_permission(user):
+        flash('Access denied. Operational privileges required to activate performance guarantees.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    guarantee = PerformanceGuarantee.query.get_or_404(guarantee_id)
+
+    if guarantee.status != 'Eligible':
+        flash(f'Cannot activate guarantee #{guarantee_id}. Current status is "{guarantee.status}" (must be "Eligible").', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    if guarantee.period_days is None:
+        flash(f'Cannot activate guarantee #{guarantee_id}: missing period_days configuration.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    if guarantee.cycle_days is None:
+        flash(f'Cannot activate guarantee #{guarantee_id}: missing cycle_days configuration.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    prop = guarantee.property
+    dab = prop.dab if prop else None
+    start_ts = dab.approved_at if (dab and dab.approved_at) else guarantee.eligible_at
+
+    if not start_ts:
+        flash(f'Cannot activate guarantee #{guarantee_id}: DAB Property is not yet Approved & Listed (dab.approved_at missing).', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    now = datetime.utcnow()
+    period_days = guarantee.period_days
+    cycle_days = guarantee.cycle_days
+
+    guarantee.status = 'Active'
+    guarantee.start_at = start_ts
+    guarantee.start_date = start_ts
+    guarantee.end_date = start_ts + timedelta(days=period_days)
+
+
+    existing_c1 = GuaranteeCycle.query.filter_by(
+        performance_guarantee_id=guarantee.guarantee_id,
+        cycle_number=1
+    ).first()
+
+    if not existing_c1:
+        cycle1 = GuaranteeCycle(
+            performance_guarantee_id=guarantee.guarantee_id,
+            cycle_number=1,
+            cycle_start=start_ts.date(),
+            cycle_end=(start_ts + timedelta(days=cycle_days)).date(),
+            days_elapsed=0,
+            days_remaining=cycle_days,
+            status='Active',
+            created_at=now
+        )
+        db.session.add(cycle1)
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='PERFORMANCE_GUARANTEE_ACTIVATED',
+        entity_type='PerformanceGuarantee',
+        entity_id=guarantee.guarantee_id,
+        previous_values={'status': 'Eligible', 'start_at': None},
+        new_values={'status': 'Active', 'start_at': start_ts.isoformat()},
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='PERFORMANCE_GUARANTEE_ACTIVATED',
+        description=f'Performance Guarantee #{guarantee.guarantee_id} activated by user #{user_id} using property approval timestamp {start_ts.isoformat()}',
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+
+    db.session.commit()
+
+    flash(f'Performance Guarantee #{guarantee.guarantee_id} activated successfully using property approval timestamp.', 'success')
+    return redirect(url_for('admin_performance'))
+
+
+@app.route('/admin/performance/<int:guarantee_id>/trigger-milestone/', methods=['POST'])
+@performance_admin_required
+def admin_trigger_guarantee_milestone(guarantee_id):
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user or not has_performance_operational_permission(user):
+        flash('Access denied. Operational privileges required to trigger milestones.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    guarantee = PerformanceGuarantee.query.get_or_404(guarantee_id)
+
+    if guarantee.guarantee_type != 'owner_guarantee':
+        flash(f'Guarantee #{guarantee_id} is not an owner performance guarantee.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    if guarantee.status not in ['Active', 'Completed', 'Redeemed_Partial', 'Redeemed_Full']:
+        flash(f'Cannot trigger milestone for guarantee #{guarantee_id}. Current status is "{guarantee.status}".', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    if not guarantee.start_at:
+        flash(f'Cannot trigger milestone for guarantee #{guarantee_id}: start_at clock timestamp is missing.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    now = datetime.utcnow()
+    elapsed_days = max(0, (now - guarantee.start_at).days)
+
+    existing_events = GuaranteeEvent.query.filter_by(performance_guarantee_id=guarantee.guarantee_id).all()
+    recorded_types = {e.event_type for e in existing_events}
+
+    recorded_milestones = []
+
+    if elapsed_days >= 90 and 'Milestone_3_Months' not in recorded_types:
+        evt3 = GuaranteeEvent(
+            performance_guarantee_id=guarantee.guarantee_id,
+            event_type='Milestone_3_Months',
+            details=f'3-Month Milestone reached ({elapsed_days} days elapsed)',
+            occurred_at=now,
+            created_at=now
+        )
+        db.session.add(evt3)
+        recorded_milestones.append('Milestone_3_Months')
+
+        audit3 = AuditLog(
+            user_id=user_id,
+            action='GUARANTEE_MILESTONE_RECORDED',
+            entity_type='PerformanceGuarantee',
+            entity_id=guarantee.guarantee_id,
+            previous_values=None,
+            new_values={'event_type': 'Milestone_3_Months', 'elapsed_days': elapsed_days},
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(audit3)
+
+        sec3 = SecurityEvent(
+            user_id=user_id,
+            event_type='GUARANTEE_MILESTONE_REACHED',
+            description=f'Performance Guarantee #{guarantee.guarantee_id} reached 3-Month milestone ({elapsed_days} days elapsed)',
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(sec3)
+
+    if elapsed_days >= 180 and 'Milestone_6_Months' not in recorded_types:
+        evt6 = GuaranteeEvent(
+            performance_guarantee_id=guarantee.guarantee_id,
+            event_type='Milestone_6_Months',
+            details=f'6-Month Milestone reached ({elapsed_days} days elapsed)',
+            occurred_at=now,
+            created_at=now
+        )
+        db.session.add(evt6)
+        recorded_milestones.append('Milestone_6_Months')
+
+        c1 = GuaranteeCycle.query.filter_by(
+            performance_guarantee_id=guarantee.guarantee_id,
+            cycle_number=1
+        ).first()
+        if c1 and c1.status == 'Active':
+            c1.status = 'Completed'
+
+        audit6 = AuditLog(
+            user_id=user_id,
+            action='GUARANTEE_MILESTONE_RECORDED',
+            entity_type='PerformanceGuarantee',
+            entity_id=guarantee.guarantee_id,
+            previous_values=None,
+            new_values={'event_type': 'Milestone_6_Months', 'elapsed_days': elapsed_days},
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(audit6)
+
+        sec6 = SecurityEvent(
+            user_id=user_id,
+            event_type='GUARANTEE_MILESTONE_REACHED',
+            description=f'Performance Guarantee #{guarantee.guarantee_id} reached 6-Month milestone ({elapsed_days} days elapsed)',
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(sec6)
+
+    if recorded_milestones:
+        db.session.commit()
+        flash(f'Recorded milestone(s) for Guarantee #{guarantee_id}: {", ".join(recorded_milestones)}', 'success')
+    else:
+        flash(f'No new milestones to record for Guarantee #{guarantee_id} ({elapsed_days} days elapsed).', 'info')
+
+    return redirect(url_for('admin_performance'))
+
+
+@app.route('/admin/performance/sync-milestones/', methods=['POST'])
+@performance_admin_required
+def admin_sync_performance_milestones():
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user or not has_performance_operational_permission(user):
+        flash('Access denied. Operational privileges required to sync milestones.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    active_guarantees = PerformanceGuarantee.query.filter_by(
+        guarantee_type='owner_guarantee',
+        status='Active'
+    ).all()
+
+    now = datetime.utcnow()
+    total_processed = 0
+    total_milestones_recorded = 0
+
+    for guarantee in active_guarantees:
+        if not guarantee.start_at:
+            continue
+
+        elapsed_days = max(0, (now - guarantee.start_at).days)
+        existing_events = GuaranteeEvent.query.filter_by(performance_guarantee_id=guarantee.guarantee_id).all()
+        recorded_types = {e.event_type for e in existing_events}
+
+        processed_for_g = False
+        if elapsed_days >= 90 and 'Milestone_3_Months' not in recorded_types:
+            evt3 = GuaranteeEvent(
+                performance_guarantee_id=guarantee.guarantee_id,
+                event_type='Milestone_3_Months',
+                details=f'3-Month Milestone reached ({elapsed_days} days elapsed)',
+                occurred_at=now,
+                created_at=now
+            )
+            db.session.add(evt3)
+            total_milestones_recorded += 1
+            processed_for_g = True
+
+            audit3 = AuditLog(
+                user_id=user_id,
+                action='GUARANTEE_MILESTONE_RECORDED',
+                entity_type='PerformanceGuarantee',
+                entity_id=guarantee.guarantee_id,
+                previous_values=None,
+                new_values={'event_type': 'Milestone_3_Months', 'elapsed_days': elapsed_days},
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(audit3)
+
+            sec3 = SecurityEvent(
+                user_id=user_id,
+                event_type='GUARANTEE_MILESTONE_REACHED',
+                description=f'Performance Guarantee #{guarantee.guarantee_id} reached 3-Month milestone ({elapsed_days} days elapsed)',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec3)
+
+        if elapsed_days >= 180 and 'Milestone_6_Months' not in recorded_types:
+            evt6 = GuaranteeEvent(
+                performance_guarantee_id=guarantee.guarantee_id,
+                event_type='Milestone_6_Months',
+                details=f'6-Month Milestone reached ({elapsed_days} days elapsed)',
+                occurred_at=now,
+                created_at=now
+            )
+            db.session.add(evt6)
+            total_milestones_recorded += 1
+            processed_for_g = True
+
+            c1 = GuaranteeCycle.query.filter_by(
+                performance_guarantee_id=guarantee.guarantee_id,
+                cycle_number=1
+            ).first()
+            if c1 and c1.status == 'Active':
+                c1.status = 'Completed'
+
+            audit6 = AuditLog(
+                user_id=user_id,
+                action='GUARANTEE_MILESTONE_RECORDED',
+                entity_type='PerformanceGuarantee',
+                entity_id=guarantee.guarantee_id,
+                previous_values=None,
+                new_values={'event_type': 'Milestone_6_Months', 'elapsed_days': elapsed_days},
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(audit6)
+
+            sec6 = SecurityEvent(
+                user_id=user_id,
+                event_type='GUARANTEE_MILESTONE_REACHED',
+                description=f'Performance Guarantee #{guarantee.guarantee_id} reached 6-Month milestone ({elapsed_days} days elapsed)',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec6)
+
+        if processed_for_g:
+            total_processed += 1
+
+    db.session.commit()
+    flash(f'Batch milestone sync completed. Processed {total_processed} guarantees, recorded {total_milestones_recorded} milestone events.', 'success')
+    return redirect(url_for('admin_performance'))
+
+
+@app.route('/admin/performance/<int:guarantee_id>/initiate-redemption/', methods=['POST'])
+@performance_admin_required
+def admin_initiate_performance_redemption(guarantee_id):
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user or not has_performance_operational_permission(user):
+        flash('Access denied. Operational privileges required to initiate redemption claims.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    guarantee = PerformanceGuarantee.query.get_or_404(guarantee_id)
+
+    if guarantee.guarantee_type != 'owner_guarantee':
+        flash(f'Guarantee #{guarantee_id} is not an owner performance guarantee.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    if guarantee.status in ['Redeemed_Full', 'Completed']:
+        flash(f'Cannot initiate redemption for guarantee #{guarantee_id}. Current status is "{guarantee.status}".', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    pending_settlement = GuaranteeSettlement.query.filter_by(
+        performance_guarantee_id=guarantee.guarantee_id,
+        status='Pending'
+    ).first()
+    if pending_settlement:
+        flash(f'Guarantee #{guarantee_id} already has a pending redemption settlement (ID #{pending_settlement.id}).', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    amount_raw = request.form.get('amount', '').strip()
+    if not amount_raw:
+        flash('Settlement amount is required.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    try:
+        amount = Decimal(amount_raw)
+    except Exception:
+        flash(f'Invalid settlement amount format: {amount_raw}', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    if amount <= 0:
+        flash('Settlement amount must be positive.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    if guarantee.cap_amount is not None:
+        cap_dec = Decimal(str(guarantee.cap_amount))
+        if amount > cap_dec:
+            flash(f'Settlement amount ₦{amount:,.2f} exceeds guarantee cap amount of ₦{cap_dec:,.2f}.', 'danger')
+            return redirect(url_for('admin_performance'))
+
+    now = datetime.utcnow()
+    ref_note = request.form.get('reference', '').strip() or f'Redemption claim initiated by admin #{user_id}'
+
+    settlement = GuaranteeSettlement(
+        performance_guarantee_id=guarantee.guarantee_id,
+        amount=amount,
+        settlement_type='redemption',
+        status='Pending',
+        reference=ref_note,
+        created_at=now
+    )
+    db.session.add(settlement)
+    db.session.flush()
+
+    evt = GuaranteeEvent(
+        performance_guarantee_id=guarantee.guarantee_id,
+        event_type='Redemption_Initiated',
+        details=f'Redemption claim initiated for ₦{amount:,.2f}. Settlement ID #{settlement.id}',
+        occurred_at=now,
+        created_at=now
+    )
+    db.session.add(evt)
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='GUARANTEE_REDEMPTION_INITIATED',
+        entity_type='GuaranteeSettlement',
+        entity_id=settlement.id,
+        previous_values=None,
+        new_values={'guarantee_id': guarantee.guarantee_id, 'amount': float(amount), 'status': 'Pending'},
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec = SecurityEvent(
+        user_id=user_id,
+        event_type='GUARANTEE_REDEMPTION_INITIATED',
+        description=f'Redemption claim of ₦{amount:,.2f} initiated for Guarantee #{guarantee_id} (Settlement #{settlement.id})',
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec)
+    db.session.commit()
+
+    flash(f'Redemption claim of ₦{amount:,.2f} initiated for Guarantee #{guarantee_id} (Settlement ID #{settlement.id}).', 'success')
+    return redirect(url_for('admin_performance'))
+
+
+@app.route('/admin/performance/settlement/<int:settlement_id>/approve/', methods=['POST'])
+@performance_admin_required
+def admin_approve_guarantee_settlement(settlement_id):
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user or not has_settlement_approval_permission(user):
+        flash('Access denied. Settlement approval privileges required.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    settlement = GuaranteeSettlement.query.get_or_404(settlement_id)
+
+    if settlement.status != 'Pending':
+        flash(f'Cannot approve settlement #{settlement_id}. Current status is "{settlement.status}" (must be "Pending").', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    now = datetime.utcnow()
+    settlement.status = 'Approved'
+    settlement.approved_at = now
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='GUARANTEE_SETTLEMENT_APPROVED',
+        entity_type='GuaranteeSettlement',
+        entity_id=settlement.id,
+        previous_values={'status': 'Pending'},
+        new_values={'status': 'Approved', 'approved_at': now.isoformat()},
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec = SecurityEvent(
+        user_id=user_id,
+        event_type='GUARANTEE_SETTLEMENT_APPROVED',
+        description=f'Guarantee Settlement #{settlement.id} (₦{settlement.amount:,.2f}) approved by user #{user_id}',
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec)
+    db.session.commit()
+
+    flash(f'Settlement #{settlement_id} approved successfully.', 'success')
+    return redirect(url_for('admin_performance'))
+
+
+@app.route('/admin/performance/settlement/<int:settlement_id>/record-payment/', methods=['POST'])
+@performance_admin_required
+def admin_record_guarantee_settlement_payment(settlement_id):
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user or not has_settlement_payment_permission(user):
+        flash('Access denied. Settlement payment recording privileges required.', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    settlement = GuaranteeSettlement.query.get_or_404(settlement_id)
+
+    if settlement.status != 'Approved':
+        flash(f'Cannot record payment for settlement #{settlement_id}. Current status is "{settlement.status}" (must be "Approved").', 'danger')
+        return redirect(url_for('admin_performance'))
+
+    now = datetime.utcnow()
+    settlement.status = 'Paid'
+    settlement.paid_at = now
+
+    guarantee = settlement.performance_guarantee
+    guarantee.settled_at = now
+
+    evt = GuaranteeEvent(
+        performance_guarantee_id=guarantee.guarantee_id,
+        event_type='Settlement_Completed',
+        details=f'Settlement #{settlement.id} payment of ₦{settlement.amount:,.2f} recorded.',
+        occurred_at=now,
+        created_at=now
+    )
+    db.session.add(evt)
+
+    all_paid = GuaranteeSettlement.query.filter_by(
+        performance_guarantee_id=guarantee.guarantee_id,
+        status='Paid'
+    ).all()
+    paid_ids = {s.id for s in all_paid}
+    if settlement.id not in paid_ids:
+        all_paid.append(settlement)
+
+    total_paid = sum(Decimal(str(s.amount)) for s in all_paid)
+
+    if guarantee.cap_amount is not None:
+        cap_dec = Decimal(str(guarantee.cap_amount))
+        if total_paid >= cap_dec:
+            guarantee.status = 'Redeemed_Full'
+        else:
+            guarantee.status = 'Redeemed_Partial'
+    else:
+        guarantee.status = 'Redeemed_Full'
+
+    c1 = GuaranteeCycle.query.filter_by(
+        performance_guarantee_id=guarantee.guarantee_id,
+        cycle_number=1
+    ).first()
+    if c1 and c1.status in ['Active', 'Completed']:
+        c1.status = 'Redeemed'
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='GUARANTEE_SETTLEMENT_PAID',
+        entity_type='PerformanceGuarantee',
+        entity_id=guarantee.guarantee_id,
+        previous_values={'status': guarantee.status, 'settled_at': None},
+        new_values={'status': guarantee.status, 'settled_at': now.isoformat(), 'settlement_id': settlement.id, 'amount': float(settlement.amount)},
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec = SecurityEvent(
+        user_id=user_id,
+        event_type='GUARANTEE_SETTLEMENT_COMPLETED',
+        description=f'Settlement #{settlement.id} payment of ₦{settlement.amount:,.2f} recorded for Guarantee #{guarantee.guarantee_id}. New guarantee status: {guarantee.status}',
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec)
+    db.session.commit()
+
+    flash(f'Settlement #{settlement_id} payment of ₦{settlement.amount:,.2f} recorded successfully. Guarantee status updated to {guarantee.status}.', 'success')
+    return redirect(url_for('admin_performance'))

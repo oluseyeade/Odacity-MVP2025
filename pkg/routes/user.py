@@ -2,15 +2,17 @@ import os
 import json
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
 from urllib.parse import urlparse
 from flask import render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 from pkg import app
-from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog, Negotiation
+from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog, Negotiation, Invoice, Payment, TransactionDocument
 from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, BuyerRespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm, DabIndividualEnquiryForm, GeneralEnquiryForm, ControlledPropertySubmissionForm
 from pkg.services.email_service import send_enquiry_acknowledgement
+from pkg.routes.admin import has_admin_permission, has_transaction_initiation_permission, has_phase16_operational_permission, has_performance_operational_permission
 
 
 
@@ -2093,6 +2095,26 @@ def owner_dashboard():
     documents = PropertyDocument.query.filter(PropertyDocument.property_id.in_(prop_ids)).order_by(PropertyDocument.created_at.desc()).all() if prop_ids else []
     perf_guarantees = PerformanceGuarantee.query.filter_by(owner_profile_id=owner_prof.owner_profile_id).order_by(PerformanceGuarantee.created_at.desc()).all()
 
+    now_dt = datetime.utcnow()
+    for g in perf_guarantees:
+        if g.start_at:
+            elapsed = (now_dt - g.start_at).days
+            g.calc_days_elapsed = max(0, elapsed)
+            if g.period_days is not None:
+                g.calc_days_remaining = max(0, g.period_days - g.calc_days_elapsed)
+            else:
+                g.calc_days_remaining = None
+        else:
+            g.calc_days_elapsed = 0
+            g.calc_days_remaining = g.period_days
+
+        event_types = [e.event_type for e in g.events] if g.events else []
+        g.has_m3 = 'Milestone_3_Months' in event_types
+        g.has_m6 = 'Milestone_6_Months' in event_types
+        g.has_redemption_initiated = 'Redemption_Initiated' in event_types
+        g.has_settlement_completed = 'Settlement_Completed' in event_types
+
+
     # Portfolio Metrics
     total_properties_count = len(dabs)
     available_properties = [p for p in properties if p.publication_status in ['Available', 'Public Listing', 'Private Listing', 'Approved']]
@@ -2715,6 +2737,398 @@ def buyer_respond_offer(offer_id):
 
         flash(f'Counter-offer of ₦{counter_val:,.2f} submitted to property owner.', 'success')
         return redirect(url_for('buyer_offers'))
+
+
+# ==========================================
+# PHASE 15 — TRANSACTION LIFECYCLE ROUTES
+# ==========================================
+
+@app.route('/offers/<int:offer_id>/initiate-transaction/', methods=['POST'])
+def initiate_transaction(offer_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to initiate a transaction.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    offer_rec = Offer.query.get_or_404(offer_id)
+
+    # Offer status MUST be exactly Accepted
+    if offer_rec.status != 'Accepted':
+        flash('Transactions can only be initiated from Accepted purchase offers.', 'danger')
+        return redirect(url_for('buyer_offers'))
+
+    # Authorization Check: User must be either the Buyer, Property Owner, or Admin
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    owner_profile = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+
+    is_buyer = cust_profile and offer_rec.customer_id == cust_profile.customer_id
+    is_owner = (
+        owner_profile and
+        offer_rec.property and
+        offer_rec.property.dab and
+        offer_rec.property.dab.owner_profile_id == owner_profile.owner_profile_id
+    )
+    user_rec = User.query.get(user_id)
+    is_admin = user_rec and has_transaction_initiation_permission(user_rec)
+
+    if not (is_buyer or is_owner or is_admin):
+        flash('Purchase offer record not found or access denied.', 'danger')
+        return redirect(url_for('buyer_offers'))
+
+    # Duplicate Protection Check: Do not create duplicate Transaction
+    existing_tx = Transaction.query.filter_by(offer_id=offer_rec.offer_id).first()
+    if existing_tx:
+        flash(f'Transaction #{existing_tx.transaction_id} is already initiated for this offer.', 'info')
+        return redirect(url_for('transaction_detail', transaction_id=existing_tx.transaction_id))
+
+    # Generate Unique Transaction Reference
+    while True:
+        ref_candidate = f"TX-{uuid.uuid4().hex[:8].upper()}"
+        if not Transaction.query.filter_by(transaction_reference=ref_candidate).first():
+            tx_ref = ref_candidate
+            break
+
+    # Monetary calculation using Decimal-safe arithmetic
+    offer_amt_dec = Decimal(str(offer_rec.offer_amount or 0))
+    comm_pct = Decimal('10.00')
+    comm_amt = (offer_amt_dec * comm_pct / Decimal('100.00')).quantize(Decimal('0.01'))
+
+    new_tx = Transaction(
+        customer_id=offer_rec.customer_id,
+        property_id=offer_rec.property_id,
+        offer_id=offer_rec.offer_id,
+        transaction_reference=tx_ref,
+        transaction_type='sale',
+        type='sale',
+        status='Initiated',
+        transaction_value=offer_amt_dec,
+        total_amount=offer_amt_dec,
+        odacity_commission_percentage=comm_pct,
+        odacity_commission_amount=comm_amt,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    db.session.add(new_tx)
+    db.session.flush()
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='TRANSACTION_INITIATED',
+        entity_type='Transaction',
+        entity_id=new_tx.transaction_id,
+        previous_values=None,
+        new_values={
+            'transaction_reference': tx_ref,
+            'status': 'Initiated',
+            'transaction_value': float(offer_amt_dec),
+            'commission_amount': float(comm_amt)
+        },
+        ip_address=request.remote_addr,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(audit)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='TRANSACTION_INITIATED',
+        description=f'Transaction {tx_ref} initiated for Accepted Offer #{offer_rec.offer_id}',
+        ip_address=request.remote_addr,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Transaction {tx_ref} successfully initiated!', 'success')
+    return redirect(url_for('transaction_detail', transaction_id=new_tx.transaction_id))
+
+
+@app.route('/transactions/<int:transaction_id>/')
+def transaction_detail(transaction_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to view transaction details.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+
+    # Object-level Authorization Check:
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    owner_profile = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+    user_rec = User.query.get(user_id)
+
+    is_buyer = cust_profile and tx.customer_id == cust_profile.customer_id
+    is_owner = (
+        owner_profile and
+        tx.property and
+        tx.property.dab and
+        tx.property.dab.owner_profile_id == owner_profile.owner_profile_id
+    )
+    is_admin = user_rec and has_admin_permission(user_rec)
+    is_operational_admin = user_rec and has_phase16_operational_permission(user_rec)
+
+    if not (is_buyer or is_owner or is_admin):
+        flash('Transaction record not found or access denied.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    return render_template(
+        'user/transactions.html',
+        title=f'Transaction Detail — {tx.transaction_reference or tx.transaction_id}',
+        tx=tx,
+        is_buyer=is_buyer,
+        is_owner=is_owner,
+        is_admin=is_admin,
+        is_operational_admin=is_operational_admin
+    )
+
+
+@app.route('/transactions/<int:transaction_id>/invoices/<int:invoice_id>/pay/', methods=['POST'])
+def pay_invoice(transaction_id, invoice_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to make a payment.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+    inv = Invoice.query.get_or_404(invoice_id)
+
+    # Object-level Authorization Check: Only Buyer can pay their invoice
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    if not cust_profile or tx.customer_id != cust_profile.customer_id:
+        flash('Payment authorized only for the transaction buyer.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    if inv.transaction_id != tx.transaction_id:
+        flash('Invoice does not belong to the specified transaction.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    raw_amount = request.form.get('amount', '').strip()
+    raw_ref = request.form.get('payment_reference', '').strip()
+    payment_method = request.form.get('payment_method', 'card').strip()
+
+    try:
+        pay_amt = Decimal(raw_amount)
+    except Exception:
+        flash('Invalid payment amount specified.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    if pay_amt <= Decimal('0.00'):
+        flash('Payment amount must be greater than zero.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    amt_due_dec = Decimal(str(inv.amount_due or 0))
+    amt_paid_dec = Decimal(str(inv.amount_paid or 0))
+    outstanding = amt_due_dec - amt_paid_dec
+
+    if pay_amt > outstanding:
+        flash(f'Payment amount (₦{pay_amt:,.2f}) exceeds outstanding invoice balance (₦{outstanding:,.2f}).', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    if raw_ref:
+        pay_ref = raw_ref
+        if Payment.query.filter_by(payment_reference=pay_ref).first():
+            flash(f'Duplicate payment reference {pay_ref} detected.', 'danger')
+            return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+    else:
+        while True:
+            cand_ref = f"PAY-{uuid.uuid4().hex[:8].upper()}"
+            if not Payment.query.filter_by(payment_reference=cand_ref).first():
+                pay_ref = cand_ref
+                break
+
+    now = datetime.utcnow()
+    new_payment = Payment(
+        invoice_id=inv.invoice_id,
+        transaction_id=tx.transaction_id,
+        payment_reference=pay_ref,
+        amount=pay_amt,
+        method=payment_method,
+        payment_method=payment_method,
+        status='Completed',
+        transaction_ref=tx.transaction_reference,
+        paid_at=now,
+        payment_date=now,
+        reconciliation_note='Buyer online payment (Controlled MVP)',
+        created_at=now
+    )
+    db.session.add(new_payment)
+
+    new_total_paid = amt_paid_dec + pay_amt
+    inv.amount_paid = new_total_paid
+    if new_total_paid >= amt_due_dec:
+        inv.status = 'Paid'
+        inv.paid_at = now
+    else:
+        inv.status = 'Partially_Paid'
+
+    audit_pay = AuditLog(
+        user_id=user_id,
+        action='PAYMENT_RECORDED',
+        entity_type='Payment',
+        entity_id=new_payment.payment_id,
+        previous_values=None,
+        new_values={
+            'payment_reference': pay_ref,
+            'amount': float(pay_amt),
+            'invoice_id': inv.invoice_id,
+            'invoice_status': inv.status
+        },
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit_pay)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='PAYMENT_COMPLETED',
+        description=f"Payment {pay_ref} of ₦{pay_amt:,.2f} completed for Invoice {inv.invoice_number} by buyer #{user_id}",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Payment {pay_ref} of ₦{pay_amt:,.2f} successfully processed.', 'success')
+    return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+
+@app.route('/transactions/<int:transaction_id>/documents/upload/', methods=['POST'])
+def upload_transaction_document(transaction_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to upload transaction documents.', 'warning')
+        return redirect(url_for('login', next=url_for('transaction_detail', transaction_id=transaction_id)))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+    user_rec = User.query.get(user_id)
+
+    # Object-level Authorization Check: Buyer, Owner, or Admin
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    owner_profile = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+
+    is_buyer = cust_profile and tx.customer_id == cust_profile.customer_id
+    is_owner = (
+        owner_profile and
+        tx.property and
+        tx.property.dab and
+        tx.property.dab.owner_profile_id == owner_profile.owner_profile_id
+    )
+    is_admin = user_rec and has_admin_permission(user_rec)
+
+    if not (is_buyer or is_owner or is_admin):
+        flash('Access denied or transaction record not found.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if tx.status == 'Completion':
+        flash('Cannot upload documents for a completed transaction.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    file = request.files.get('document_file')
+    document_type = request.form.get('document_type', '').strip() or 'General Transaction Document'
+
+    if not file or not file.filename:
+        flash('Please select a valid document file to upload.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    filename = file.filename
+    allowed_exts = {'pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'}
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+
+    if ext not in allowed_exts:
+        flash('Validation error: Uploaded document must be in PDF, PNG, JPG, JPEG, DOC, or DOCX format.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    safe_name = secure_filename(filename) or f'tx_doc.{ext}'
+    unique_name = f"tx_doc_{transaction_id}_{uuid.uuid4().hex[:8]}_{safe_name}"
+
+    upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'transaction_documents')
+    os.makedirs(upload_dir, exist_ok=True)
+    save_path = os.path.join(upload_dir, unique_name)
+    file.save(save_path)
+
+    rel_path = f"uploads/transaction_documents/{unique_name}"
+    now = datetime.utcnow()
+
+    new_doc = TransactionDocument(
+        transaction_id=tx.transaction_id,
+        document_type=document_type,
+        file_path=rel_path,
+        status='Submitted',
+        uploaded_by_user_id=user_id,
+        uploaded_at=now,
+        created_at=now
+    )
+    db.session.add(new_doc)
+    db.session.flush()
+
+    audit = AuditLog(
+        user_id=user_id,
+        action='TRANSACTION_DOCUMENT_SUBMITTED',
+        entity_type='TransactionDocument',
+        entity_id=new_doc.transaction_document_id,
+        previous_values=None,
+        new_values={
+            'transaction_id': tx.transaction_id,
+            'document_type': document_type,
+            'file_path': rel_path,
+            'status': 'Submitted'
+        },
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(audit)
+
+    sec_event = SecurityEvent(
+        user_id=user_id,
+        event_type='TRANSACTION_DOCUMENT_SUBMITTED',
+        description=f"Transaction document ({document_type}) uploaded for Transaction #{tx.transaction_id} by user #{user_id}",
+        ip_address=request.remote_addr,
+        created_at=now
+    )
+    db.session.add(sec_event)
+    db.session.commit()
+
+    flash(f'Transaction document "{document_type}" submitted successfully.', 'success')
+    return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+
+@app.route('/transactions/<int:transaction_id>/documents/<int:document_id>/serve/')
+def serve_transaction_document(transaction_id, document_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to view transaction documents.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    tx = Transaction.query.get_or_404(transaction_id)
+    doc = TransactionDocument.query.get_or_404(document_id)
+
+    # Document IDOR check: document MUST belong to the specified transaction
+    if doc.transaction_id != tx.transaction_id:
+        flash('Document record does not match the specified transaction.', 'danger')
+        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
+
+    # Object-level Authorization Check: Buyer, Owner, or Admin
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    owner_profile = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+    user_rec = User.query.get(user_id)
+
+    is_buyer = cust_profile and tx.customer_id == cust_profile.customer_id
+    is_owner = (
+        owner_profile and
+        tx.property and
+        tx.property.dab and
+        tx.property.dab.owner_profile_id == owner_profile.owner_profile_id
+    )
+    is_admin = user_rec and has_admin_permission(user_rec)
+
+    if not (is_buyer or is_owner or is_admin):
+        flash('Access denied to transaction document.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    from flask import send_from_directory
+    upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'transaction_documents')
+    filename = os.path.basename(doc.file_path)
+    return send_from_directory(upload_dir, filename)
+
 
 
 @app.route('/seller/applications/')

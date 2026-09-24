@@ -1,0 +1,141 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ title or "Transactions Audit — Odacity Admin" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-receipt text-danger me-2"></i>Transactions Audit & Compliance</h2>
+            <p class="text-muted mb-0">Platform-wide administrative oversight for initiated real estate transactions and commission calculations.</p>
+        </div>
+    </div>
+
+    <!-- STATUS FILTER BAR -->
+    <div class="mb-4 d-flex gap-2">
+        <a href="{{ url_for('admin_transactions') }}" class="btn btn-sm {% if not status_filter %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">All Transactions</a>
+        <a href="{{ url_for('admin_transactions', status='Initiated') }}" class="btn btn-sm {% if status_filter == 'Initiated' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Initiated</a>
+        <a href="{{ url_for('admin_transactions', status='Completion') }}" class="btn btn-sm {% if status_filter == 'Completion' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Completed</a>
+    </div>
+
+    <!-- TRANSACTIONS TABLE -->
+    <div class="admin-table-card">
+        {% if transactions %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" style="width: 120px;">Ref / ID</th>
+                            <th scope="col">Property Details</th>
+                            <th scope="col">Buyer / Customer</th>
+                            <th scope="col">Transaction Value</th>
+                            <th scope="col">Commission (10%)</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Invoice Status</th>
+                            <th scope="col">Created Date</th>
+                            <th scope="col" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in transactions %}
+                            <tr>
+                                <td class="fw-bold text-dark font-monospace">{{ tx.transaction_reference or '#TX-' ~ tx.transaction_id }}</td>
+                                <td>
+                                    {% if tx.property %}
+                                        <a href="{{ url_for('property_detail', property_id=tx.property_id) }}" class="fw-bold text-dark text-decoration-none">
+                                            {{ tx.property.title }}
+                                        </a>
+                                        <div class="small text-muted">
+                                            ID: #{{ tx.property_id }} | Type: {{ (tx.transaction_type or 'Sale')|upper }}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Property #{{ tx.property_id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if tx.customer %}
+                                        <span class="fw-bold">{{ tx.customer.first_name or 'Buyer' }} {{ tx.customer.last_name or '' }}</span>
+                                        <div class="small text-muted">ID: #{{ tx.customer_id }}</div>
+                                    {% else %}
+                                        <span class="text-muted">Customer #{{ tx.customer_id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold text-success">
+                                    ₦{{ "{:,.2f}".format(tx.transaction_value or tx.total_amount or 0) }}
+                                </td>
+                                <td class="fw-bold text-danger small">
+                                    ₦{{ "{:,.2f}".format(tx.odacity_commission_amount or 0) }}
+                                </td>
+                                <td>
+                                    {% if tx.status == 'Completion' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif tx.status == 'Initiated' %}
+                                        <span class="badge bg-warning text-dark">Initiated</span>
+                                    {% else %}
+                                        <span class="badge bg-info text-dark">{{ tx.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if tx.invoices %}
+                                        {% set inv = tx.invoices[0] %}
+                                        {% if inv.status == 'Paid' %}
+                                            <span class="badge bg-success">Paid</span>
+                                        {% elif inv.status == 'Partially_Paid' %}
+                                            <span class="badge bg-info text-dark">Partially Paid</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ inv.status }}</span>
+                                        {% endif %}
+                                        <div class="small text-muted font-monospace">{{ inv.invoice_number }}</div>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border">Not Issued</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">
+                                    {{ tx.created_at.strftime('%Y-%m-%d %H:%M') if tx.created_at else 'N/A' }}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('transaction_detail', transaction_id=tx.transaction_id) }}" class="btn btn-sm btn-outline-danger fw-bold rounded-pill">
+                                        View Detail
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-receipt text-muted display-4 d-block mb-3"></i>
+                <h5 class="fw-bold text-dark mb-1">No Transactions Found</h5>
+                <p class="text-muted mb-0">No transaction records match the selected filter criteria.</p>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
