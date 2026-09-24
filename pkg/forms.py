@@ -84,9 +84,17 @@ class DirectAssetBriefForm(FlaskForm):
     submit = SubmitField("Submit Direct Asset Brief")
 
 class RespondOfferForm(FlaskForm):
-    action = SelectField("Response Action", choices=[('Accepted', 'Accept Offer'), ('Rejected', 'Reject Offer')], validators=[DataRequired()])
+    action = SelectField("Response Action", choices=[('Accepted', 'Accept Offer'), ('Rejected', 'Reject Offer'), ('Counter_Offer', 'Counter Offer')], validators=[DataRequired()])
+    counter_amount = DecimalField("Counter Offer Amount (NGN)", validators=[Optional()])
     notes = TextAreaField("Response Notes (Optional)", validators=[Optional()])
     submit = SubmitField("Submit Response")
+
+class BuyerRespondOfferForm(FlaskForm):
+    action = SelectField("Response Action", choices=[('Accepted', 'Accept Counter Offer'), ('Rejected', 'Reject Counter Offer'), ('Counter_Offer', 'Propose Counter Offer')], validators=[DataRequired()])
+    counter_amount = DecimalField("Counter Offer Amount (NGN)", validators=[Optional()])
+    notes = TextAreaField("Message / Notes (Optional)", validators=[Optional()])
+    submit = SubmitField("Submit Response")
+
 
 
 class DabInstitutionEnquiryForm(FlaskForm):

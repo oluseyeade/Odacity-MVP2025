@@ -54,6 +54,7 @@
     <div class="mb-4 d-flex gap-2">
         <a href="{{ url_for('admin_offers') }}" class="btn btn-sm {% if not status_filter %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">All Offers</a>
         <a href="{{ url_for('admin_offers', status='Submitted') }}" class="btn btn-sm {% if status_filter == 'Submitted' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Submitted</a>
+        <a href="{{ url_for('admin_offers', status='Counter_Offer') }}" class="btn btn-sm {% if status_filter == 'Counter_Offer' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Counter Offer</a>
         <a href="{{ url_for('admin_offers', status='Accepted') }}" class="btn btn-sm {% if status_filter == 'Accepted' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Accepted</a>
         <a href="{{ url_for('admin_offers', status='Rejected') }}" class="btn btn-sm {% if status_filter == 'Rejected' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Rejected</a>
         <a href="{{ url_for('admin_offers', status='Cancelled') }}" class="btn btn-sm {% if status_filter == 'Cancelled' %}btn-danger{% else %}btn-outline-secondary{% endif %} rounded-pill">Cancelled</a>
@@ -105,6 +106,8 @@
                                 <td>
                                     {% if offer.status == 'Submitted' %}
                                         <span class="badge bg-info text-dark">Submitted</span>
+                                    {% elif offer.status == 'Counter_Offer' or offer.status == 'Countered' %}
+                                        <span class="badge bg-primary">Counter Offer</span>
                                     {% elif offer.status == 'Accepted' %}
                                         <span class="badge bg-success">Accepted</span>
                                     {% elif offer.status == 'Rejected' %}
@@ -114,6 +117,14 @@
                                     {% else %}
                                         <span class="badge bg-light text-dark border">{{ offer.status }}</span>
                                     {% endif %}
+
+                                    {% if offer.negotiations %}
+                                        <div class="mt-1">
+                                            <button class="btn btn-link btn-sm p-0 text-decoration-none small text-danger" type="button" data-bs-toggle="collapse" data-bs-target="#admin-neg-history-{{ offer.offer_id }}">
+                                                <i class="bi bi-clock-history me-1"></i>Negotiations ({{ offer.negotiations|length }})
+                                            </button>
+                                        </div>
+                                    {% endif %}
                                 </td>
                                 <td class="small text-muted">
                                     {{ offer.submitted_at.strftime('%Y-%m-%d %H:%M') if offer.submitted_at else 'N/A' }}
@@ -122,6 +133,30 @@
                                     {{ offer.responded_at.strftime('%Y-%m-%d %H:%M') if offer.responded_at else '—' }}
                                 </td>
                             </tr>
+
+                            {% if offer.negotiations %}
+                            <tr class="collapse bg-light" id="admin-neg-history-{{ offer.offer_id }}">
+                                <td colspan="7" class="p-3">
+                                    <div class="small fw-bold text-uppercase text-secondary mb-2"><i class="bi bi-shield-check me-1"></i> Audit Negotiation History Thread</div>
+                                    <ul class="list-group list-group-flush border rounded-3 bg-white">
+                                        {% for neg in offer.negotiations %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge {% if neg.direction == 'owner_to_buyer' %}bg-primary{% else %}bg-info text-dark{% endif %} me-2">
+                                                    {{ 'Owner Counter' if neg.direction == 'owner_to_buyer' else 'Buyer Counter' }}
+                                                </span>
+                                                <span class="fw-bold text-success">₦{{ "{:,.2f}".format(neg.counter_offer_amount or neg.proposed_amount or 0) }}</span>
+                                                {% if neg.message %}
+                                                    <p class="mb-0 text-muted small mt-1"><em>"{{ neg.message }}"</em></p>
+                                                {% endif %}
+                                            </div>
+                                            <span class="text-muted small">User ID: #{{ neg.created_by_user_id or 'System' }} | {{ neg.created_at.strftime('%Y-%m-%d %H:%M') if neg.created_at else '' }}</span>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                            </tr>
+                            {% endif %}
                         {% endfor %}
                     </tbody>
                 </table>

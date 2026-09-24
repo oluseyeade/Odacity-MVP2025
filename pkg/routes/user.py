@@ -8,8 +8,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 from pkg import app
-from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog
-from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm, DabIndividualEnquiryForm, GeneralEnquiryForm, ControlledPropertySubmissionForm
+from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog, Negotiation
+from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, BuyerRespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm, DabIndividualEnquiryForm, GeneralEnquiryForm, ControlledPropertySubmissionForm
 from pkg.services.email_service import send_enquiry_acknowledgement
 
 
@@ -2006,12 +2006,14 @@ def buyer_offers():
     # Scoped strictly to authenticated customer ID
     offers = Offer.query.filter_by(customer_id=cust_profile.customer_id).order_by(Offer.submitted_at.desc()).all()
     cancel_form = CancelOfferForm()
+    respond_form = BuyerRespondOfferForm()
 
     return render_template(
         'user/buyer_offers.html',
         title='My Purchase Offers',
         offers=offers,
-        cancel_form=cancel_form
+        cancel_form=cancel_form,
+        respond_form=respond_form
     )
 
 
@@ -2469,27 +2471,250 @@ def respond_offer(offer_id):
         flash(f'Offer is already in terminal/processed status: {offer_rec.status}.', 'warning')
         return redirect(url_for('seller_offers'))
 
+    if offer_rec.valid_until and offer_rec.valid_until < datetime.utcnow():
+        flash('Offer has expired and cannot be negotiated.', 'danger')
+        return redirect(url_for('seller_offers'))
+
     action = request.form.get('action', '').strip()
-    if action not in ['Accepted', 'Rejected']:
+    if action not in ['Accepted', 'Rejected', 'Counter_Offer']:
         flash('Invalid offer response action.', 'danger')
         return redirect(url_for('seller_offers'))
 
-    offer_rec.status = action
-    offer_rec.responded_at = datetime.utcnow()
+    old_status = offer_rec.status
+    old_amount = float(offer_rec.offer_amount) if offer_rec.offer_amount else 0.0
 
-    event_type = 'PURCHASE_OFFER_ACCEPTED' if action == 'Accepted' else 'PURCHASE_OFFER_REJECTED'
-    sec_event = SecurityEvent(
-        user_id=user_id,
-        event_type=event_type,
-        description=f'Property owner {action.lower()} purchase offer #{offer_id} for property #{offer_rec.property_id}',
-        ip_address=request.remote_addr,
-        created_at=datetime.utcnow()
-    )
-    db.session.add(sec_event)
-    db.session.commit()
+    if action == 'Counter_Offer':
+        counter_amount_raw = request.form.get('counter_amount', '').strip()
+        message = request.form.get('notes', '').strip() or request.form.get('message', '').strip()
 
-    flash(f'Purchase offer #{offer_id} marked as {action}.', 'success' if action == 'Accepted' else 'info')
-    return redirect(url_for('seller_offers'))
+        try:
+            counter_val = float(counter_amount_raw)
+            if counter_val <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            flash('Please provide a valid counter-offer amount greater than 0.', 'danger')
+            return redirect(url_for('seller_offers'))
+
+        neg = Negotiation(
+            offer_id=offer_rec.offer_id,
+            counter_offer_amount=counter_val,
+            proposed_amount=counter_val,
+            message=message,
+            direction='owner_to_buyer',
+            created_by_user_id=user_id,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(neg)
+
+        offer_rec.status = 'Counter_Offer'
+        offer_rec.responded_at = datetime.utcnow()
+
+        audit = AuditLog(
+            user_id=user_id,
+            action='OWNER_COUNTER_OFFER_SUBMITTED',
+            entity_type='Offer',
+            entity_id=offer_rec.offer_id,
+            previous_values={'status': old_status},
+            new_values={'status': 'Counter_Offer', 'counter_amount': counter_val},
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(audit)
+
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='COUNTER_OFFER_SUBMITTED',
+            description=f'Owner submitted counter-offer of ₦{counter_val:,.2f} for offer #{offer_id}',
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+
+        flash(f'Counter-offer of ₦{counter_val:,.2f} submitted to buyer.', 'success')
+        return redirect(url_for('seller_offers'))
+
+    else:
+        offer_rec.status = action
+        offer_rec.responded_at = datetime.utcnow()
+
+        audit = AuditLog(
+            user_id=user_id,
+            action=f'OWNER_OFFER_{action.upper()}',
+            entity_type='Offer',
+            entity_id=offer_rec.offer_id,
+            previous_values={'status': old_status},
+            new_values={'status': action},
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(audit)
+
+        event_type = 'PURCHASE_OFFER_ACCEPTED' if action == 'Accepted' else 'PURCHASE_OFFER_REJECTED'
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type=event_type,
+            description=f'Property owner {action.lower()} purchase offer #{offer_id} for property #{offer_rec.property_id}',
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+
+        flash(f'Purchase offer #{offer_id} marked as {action}.', 'success' if action == 'Accepted' else 'info')
+        return redirect(url_for('seller_offers'))
+
+
+@app.route('/offers/<int:offer_id>/respond/', methods=['POST'])
+def buyer_respond_offer(offer_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to respond to a counter offer.', 'warning')
+        return redirect(url_for('login', next=request.path))
+
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    if not cust_profile:
+        flash('Customer profile not found.', 'danger')
+        return redirect(url_for('buyer_offers'))
+
+    # Strict customer isolation (IDOR protection)
+    offer_rec = Offer.query.filter_by(offer_id=offer_id, customer_id=cust_profile.customer_id).first()
+    if not offer_rec:
+        flash('Purchase offer record not found or access denied.', 'danger')
+        return redirect(url_for('buyer_offers'))
+
+    if offer_rec.status in ['Accepted', 'Rejected', 'Cancelled', 'Expired']:
+        flash(f'Offer is already in terminal status: {offer_rec.status}.', 'warning')
+        return redirect(url_for('buyer_offers'))
+
+    if offer_rec.valid_until and offer_rec.valid_until < datetime.utcnow():
+        flash('Offer has expired and cannot be negotiated.', 'danger')
+        return redirect(url_for('buyer_offers'))
+
+    action = request.form.get('action', '').strip()
+    if action not in ['Accepted', 'Rejected', 'Counter_Offer']:
+        flash('Invalid counter offer response action.', 'danger')
+        return redirect(url_for('buyer_offers'))
+
+    old_status = offer_rec.status
+    old_amount = float(offer_rec.offer_amount) if offer_rec.offer_amount else 0.0
+
+    if action == 'Accepted':
+        latest_neg = Negotiation.query.filter_by(offer_id=offer_rec.offer_id).order_by(Negotiation.created_at.desc(), Negotiation.negotiation_id.desc()).first()
+        if latest_neg and (latest_neg.counter_offer_amount or latest_neg.proposed_amount):
+            final_amount = float(latest_neg.counter_offer_amount or latest_neg.proposed_amount)
+        else:
+            final_amount = old_amount
+
+        offer_rec.offer_amount = final_amount
+        offer_rec.status = 'Accepted'
+        offer_rec.responded_at = datetime.utcnow()
+
+        audit = AuditLog(
+            user_id=user_id,
+            action='COUNTER_OFFER_ACCEPTED',
+            entity_type='Offer',
+            entity_id=offer_rec.offer_id,
+            previous_values={'status': old_status, 'offer_amount': old_amount},
+            new_values={'status': 'Accepted', 'offer_amount': final_amount},
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(audit)
+
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='COUNTER_OFFER_ACCEPTED',
+            description=f'Buyer accepted counter-offer of ₦{final_amount:,.2f} for offer #{offer_id}',
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+
+        # CRITICAL: STOP HERE. DO NOT CREATE Transaction, Invoice, Payment, or TransactionDocument.
+        flash(f'Counter-offer accepted! Purchase offer #{offer_id} is now Accepted at ₦{final_amount:,.2f}.', 'success')
+        return redirect(url_for('buyer_offers'))
+
+    elif action == 'Rejected':
+        offer_rec.status = 'Rejected'
+        offer_rec.responded_at = datetime.utcnow()
+
+        audit = AuditLog(
+            user_id=user_id,
+            action='COUNTER_OFFER_REJECTED',
+            entity_type='Offer',
+            entity_id=offer_rec.offer_id,
+            previous_values={'status': old_status},
+            new_values={'status': 'Rejected'},
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(audit)
+
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='COUNTER_OFFER_REJECTED',
+            description=f'Buyer rejected counter-offer for offer #{offer_id}',
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+
+        flash(f'Counter-offer rejected. Purchase offer #{offer_id} is marked as Rejected.', 'info')
+        return redirect(url_for('buyer_offers'))
+
+    elif action == 'Counter_Offer':
+        counter_amount_raw = request.form.get('counter_amount', '').strip()
+        message = request.form.get('notes', '').strip() or request.form.get('message', '').strip()
+
+        try:
+            counter_val = float(counter_amount_raw)
+            if counter_val <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            flash('Please enter a valid numeric counter-offer amount greater than 0.', 'danger')
+            return redirect(url_for('buyer_offers'))
+
+        neg = Negotiation(
+            offer_id=offer_rec.offer_id,
+            proposed_amount=counter_val,
+            counter_offer_amount=counter_val,
+            message=message,
+            direction='buyer_to_owner',
+            created_by_user_id=user_id,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(neg)
+
+        offer_rec.status = 'Counter_Offer'
+        offer_rec.responded_at = datetime.utcnow()
+
+        audit = AuditLog(
+            user_id=user_id,
+            action='BUYER_COUNTER_OFFER_SUBMITTED',
+            entity_type='Offer',
+            entity_id=offer_rec.offer_id,
+            previous_values={'status': old_status},
+            new_values={'status': 'Counter_Offer', 'counter_amount': counter_val},
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(audit)
+
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='COUNTER_OFFER_SUBMITTED',
+            description=f'Buyer submitted counter-offer of ₦{counter_val:,.2f} for offer #{offer_id}',
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+
+        flash(f'Counter-offer of ₦{counter_val:,.2f} submitted to property owner.', 'success')
+        return redirect(url_for('buyer_offers'))
 
 
 @app.route('/seller/applications/')
