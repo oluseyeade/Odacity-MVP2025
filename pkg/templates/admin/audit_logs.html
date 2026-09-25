@@ -1,0 +1,141 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}System Audit Trail & Governance Logs — ODACITY{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center bg-dark text-white rounded-4 p-4 mb-4 shadow-sm">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-secondary text-uppercase px-3 py-2 rounded-pill fw-bold" style="letter-spacing: 1px;">Governance Oversight</span>
+                <span class="badge bg-outline-light border text-light rounded-pill">Read-Only Immutable Audit</span>
+            </div>
+            <h3 class="fw-bold mb-1">System Audit Trail & Event Logs</h3>
+            <p class="text-secondary small mb-0">Immutable records of administrative actions, state transitions, security events, and controlled overrides.</p>
+        </div>
+        <div class="mt-3 mt-md-0">
+            <span class="badge bg-outline-light border px-3 py-2 text-white font-monospace">
+                <i class="bi bi-shield-lock me-1"></i>Audit Admin Access
+            </span>
+        </div>
+    </div>
+
+    <!-- Filter Form -->
+    <div class="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-light">
+        <form method="GET" action="{{ url_for('admin_audit_logs') }}" class="row g-2 align-items-center">
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold text-muted mb-1">Period Filter</label>
+                <select name="period" class="form-select form-select-sm rounded-3">
+                    <option value="7d" {% if period == '7d' %}selected{% endif %}>Last 7 Days</option>
+                    <option value="30d" {% if period == '30d' %}selected{% endif %}>Last 30 Days</option>
+                    <option value="90d" {% if period == '90d' %}selected{% endif %}>Last 90 Days</option>
+                    <option value="all" {% if period == 'all' %}selected{% endif %}>All Records</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold text-muted mb-1">Action String</label>
+                <input type="text" name="action" value="{{ selected_action if selected_action != 'all' else '' }}" class="form-control form-control-sm rounded-3" placeholder="e.g. CONTROLLED_OVERRIDE, USER_CREATE...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold text-muted mb-1">Entity Type</label>
+                <input type="text" name="entity_type" value="{{ selected_entity_type if selected_entity_type != 'all' else '' }}" class="form-control form-control-sm rounded-3" placeholder="e.g. Property, DAB, User...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold text-muted mb-1">Acting Administrator</label>
+                <select name="admin_id" class="form-select form-select-sm rounded-3">
+                    <option value="all">All Administrators</option>
+                    {% for adm in admin_users %}
+                        <option value="{{ adm.user_id }}" {% if selected_admin_id == adm.user_id|string %}selected{% endif %}>{{ adm.full_name or adm.email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end mt-3">
+                <button type="submit" class="btn btn-sm btn-dark w-100 rounded-pill fw-bold">
+                    <i class="bi bi-filter me-1"></i>Filter
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Audit Logs Table -->
+    <div class="card border-0 shadow-sm rounded-4 p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+            <h5 class="fw-bold mb-0">Audit Events ({{ audit_logs|length }})</h5>
+            <span class="badge bg-secondary font-monospace">{{ audit_logs|length }} Event(s) Shown</span>
+        </div>
+
+        {% if audit_logs %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Log ID</th>
+                            <th>Timestamp</th>
+                            <th>Acting Administrator</th>
+                            <th>Action</th>
+                            <th>Entity Type & ID</th>
+                            <th>Previous Values</th>
+                            <th>New Values / Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in audit_logs %}
+                            <tr>
+                                <td class="font-monospace fw-bold">#{{ log.audit_log_id }}</td>
+                                <td class="small text-secondary text-nowrap">
+                                    <i class="bi bi-clock me-1"></i>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}
+                                </td>
+                                <td>
+                                    {% if log.user %}
+                                        <div class="fw-bold text-dark small">{{ log.user.full_name }}</div>
+                                        <small class="text-muted font-monospace">{{ log.user.email }}</small>
+                                    {% else %}
+                                        <span class="text-muted small">System / Anonymous</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if 'OVERRIDE' in log.action %}
+                                        <span class="badge bg-danger text-uppercase">{{ log.action }}</span>
+                                    {% elif 'APPROVE' in log.action or 'VERIFY' in log.action %}
+                                        <span class="badge bg-success text-uppercase">{{ log.action }}</span>
+                                    {% elif 'CREATE' in log.action or 'ASSIGN' in log.action %}
+                                        <span class="badge bg-primary text-uppercase">{{ log.action }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary text-uppercase">{{ log.action }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.entity_type %}
+                                        <span class="badge bg-light text-dark border font-monospace">{{ log.entity_type }} #{{ log.entity_id or '—' }}</span>
+                                    {% else %}
+                                        <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small font-monospace" style="max-width: 200px; word-break: break-word;">
+                                    {% if log.previous_values %}
+                                        <code>{{ log.previous_values|tojson }}</code>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small font-monospace" style="max-width: 250px; word-break: break-word;">
+                                    {% if log.new_values %}
+                                        <code>{{ log.new_values|tojson }}</code>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-secondary border-0 rounded-3 mb-0">
+                <i class="bi bi-info-circle me-2"></i>No audit records found matching the specified criteria.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

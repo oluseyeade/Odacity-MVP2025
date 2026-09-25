@@ -1,0 +1,218 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Superadmin Command Centre — ODACITY{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+    <!-- Header Banner -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center bg-dark text-white rounded-4 p-4 mb-4 shadow-sm">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-danger text-uppercase px-3 py-2 rounded-pill fw-bold" style="letter-spacing: 1px;">Superadmin Governance</span>
+                <span class="badge bg-outline-light border text-light rounded-pill">Odacity MVP 2025</span>
+            </div>
+            <h3 class="fw-bold mb-1">Odacity Business Command Centre</h3>
+            <p class="text-secondary small mb-0">Central Business Intelligence, Pipeline Monitoring, Governance & Executive Controls</p>
+        </div>
+        <div class="mt-3 mt-md-0 d-flex align-items-center gap-2">
+            <label class="text-secondary small fw-semibold text-nowrap"><i class="bi bi-funnel me-1"></i>Period:</label>
+            <div class="btn-group btn-group-sm" role="group">
+                <a href="{{ url_for('admin_command_centre', period='7d') }}" class="btn {% if period == '7d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">7D</a>
+                <a href="{{ url_for('admin_command_centre', period='30d') }}" class="btn {% if period == '30d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">30D</a>
+                <a href="{{ url_for('admin_command_centre', period='90d') }}" class="btn {% if period == '90d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">90D</a>
+                <a href="{{ url_for('admin_command_centre', period='12m') }}" class="btn {% if period == '12m' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">12M</a>
+                <a href="{{ url_for('admin_command_centre', period='all') }}" class="btn {% if period == 'all' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">All</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 1: Business Overview KPI Matrix -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-primary">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Customer Base</span>
+                <h3 class="fw-bold my-2 text-dark">{{ kpis.total_users }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Active: <strong>{{ kpis.active_users }}</strong></span>
+                    <span class="badge bg-primary-subtle text-primary">+{{ kpis.new_users_period }} ({{ period.upper() }})</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-info">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">DAB Submissions</span>
+                <h3 class="fw-bold my-2 text-dark">{{ kpis.total_dabs }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Pending: <strong>{{ kpis.pending_dabs }}</strong></span>
+                    <span class="badge bg-info-subtle text-info fw-bold">+{{ kpis.dabs_period }} ({{ period.upper() }})</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-success">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Property Supply</span>
+                <h3 class="fw-bold my-2 text-dark">{{ kpis.published_props }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Total: <strong>{{ kpis.total_props }}</strong></span>
+                    <span class="badge bg-success-subtle text-success fw-bold">+{{ kpis.properties_period }} ({{ period.upper() }})</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-warning">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Active Deals</span>
+                <h3 class="fw-bold my-2 text-dark">{{ kpis.active_txs }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Completed:</span>
+                    <span class="badge bg-success fw-bold">{{ kpis.completed_txs }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-danger">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Deal Volume (NGN)</span>
+                <h4 class="fw-bold my-2 text-dark">₦{{ "%.2f"|format(kpis.total_tx_val) }}</h4>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Commission:</span>
+                    <strong class="text-danger">₦{{ "%.2f"|format(kpis.total_commission) }}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-secondary">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Reward Liability</span>
+                <h4 class="fw-bold my-2 text-dark">₦{{ "%.2f"|format(kpis.total_earned_rewards) }}</h4>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Cash Withdrawals:</span>
+                    <span class="badge bg-danger text-white">₦{{ "%.2f"|format(kpis.pending_withdrawals_sum) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 2: Management Attention & Bottleneck Alerts -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Management Attention & Operational Bottlenecks</h5>
+            <span class="badge bg-dark rounded-pill">{{ alerts|length }} Actionable Alert(s)</span>
+        </div>
+        <div class="card-body pt-0">
+            {% if alerts %}
+                <div class="row g-3">
+                    {% for alert in alerts %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-{{ alert.severity }} text-uppercase mb-1" style="font-size: 0.75rem;">{{ alert.title }}</span>
+                                    <h6 class="fw-bold mb-1 text-dark">{{ alert.count }} {{ alert.label }}</h6>
+                                    <small class="text-muted">{{ alert.description }}</small>
+                                </div>
+                                <a href="{{ alert.url }}" class="btn btn-sm btn-outline-dark rounded-pill text-nowrap ms-2">Action &rarr;</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-success border-0 rounded-3 mb-0">
+                    <i class="bi bi-check-circle-fill me-2"></i>All operational queues are clear. No pending bottlenecks require immediate management attention.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Section 3: Operational Pipeline Matrix -->
+    <div class="row g-4 mb-4">
+        <!-- Demand & Supply Pipeline -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+                <h5 class="fw-bold text-dark border-bottom pb-3 mb-3">Supply & Verification Pipeline</h5>
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Pending Direct Asset Briefs (DAB)</h6>
+                            <small class="text-muted">Awaiting intent evaluation & approval (Period Submissions: +{{ kpis.dabs_period }})</small>
+                        </div>
+                        <span class="badge bg-warning text-dark fs-6">{{ kpis.pending_dabs }}</span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Properties Under Verification</h6>
+                            <small class="text-muted">Title deeds & site verification in progress (Period Created: +{{ kpis.properties_period }})</small>
+                        </div>
+                        <span class="badge bg-info text-white fs-6">{{ kpis.unverified_props }}</span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Published Available Properties</h6>
+                            <small class="text-muted">Active marketplace listings</small>
+                        </div>
+                        <span class="badge bg-success fs-6">{{ kpis.published_props }}</span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Active Performance Guarantees</h6>
+                            <small class="text-muted">Properties under guarantee lifecycle</small>
+                        </div>
+                        <span class="badge bg-primary fs-6">{{ kpis.active_guarantees }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deal Execution & Customer Operations -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+                <h5 class="fw-bold text-dark border-bottom pb-3 mb-3">Deal Execution & Operations</h5>
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Inspection Bookings Requested</h6>
+                            <small class="text-muted">Awaiting scheduling (Period Requests: +{{ kpis.inspections_period }})</small>
+                        </div>
+                        <span class="badge bg-warning text-dark fs-6">{{ kpis.requested_inspections }}</span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Scheduled Inspections</h6>
+                            <small class="text-muted">Confirmed inspection visits</small>
+                        </div>
+                        <span class="badge bg-info text-white fs-6">{{ kpis.scheduled_inspections }}</span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Submitted Offers Awaiting Review</h6>
+                            <small class="text-muted">Buyer letters & price proposals (Period Submitted: +{{ kpis.offers_period }})</small>
+                        </div>
+                        <span class="badge bg-primary fs-6">{{ kpis.submitted_offers }}</span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Active Deal Transactions & Referrals</h6>
+                            <small class="text-muted">Transactions in progress (Period Referrals: +{{ kpis.referrals_period }})</small>
+                        </div>
+                        <span class="badge bg-danger fs-6">{{ kpis.active_txs }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 4: Governance & Superadmin Quick Actions -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 bg-light border-start border-4 border-dark">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <h5 class="fw-bold text-dark mb-1"><i class="bi bi-shield-lock-fill me-2"></i>Superadmin Governance Controls</h5>
+                <p class="text-secondary small mb-0">Manage Admin user accounts, assign Master PRD roles, perform controlled operational overrides, and review system audit logs.</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('admin_users') }}" class="btn btn-dark rounded-pill fw-bold">
+                    <i class="bi bi-people-fill me-1"></i> Admin User Governance
+                </a>
+                <a href="{{ url_for('admin_audit_logs') }}" class="btn btn-outline-dark rounded-pill fw-bold">
+                    <i class="bi bi-journal-text me-1"></i> View Audit Trail
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,14 +1,16 @@
-import os
+﻿import os
 import json
 import secrets
 import logging
 import uuid
+from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime, timedelta
 from functools import wraps
+from werkzeug.security import generate_password_hash
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from pkg import app
-from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer, Transaction, Invoice, Payment, PerformanceGuarantee, GuaranteeCycle, GuaranteeEvent, GuaranteeSettlement, BankGuaranteeReference, Mandate, TransactionDocument, Referral, ReferralReward, ReferralEvent, GoldAccount, GoldReward, GoldEvent
+from pkg.models import db, User, Role, UserRole, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer, Transaction, Invoice, Payment, PerformanceGuarantee, GuaranteeCycle, GuaranteeEvent, GuaranteeSettlement, BankGuaranteeReference, Mandate, TransactionDocument, Referral, ReferralReward, ReferralEvent, GoldAccount, GoldReward, GoldEvent
 from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification, create_user_notification
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,26 @@ SETTLEMENT_APPROVAL_ADMIN_ROLES = {
 SETTLEMENT_PAYMENT_ADMIN_ROLES = {
     'super admin', 'finance admin',
     'super_admin', 'finance_admin'
+}
+
+PROPERTY_ADMIN_ROLES = {
+    'super admin', 'property admin', 'mandate manager',
+    'super_admin', 'property_admin', 'mandate_manager'
+}
+
+COMPLIANCE_ADMIN_ROLES = {
+    'super admin', 'compliance admin', 'property admin',
+    'super_admin', 'compliance_admin', 'property_admin'
+}
+
+SUPPORT_ADMIN_ROLES = {
+    'super admin', 'customer support', 'property admin', 'mandate manager',
+    'super_admin', 'customer_support', 'property_admin', 'mandate_manager'
+}
+
+AUDIT_ADMIN_ROLES = {
+    'super admin', 'audit admin',
+    'super_admin', 'audit_admin'
 }
 
 
@@ -170,30 +192,155 @@ def has_settlement_payment_permission(user):
     return False
 
 
-def admin_required(f):
-    """
-    Decorator to enforce server-side administrator authorization.
-    Verifies that the user is logged in, active, and has is_super_admin = True.
-    """
+def user_has_any_role(user, allowed_roles_set):
+    """Helper to check if user is active and has any role in allowed_roles_set or is_super_admin."""
+    if not user or not user.is_active:
+        return False
+    if user.is_super_admin:
+        return True
+    if hasattr(user, 'user_roles') and user.user_roles:
+        for ur in user.user_roles:
+            if ur.role and ur.role.name:
+                rname = ur.role.name.strip().lower()
+                if rname in allowed_roles_set:
+                    return True
+    return False
+
+
+def finance_admin_required(f):
+    """Decorator allowing strictly Super Admin and Finance Admin for financial mutations."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
             return redirect(url_for('login', next=request.url))
-        
+
+        user = User.query.get(user_id)
+        if not user or not user_has_any_role(user, SETTLEMENT_PAYMENT_ADMIN_ROLES):
+            flash('Access denied. Financial administration privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def superadmin_required(f):
+    """Decorator requiring strictly active Superadmin status."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
         user = User.query.get(user_id)
         if not user or not user.is_active or not user.is_super_admin:
+            flash('Access denied. Superadmin privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def admin_required(f):
+    """Legacy alias for superadmin_required where strict superadmin is needed."""
+    return superadmin_required(f)
+
+
+def admin_view_required(f):
+    """Decorator allowing read-only administrative access for all 8 Master PRD roles."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
+        user = User.query.get(user_id)
+        if not user or not has_admin_permission(user):
             flash('Access denied. Administrative privileges required.', 'danger')
             return redirect(url_for('dashboard'))
-        
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def property_admin_required(f):
+    """Decorator allowing Property Admin, Mandate Manager, and Super Admin."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
+        user = User.query.get(user_id)
+        if not user or not user_has_any_role(user, PROPERTY_ADMIN_ROLES):
+            flash('Access denied. Property administration privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def compliance_admin_required(f):
+    """Decorator allowing Compliance Admin, Property Admin, and Super Admin."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
+        user = User.query.get(user_id)
+        if not user or not user_has_any_role(user, COMPLIANCE_ADMIN_ROLES):
+            flash('Access denied. Compliance administration privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def support_admin_required(f):
+    """Decorator allowing Customer Support, Property Admin, Mandate Manager, and Super Admin."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
+        user = User.query.get(user_id)
+        if not user or not user_has_any_role(user, SUPPORT_ADMIN_ROLES):
+            flash('Access denied. Customer support privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def audit_admin_required(f):
+    """Decorator allowing Audit Admin and Super Admin."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Please log in as an administrator to access the admin portal.', 'warning')
+            return redirect(url_for('login', next=request.url))
+
+        user = User.query.get(user_id)
+        if not user or not user_has_any_role(user, AUDIT_ADMIN_ROLES):
+            flash('Access denied. Audit administration privileges required.', 'danger')
+            return redirect(url_for('dashboard'))
+
         return f(*args, **kwargs)
     return decorated_function
 
 
 def transaction_admin_required(f):
     """
-    Decorator to enforce server-side authorization for the Phase 15 transaction administration route.
+    Decorator to enforce server-side authorization for transaction administration routes.
     Allows all 8 Master PRD administrative roles (and Super Admin) to view transaction records.
     """
     @wraps(f)
@@ -287,7 +434,7 @@ def get_or_create_customized_link(v_case, admin_user_id=None):
     """
     Idempotent helper to retrieve or generate a cryptographically safe tokenized
     Customized Listing Link for an approved VerificationCase (status == 'Passed').
-    
+
     Stores metadata inside VerificationCase.result_details (JSON string) and logs
     a VerificationEvent of event_type='CUSTOMIZED_LINK_GENERATED'.
     """
@@ -316,7 +463,7 @@ def get_or_create_customized_link(v_case, admin_user_id=None):
             "created_at": now.isoformat(),
             "status": "active"
         }
-        
+
         # Persist safely in result_details
         current_data = {}
         if v_case.result_details:
@@ -349,7 +496,7 @@ def get_or_create_customized_link(v_case, admin_user_id=None):
 
 
 @app.route('/admin/intents/')
-@admin_required
+@admin_view_required
 def admin_intents():
     """
     Admin Dashboard: List all submitted, approved, and declined enquiry intents (VerificationCases).
@@ -392,12 +539,12 @@ def admin_intents():
         stats=stats,
         current_status=status_filter,
         current_type=type_filter,
-        title='Admin Intent Management — Odacity'
+        title='Admin Intent Management â€” Odacity'
     )
 
 
 @app.route('/admin/intents/<int:case_id>/')
-@admin_required
+@admin_view_required
 def admin_intent_detail(case_id):
     """
     Admin Detail View: Inspect specific enquiry intent case, payload details, uploaded documents, history logs, and Customized Listing Link.
@@ -442,16 +589,16 @@ def admin_intent_detail(case_id):
         customized_url=customized_url,
         now=now,
         public_eligible_at=public_eligible_at,
-        title=f'Review Intent #{case_id} — Odacity Admin'
+        title=f'Review Intent #{case_id} â€” Odacity Admin'
     )
 
 
 @app.route('/admin/intents/<int:case_id>/approve/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_intent_approve(case_id):
     """
     State Transition: Submitted -> Passed (Intent Approved).
-    Authorized for super administrators only.
+    Authorized for property administrators and mandate managers.
     Generates Customized Listing Link and dispatches Email 2 notification upon successful commit.
     """
     v_case = VerificationCase.query.get_or_404(case_id)
@@ -459,7 +606,7 @@ def admin_intent_approve(case_id):
     if v_case.status == 'Passed':
         flash(f'Intent #{case_id} has already been approved.', 'warning')
         return redirect(url_for('admin_intents'))
-    
+
     if v_case.status == 'Failed':
         flash(f'Cannot approve Intent #{case_id} because it has already been declined.', 'danger')
         return redirect(url_for('admin_intents'))
@@ -566,7 +713,7 @@ def admin_intent_approve(case_id):
 
 
 @app.route('/admin/intents/<int:case_id>/generate-link/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_generate_customized_link(case_id):
     """
     Admin Route: Generate or retrieve the Customized Listing Link for an approved intent (status == 'Passed').
@@ -628,11 +775,11 @@ def admin_generate_customized_link(case_id):
 
 
 @app.route('/admin/intents/<int:case_id>/decline/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_intent_decline(case_id):
     """
     State Transition: Submitted -> Failed (Intent Declined).
-    Authorized for super administrators only.
+    Authorized for property administrators and mandate managers.
     Dispatches Email 2 decline notification upon successful commit.
     """
     v_case = VerificationCase.query.get_or_404(case_id)
@@ -736,10 +883,10 @@ def admin_intent_decline(case_id):
 
 
 @app.route('/admin/uploads/<path:filename>')
-@admin_required
+@admin_view_required
 def admin_serve_upload(filename):
     """
-    Secure Admin Endpoint: Serves uploaded verification documents (PDFs) to authorized super admins only.
+    Secure Admin Endpoint: Serves uploaded verification documents (PDFs) to authorized admins.
     Prevents unauthenticated or public document exposure.
     """
     upload_folder = os.path.join(app.root_path, 'static', 'uploads')
@@ -747,7 +894,7 @@ def admin_serve_upload(filename):
 
 
 @app.route('/admin/documents/<int:document_id>/verify/', methods=['POST'])
-@admin_required
+@compliance_admin_required
 def admin_verify_document(document_id):
     """
     Phase 7 Document Inspection: Verifies or rejects individual title deeds / survey documents.
@@ -829,7 +976,7 @@ def admin_verify_document(document_id):
 
 
 @app.route('/admin/media/<int:media_id>/review/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_review_media(media_id):
     """
     Phase 7 Media Review: Approves or rejects individual property photographs.
@@ -885,7 +1032,7 @@ def admin_review_media(media_id):
 
 
 @app.route('/admin/properties/<int:property_id>/verify/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_verify_property(property_id):
     """
     Phase 7 Terminal Gate: Administrative Property Verification.
@@ -1084,7 +1231,7 @@ def admin_verify_property(property_id):
 
 
 @app.route('/admin/properties/<int:property_id>/approve/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_approve_property(property_id):
     """
     Phase 8 Terminal Gate: Administrative Property Approval.
@@ -1248,7 +1395,6 @@ def admin_approve_property(property_id):
                         owner_guarantee.start_date = start_ts
                         owner_guarantee.end_date = start_ts + timedelta(days=owner_guarantee.period_days)
 
-
                         if owner_guarantee.cycle_days is not None:
                             existing_c1 = GuaranteeCycle.query.filter_by(
                                 performance_guarantee_id=owner_guarantee.guarantee_id,
@@ -1303,7 +1449,6 @@ def admin_approve_property(property_id):
 
             flash(f"Property #{property_id} ('{prop.title}') has been APPROVED successfully. Entered Private Listing (72-Hour Window). Phase 8/9 complete.", 'success')
 
-
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error approving property #{property_id}: {e}")
@@ -1315,7 +1460,7 @@ def admin_approve_property(property_id):
 
 
 @app.route('/admin/properties/<int:property_id>/update-status/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_update_property_status(property_id):
     """
     Phase 10 Administrative Property Status Transition (Sold / Unavailable).
@@ -1501,11 +1646,11 @@ def admin_update_property_status(property_id):
 
 
 # ==========================================
-# PHASE 12 — ADMIN INSPECTION MANAGEMENT
+# PHASE 12 â€” ADMIN INSPECTION MANAGEMENT
 # ==========================================
 
 @app.route('/admin/inspections/')
-@admin_required
+@admin_view_required
 def admin_inspections():
     status_filter = request.args.get('status', '').strip()
     query = Inspection.query.order_by(Inspection.requested_at.desc())
@@ -1525,7 +1670,7 @@ def admin_inspections():
 
     return render_template(
         'admin/inspections.html',
-        title='Inspection Management — Odacity Admin',
+        title='Inspection Management â€” Odacity Admin',
         inspections=inspections_list,
         counts=counts,
         active_status=status_filter
@@ -1533,7 +1678,7 @@ def admin_inspections():
 
 
 @app.route('/admin/inspections/<int:inspection_id>/schedule/', methods=['POST'])
-@admin_required
+@support_admin_required
 def admin_schedule_inspection(inspection_id):
     admin_user_id = session.get('user_id')
     insp = Inspection.query.get_or_404(inspection_id)
@@ -1610,7 +1755,7 @@ def admin_schedule_inspection(inspection_id):
 
 
 @app.route('/admin/inspections/<int:inspection_id>/complete/', methods=['POST'])
-@admin_required
+@property_admin_required
 def admin_complete_inspection(inspection_id):
     admin_user_id = session.get('user_id')
     insp = Inspection.query.get_or_404(inspection_id)
@@ -1670,7 +1815,7 @@ def admin_complete_inspection(inspection_id):
 
 
 @app.route('/admin/inspections/<int:inspection_id>/cancel/', methods=['POST'])
-@admin_required
+@support_admin_required
 def admin_cancel_inspection(inspection_id):
     admin_user_id = session.get('user_id')
     insp = Inspection.query.get_or_404(inspection_id)
@@ -1717,11 +1862,11 @@ def admin_cancel_inspection(inspection_id):
 
 
 # ==========================================
-# PHASE 13 — ADMIN OFFER MANAGEMENT & AUDIT ROUTE
+# PHASE 13 â€” ADMIN OFFER MANAGEMENT & AUDIT ROUTE
 # ==========================================
 
 @app.route('/admin/offers/')
-@admin_required
+@admin_view_required
 def admin_offers():
     status_filter = request.args.get('status', '').strip()
     query = Offer.query.order_by(Offer.submitted_at.desc())
@@ -1733,14 +1878,14 @@ def admin_offers():
 
     return render_template(
         'admin/offers.html',
-        title='Purchase Offers Audit — Odacity Admin',
+        title='Purchase Offers Audit â€” Odacity Admin',
         offers=offers,
         status_filter=status_filter
     )
 
 
 # ==========================================
-# PHASE 15 — ADMIN TRANSACTION AUDIT ROUTE
+# PHASE 15 â€” ADMIN TRANSACTION AUDIT ROUTE
 # ==========================================
 
 @app.route('/admin/transactions/')
@@ -1760,7 +1905,7 @@ def admin_transactions():
 
     return render_template(
         'admin/transactions.html',
-        title='Transactions Audit — Odacity Admin',
+        title='Transactions Audit â€” Odacity Admin',
         transactions=transactions,
         status_filter=status_filter,
         is_operational_admin=is_operational_admin
@@ -1768,17 +1913,14 @@ def admin_transactions():
 
 
 # ==========================================
-# PHASE 16 — INVOICE, PAYMENT & PROGRESS ADMIN ROUTES
+# PHASE 16 â€” INVOICE, PAYMENT & PROGRESS ADMIN ROUTES
 # ==========================================
 
 @app.route('/admin/transactions/<int:transaction_id>/generate-invoice/', methods=['POST'])
-@transaction_admin_required
+@finance_admin_required
 def admin_generate_invoice(transaction_id):
     user_id = session.get('user_id')
     user_rec = User.query.get(user_id)
-    if not user_rec or not has_phase16_operational_permission(user_rec):
-        flash('Access denied. Operational privileges required to generate invoices.', 'danger')
-        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
 
     tx = Transaction.query.get_or_404(transaction_id)
 
@@ -1846,7 +1988,7 @@ def admin_generate_invoice(transaction_id):
             user_id=buyer_user_id,
             notification_type='INVOICE_GENERATED',
             subject=f'Invoice Generated for Transaction #{tx.transaction_id}',
-            message=f'Invoice #{inv_number} for ₦{amt_due_dec:,.2f} is ready for payment.',
+            message=f'Invoice #{inv_number} for â‚¦{amt_due_dec:,.2f} is ready for payment.',
             url='/buyer/dashboard/',
             send_email=True
         )
@@ -1856,13 +1998,10 @@ def admin_generate_invoice(transaction_id):
 
 
 @app.route('/admin/transactions/<int:transaction_id>/invoices/<int:invoice_id>/record-payment/', methods=['POST'])
-@transaction_admin_required
+@finance_admin_required
 def admin_record_payment(transaction_id, invoice_id):
     user_id = session.get('user_id')
     user_rec = User.query.get(user_id)
-    if not user_rec or not has_phase16_operational_permission(user_rec):
-        flash('Access denied. Operational privileges required to record payments.', 'danger')
-        return redirect(url_for('transaction_detail', transaction_id=transaction_id))
 
     tx = Transaction.query.get_or_404(transaction_id)
     inv = Invoice.query.get_or_404(invoice_id)
@@ -1890,7 +2029,7 @@ def admin_record_payment(transaction_id, invoice_id):
     outstanding = amt_due_dec - amt_paid_dec
 
     if pay_amt > outstanding:
-        flash(f'Payment amount (₦{pay_amt:,.2f}) exceeds outstanding invoice balance (₦{outstanding:,.2f}).', 'danger')
+        flash(f'Payment amount (â‚¦{pay_amt:,.2f}) exceeds outstanding invoice balance (â‚¦{outstanding:,.2f}).', 'danger')
         return redirect(url_for('transaction_detail', transaction_id=transaction_id))
 
     if raw_ref:
@@ -1950,7 +2089,7 @@ def admin_record_payment(transaction_id, invoice_id):
     sec_event = SecurityEvent(
         user_id=user_id,
         event_type='PAYMENT_COMPLETED',
-        description=f"Payment {pay_ref} of ₦{pay_amt:,.2f} recorded for Invoice {inv.invoice_number}",
+        description=f"Payment {pay_ref} of â‚¦{pay_amt:,.2f} recorded for Invoice {inv.invoice_number}",
         ip_address=request.remote_addr,
         created_at=now
     )
@@ -1963,12 +2102,12 @@ def admin_record_payment(transaction_id, invoice_id):
             user_id=buyer_user_id,
             notification_type='PAYMENT_RECORDED',
             subject=f'Payment Confirmed for Invoice {inv.invoice_number}',
-            message=f'Payment {pay_ref} of ₦{pay_amt:,.2f} has been recorded for Invoice {inv.invoice_number}.',
+            message=f'Payment {pay_ref} of â‚¦{pay_amt:,.2f} has been recorded for Invoice {inv.invoice_number}.',
             url='/buyer/dashboard/',
             send_email=True
         )
 
-    flash(f'Payment {pay_ref} of ₦{pay_amt:,.2f} recorded successfully.', 'success')
+    flash(f'Payment {pay_ref} of â‚¦{pay_amt:,.2f} recorded successfully.', 'success')
     return redirect(url_for('transaction_detail', transaction_id=transaction_id))
 
 
@@ -2234,7 +2373,7 @@ def admin_performance():
 
     return render_template(
         'admin/performance.html',
-        title='Performance Guarantee Engine — Odacity Admin',
+        title='Performance Guarantee Engine â€” Odacity Admin',
         perf_guarantees=perf_guarantees,
         status_filter=status_filter,
         is_operational=is_operational,
@@ -2609,7 +2748,7 @@ def admin_initiate_performance_redemption(guarantee_id):
     if guarantee.cap_amount is not None:
         cap_dec = Decimal(str(guarantee.cap_amount))
         if amount > cap_dec:
-            flash(f'Settlement amount ₦{amount:,.2f} exceeds guarantee cap amount of ₦{cap_dec:,.2f}.', 'danger')
+            flash(f'Settlement amount â‚¦{amount:,.2f} exceeds guarantee cap amount of â‚¦{cap_dec:,.2f}.', 'danger')
             return redirect(url_for('admin_performance'))
 
     now = datetime.utcnow()
@@ -2629,7 +2768,7 @@ def admin_initiate_performance_redemption(guarantee_id):
     evt = GuaranteeEvent(
         performance_guarantee_id=guarantee.guarantee_id,
         event_type='Redemption_Initiated',
-        details=f'Redemption claim initiated for ₦{amount:,.2f}. Settlement ID #{settlement.id}',
+        details=f'Redemption claim initiated for â‚¦{amount:,.2f}. Settlement ID #{settlement.id}',
         occurred_at=now,
         created_at=now
     )
@@ -2650,14 +2789,14 @@ def admin_initiate_performance_redemption(guarantee_id):
     sec = SecurityEvent(
         user_id=user_id,
         event_type='GUARANTEE_REDEMPTION_INITIATED',
-        description=f'Redemption claim of ₦{amount:,.2f} initiated for Guarantee #{guarantee_id} (Settlement #{settlement.id})',
+        description=f'Redemption claim of â‚¦{amount:,.2f} initiated for Guarantee #{guarantee_id} (Settlement #{settlement.id})',
         ip_address=request.remote_addr,
         created_at=now
     )
     db.session.add(sec)
     db.session.commit()
 
-    flash(f'Redemption claim of ₦{amount:,.2f} initiated for Guarantee #{guarantee_id} (Settlement ID #{settlement.id}).', 'success')
+    flash(f'Redemption claim of â‚¦{amount:,.2f} initiated for Guarantee #{guarantee_id} (Settlement ID #{settlement.id}).', 'success')
     return redirect(url_for('admin_performance'))
 
 
@@ -2696,7 +2835,7 @@ def admin_approve_guarantee_settlement(settlement_id):
     sec = SecurityEvent(
         user_id=user_id,
         event_type='GUARANTEE_SETTLEMENT_APPROVED',
-        description=f'Guarantee Settlement #{settlement.id} (₦{settlement.amount:,.2f}) approved by user #{user_id}',
+        description=f'Guarantee Settlement #{settlement.id} (â‚¦{settlement.amount:,.2f}) approved by user #{user_id}',
         ip_address=request.remote_addr,
         created_at=now
     )
@@ -2733,7 +2872,7 @@ def admin_record_guarantee_settlement_payment(settlement_id):
     evt = GuaranteeEvent(
         performance_guarantee_id=guarantee.guarantee_id,
         event_type='Settlement_Completed',
-        details=f'Settlement #{settlement.id} payment of ₦{settlement.amount:,.2f} recorded.',
+        details=f'Settlement #{settlement.id} payment of â‚¦{settlement.amount:,.2f} recorded.',
         occurred_at=now,
         created_at=now
     )
@@ -2780,31 +2919,25 @@ def admin_record_guarantee_settlement_payment(settlement_id):
     sec = SecurityEvent(
         user_id=user_id,
         event_type='GUARANTEE_SETTLEMENT_COMPLETED',
-        description=f'Settlement #{settlement.id} payment of ₦{settlement.amount:,.2f} recorded for Guarantee #{guarantee.guarantee_id}. New guarantee status: {guarantee.status}',
+        description=f'Settlement #{settlement.id} payment of â‚¦{settlement.amount:,.2f} recorded for Guarantee #{guarantee.guarantee_id}. New guarantee status: {guarantee.status}',
         ip_address=request.remote_addr,
         created_at=now
     )
     db.session.add(sec)
     db.session.commit()
 
-    flash(f'Settlement #{settlement_id} payment of ₦{settlement.amount:,.2f} recorded successfully. Guarantee status updated to {guarantee.status}.', 'success')
+    flash(f'Settlement #{settlement_id} payment of â‚¦{settlement.amount:,.2f} recorded successfully. Guarantee status updated to {guarantee.status}.', 'success')
     return redirect(url_for('admin_performance'))
 
 
 # ==========================================
-# PHASE 20 — REFERRALS ADMIN CONTROL ROUTE
+# PHASE 20 â€” REFERRALS ADMIN CONTROL ROUTE
 # ==========================================
 @app.route('/admin/referrals/', methods=['GET'])
+@admin_view_required
 def admin_referrals():
     user_id = session.get('user_id')
-    if not user_id:
-        flash('Please login to access admin features.', 'danger')
-        return redirect(url_for('login'))
-
-    user_rec = User.query.get(user_id)
-    if not user_rec or not has_admin_permission(user_rec):
-        flash('Access denied. Administrative privileges required.', 'danger')
-        return redirect(url_for('admin_dashboard'))
+    user_rec = User.query.get(user_id) if user_id else None
 
     status_filter = request.args.get('status', 'all').strip()
 
@@ -2819,12 +2952,11 @@ def admin_referrals():
     qualified_count = Referral.query.filter_by(status='Qualified').count()
     completed_count = Referral.query.filter_by(status='Completed').count()
 
-    total_rewards = ReferralReward.query.all()
-    total_reward_sum = sum(float(r.reward_amount or 0.0) for r in total_rewards if r.reward_amount)
+    total_reward_sum = db.session.query(func.sum(ReferralReward.reward_amount)).scalar() or 0.0
 
     return render_template(
         'admin/referrals.html',
-        title='Referrals Audit & Governance — Odacity Admin',
+        title='Referrals Audit & Governance â€” Odacity Admin',
         referrals=referrals,
         status_filter=status_filter,
         total_referrals=total_referrals,
@@ -2833,4 +2965,576 @@ def admin_referrals():
         completed_count=completed_count,
         total_reward_sum=total_reward_sum,
         user=user_rec
+    )
+
+
+# ==========================================
+# PHASE 24 â€” SUPERADMIN COMMAND CENTRE & BI
+# ==========================================
+@app.route('/admin/', methods=['GET'])
+@superadmin_required
+def admin_command_centre():
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id) if user_id else None
+
+    period = request.args.get('period', '30d').strip().lower()
+    now = datetime.utcnow()
+
+    if period == '7d':
+        start_date = now - timedelta(days=7)
+    elif period == '90d':
+        start_date = now - timedelta(days=90)
+    elif period == '12m':
+        start_date = now - timedelta(days=365)
+    elif period == 'all':
+        start_date = None
+    else:  # 30d default
+        period = '30d'
+        start_date = now - timedelta(days=30)
+
+    # 1. User KPIs
+    total_users = User.query.count()
+    active_users = User.query.filter_by(is_active=True).count()
+    if start_date:
+        new_users = User.query.filter(User.created_at >= start_date).count()
+    else:
+        new_users = total_users
+
+    # Count admin users (superadmin flag or assigned admin roles)
+    admin_users_count = User.query.filter((User.is_super_admin == True) | (User.user_roles.any())).count()
+
+    # 2. DAB KPIs (Preserve lifetime total & current pending state; add period submission count)
+    total_dabs = DirectAssetBrief.query.count()
+    pending_dabs = DirectAssetBrief.query.filter(DirectAssetBrief.status.in_(['Submitted', 'Under Verification'])).count()
+    approved_dabs = DirectAssetBrief.query.filter_by(status='Approved').count()
+
+    dab_sub_q = DirectAssetBrief.query.filter(DirectAssetBrief.submitted_at.isnot(None))
+    if start_date:
+        dab_sub_q = dab_sub_q.filter(DirectAssetBrief.submitted_at >= start_date)
+    dabs_period = dab_sub_q.count()
+
+    # 3. Property KPIs (Preserve lifetime total & current supply state; add period creation activity)
+    total_properties = Property.query.count()
+    unverified_properties = Property.query.filter_by(publication_status='Under Verification').count()
+    available_properties = Property.query.filter_by(publication_status='Available').count()
+    reserved_properties = Property.query.filter_by(publication_status='Reserved').count()
+
+    prop_act_q = Property.query
+    if start_date:
+        prop_act_q = prop_act_q.filter(Property.created_at >= start_date)
+    properties_period = prop_act_q.count()
+
+    # 4. Transaction KPIs
+    # F-24-03 FIX: Active transactions exclude both Completion and Cancelled
+    active_transactions = Transaction.query.filter(~Transaction.status.in_(['Completion', 'Cancelled'])).count()
+
+    # F-24-04 FIX: Timeframe-scoped completed deal volume and commission
+    completed_tx_query = Transaction.query.filter_by(status='Completion')
+    val_query = db.session.query(func.sum(Transaction.transaction_value)).filter(Transaction.status == 'Completion')
+    comm_query = db.session.query(func.sum(Transaction.odacity_commission_amount)).filter(Transaction.status == 'Completion')
+
+    if start_date:
+        completed_tx_query = completed_tx_query.filter(Transaction.created_at >= start_date)
+        val_query = val_query.filter(Transaction.created_at >= start_date)
+        comm_query = comm_query.filter(Transaction.created_at >= start_date)
+
+    completed_transactions = completed_tx_query.count()
+    val_sum = val_query.scalar()
+    total_volume = float(val_sum) if val_sum else 0.0
+
+    comm_sum = comm_query.scalar()
+    total_commission = float(comm_sum) if comm_sum else 0.0
+
+    # 5. Inspection KPIs (Preserve current queue state; add period request activity)
+    requested_inspections = Inspection.query.filter_by(status='Requested').count()
+    scheduled_inspections = Inspection.query.filter_by(status='Scheduled').count()
+
+    insp_act_q = Inspection.query.filter(Inspection.requested_at.isnot(None))
+    if start_date:
+        insp_act_q = insp_act_q.filter(Inspection.requested_at >= start_date)
+    inspections_period = insp_act_q.count()
+
+    # 6. Offer KPIs (Preserve current queue state; add period submission activity)
+    submitted_offers = Offer.query.filter(Offer.status.in_(['Submitted', 'Under_Review'])).count()
+
+    offer_act_q = Offer.query.filter(Offer.submitted_at.isnot(None))
+    if start_date:
+        offer_act_q = offer_act_q.filter(Offer.submitted_at >= start_date)
+    offers_period = offer_act_q.count()
+
+    # 7. Performance Guarantees
+    active_guarantees = PerformanceGuarantee.query.filter_by(status='Active').count()
+
+    # 8. Financial Liabilities & Referrals
+    # F-24-04 FIX: Timeframe-scoped earned referral rewards & referral creation activity when start_date is set
+    rew_query = db.session.query(func.sum(ReferralReward.reward_amount)).filter_by(status='Earned')
+    ref_act_q = Referral.query
+    if start_date:
+        rew_query = rew_query.filter(ReferralReward.created_at >= start_date)
+        ref_act_q = ref_act_q.filter(Referral.created_at >= start_date)
+
+    rew_sum = rew_query.scalar()
+    total_referral_rewards = float(rew_sum) if rew_sum else 0.0
+    referrals_period = ref_act_q.count()
+
+    w_sum = db.session.query(func.sum(GoldReward.amount)).filter_by(reward_type='Withdrawal_Cash', status='Pending').scalar()
+    pending_withdrawals_sum = float(w_sum) if w_sum else 0.0
+    pending_withdrawals_count = GoldReward.query.filter_by(reward_type='Withdrawal_Cash', status='Pending').count()
+
+    # F-24-02 FIX: Outstanding/overdue invoices filter by supported statuses (Issued, Partially_Paid, Overdue)
+    overdue_invoices_count = Invoice.query.filter(Invoice.status.in_(['Issued', 'Partially_Paid', 'Overdue'])).count()
+
+    # Build KPIs Dict for Template
+    kpis = {
+        'total_users': total_users,
+        'active_users': active_users,
+        'new_users_period': new_users,
+        'admin_users_count': admin_users_count,
+        'total_dabs': total_dabs,
+        'pending_dabs': pending_dabs,
+        'approved_dabs': approved_dabs,
+        'dabs_period': dabs_period,
+        'total_props': total_properties,
+        'unverified_props': unverified_properties,
+        'published_props': available_properties,
+        'reserved_props': reserved_properties,
+        'properties_period': properties_period,
+        'active_txs': active_transactions,
+        'completed_txs': completed_transactions,
+        'total_tx_val': total_volume,
+        'total_commission': total_commission,
+        'requested_inspections': requested_inspections,
+        'scheduled_inspections': scheduled_inspections,
+        'inspections_period': inspections_period,
+        'submitted_offers': submitted_offers,
+        'offers_period': offers_period,
+        'active_guarantees': active_guarantees,
+        'total_earned_rewards': total_referral_rewards,
+        'referrals_period': referrals_period,
+        'pending_withdrawals_sum': pending_withdrawals_sum,
+        'pending_withdrawals_count': pending_withdrawals_count,
+        'overdue_invoices_count': overdue_invoices_count,
+    }
+
+    # Management Attention Alerts Array
+    alerts = []
+    if pending_dabs > 0:
+        alerts.append({
+            'severity': 'warning',
+            'title': 'DAB Review Bottleneck',
+            'count': pending_dabs,
+            'label': 'DAB(s) Pending Review',
+            'description': 'Direct Asset Briefs submitted by users requiring verification.',
+            'url': url_for('admin_intents')
+        })
+    if unverified_properties > 0:
+        alerts.append({
+            'severity': 'warning',
+            'title': 'Unverified Property Supply',
+            'count': unverified_properties,
+            'label': 'Property(ies) Unverified',
+            'description': 'Listings pending compliance verification before publication.',
+            'url': url_for('admin_intents')
+        })
+    if requested_inspections > 0:
+        alerts.append({
+            'severity': 'info',
+            'title': 'Requested Inspections',
+            'count': requested_inspections,
+            'label': 'Inspection(s) Requested',
+            'description': 'Customer booking requests awaiting visit scheduling.',
+            'url': url_for('admin_inspections')
+        })
+    if submitted_offers > 0:
+        alerts.append({
+            'severity': 'primary',
+            'title': 'Submitted Offers Queue',
+            'count': submitted_offers,
+            'label': 'Offer(s) Pending Review',
+            'description': 'Buyer property offers awaiting evaluation.',
+            'url': url_for('admin_offers')
+        })
+    if pending_withdrawals_count > 0:
+        alerts.append({
+            'severity': 'danger',
+            'title': 'Outstanding Cash Withdrawals',
+            'count': pending_withdrawals_count,
+            'label': f'Withdrawal Request(s) (â‚¦{pending_withdrawals_sum:,.2f})',
+            'description': 'Pending cash reward redemptions requiring finance action.',
+            'url': url_for('admin_referrals')
+        })
+    if overdue_invoices_count > 0:
+        alerts.append({
+            'severity': 'warning',
+            'title': 'Unpaid / Overdue Invoices',
+            'count': overdue_invoices_count,
+            'label': 'Unpaid Invoice(s)',
+            'description': 'Transaction invoices currently outstanding.',
+            'url': url_for('admin_transactions')
+        })
+
+    return render_template(
+        'admin/command_centre.html',
+        title='Superadmin Command Centre & BI â€” Odacity Admin',
+        user=user_rec,
+        period=period,
+        kpis=kpis,
+        alerts=alerts
+    )
+
+
+# ==========================================
+# PHASE 24 â€” ADMIN GOVERNANCE & USERS
+# ==========================================
+@app.route('/admin/users/', methods=['GET'])
+@superadmin_required
+def admin_users():
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id) if user_id else None
+
+    users = User.query.order_by(User.created_at.desc()).all()
+    roles = Role.query.order_by(Role.name).all()
+
+    return render_template(
+        'admin/users.html',
+        title='Admin Governance & Access Control â€” Odacity Admin',
+        users=users,
+        roles=roles,
+        user=user_rec
+    )
+
+
+@app.route('/admin/users/create/', methods=['POST'])
+@superadmin_required
+def admin_user_create():
+    acting_user_id = session.get('user_id')
+
+    full_name = request.form.get('full_name', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    phone = request.form.get('phone', '').strip()
+    password = request.form.get('password', '')
+    role_id = request.form.get('role_id')
+
+    if not full_name or not email or not password:
+        flash('Full Name, Email, and Password are required.', 'danger')
+        return redirect(url_for('admin_users'))
+
+    existing_user = User.query.filter_by(email=email).first()
+    if existing_user:
+        flash(f'An account with email {email} already exists.', 'warning')
+        return redirect(url_for('admin_users'))
+
+    pw_hash = generate_password_hash(password)
+
+    # Check if target role is Super Admin
+    is_super = False
+    target_role = None
+    if role_id:
+        target_role = Role.query.get(int(role_id))
+        if target_role and target_role.name.strip().lower() in ('super admin', 'super_admin'):
+            is_super = True
+
+    new_user = User(
+        email=email,
+        password_hash=pw_hash,
+        full_name=full_name,
+        phone=phone or None,
+        is_active=True,
+        is_super_admin=is_super,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(new_user)
+    db.session.flush()
+
+    if target_role:
+        user_role = UserRole(
+            user_id=new_user.user_id,
+            role_id=target_role.role_id,
+            assigned_at=datetime.utcnow()
+        )
+        db.session.add(user_role)
+
+    # Log Audit Entry
+    audit = AuditLog(
+        user_id=acting_user_id,
+        action='USER_CREATE',
+        entity_type='User',
+        entity_id=new_user.user_id,
+        new_values=json.dumps({
+            'full_name': full_name,
+            'email': email,
+            'role': target_role.name if target_role else 'None',
+            'is_super_admin': is_super
+        }),
+        created_at=datetime.utcnow()
+    )
+    db.session.add(audit)
+    db.session.commit()
+
+    flash(f'Admin user "{full_name}" created successfully.', 'success')
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/users/<int:user_id>/toggle-active/', methods=['POST'])
+@superadmin_required
+def admin_user_toggle_active(user_id):
+    acting_user_id = session.get('user_id')
+
+    if acting_user_id == user_id:
+        flash('Action prohibited: You cannot deactivate your own active session account.', 'danger')
+        return redirect(url_for('admin_users'))
+
+    target_user = User.query.get_or_404(user_id)
+
+    # Superadmin protection guard
+    if target_user.is_super_admin:
+        acting_user = User.query.get(acting_user_id)
+        if not acting_user or not acting_user.is_super_admin:
+            flash('Action prohibited: Non-Superadmins cannot deactivate a Superadmin account.', 'danger')
+            return redirect(url_for('admin_users'))
+
+    old_status = target_user.is_active
+    target_user.is_active = not old_status
+
+    audit = AuditLog(
+        user_id=acting_user_id,
+        action='USER_TOGGLE_ACTIVE',
+        entity_type='User',
+        entity_id=target_user.user_id,
+        previous_values=json.dumps({'is_active': old_status}),
+        new_values=json.dumps({'is_active': target_user.is_active}),
+        created_at=datetime.utcnow()
+    )
+    db.session.add(audit)
+    db.session.commit()
+
+    status_str = 'activated' if target_user.is_active else 'deactivated'
+    flash(f'User "{target_user.full_name or target_user.email}" has been {status_str}.', 'success')
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/users/<int:user_id>/assign-role/', methods=['POST'])
+@superadmin_required
+def admin_user_assign_role(user_id):
+    acting_user_id = session.get('user_id')
+
+    if acting_user_id == user_id:
+        flash('Action prohibited: You cannot modify roles on your own active session account.', 'danger')
+        return redirect(url_for('admin_users'))
+
+    target_user = User.query.get_or_404(user_id)
+    acting_user = User.query.get(acting_user_id)
+
+    role_id_str = request.form.get('role_id')
+    if not role_id_str:
+        flash('Please select a valid role to assign.', 'warning')
+        return redirect(url_for('admin_users'))
+
+    role = Role.query.get_or_404(int(role_id_str))
+    role_name_clean = role.name.strip().lower()
+
+    # Guard: non-superadmin cannot assign superadmin role
+    if role_name_clean in ('super admin', 'super_admin') and (not acting_user or not acting_user.is_super_admin):
+        flash('Action prohibited: Only active Superadmins can assign the Super Admin role.', 'danger')
+        return redirect(url_for('admin_users'))
+
+    # F-24-06 FIX: Preserve existing role assignments for multi-role architecture
+    existing_user_roles = UserRole.query.filter_by(user_id=target_user.user_id).all()
+    old_roles = [ur.role.name for ur in existing_user_roles if ur.role]
+    existing_role_ids = {ur.role_id for ur in existing_user_roles}
+
+    if role.role_id not in existing_role_ids:
+        new_user_role = UserRole(
+            user_id=target_user.user_id,
+            role_id=role.role_id,
+            assigned_at=datetime.utcnow()
+        )
+        db.session.add(new_user_role)
+
+    # Maintain is_super_admin consistency
+    if role_name_clean in ('super admin', 'super_admin') or target_user.is_super_admin:
+        target_user.is_super_admin = True
+
+    audit = AuditLog(
+        user_id=acting_user_id,
+        action='USER_ROLE_ASSIGN',
+        entity_type='User',
+        entity_id=target_user.user_id,
+        previous_values=json.dumps({'assigned_roles': old_roles}),
+        new_values=json.dumps({'role_id': role.role_id, 'role_name': role.name, 'is_super_admin': target_user.is_super_admin}),
+        created_at=datetime.utcnow()
+    )
+    db.session.add(audit)
+    db.session.commit()
+
+    flash(f'Role "{role.name}" assigned to "{target_user.full_name or target_user.email}" successfully.', 'success')
+    return redirect(url_for('admin_users'))
+
+
+# ==========================================
+# PHASE 24 â€” CONTROLLED OVERRIDE ENGINE
+# ==========================================
+ALLOWED_RAW_OVERRIDE_TRANSITIONS = {
+    'dab': {
+        'Submitted': ['Under Verification'],
+        'Rejected': ['Under Verification']
+    },
+    'property': {
+        'Submitted': ['Under Verification'],
+        'Under Verification': ['Archived'],
+        'Available': ['Archived', 'Under Verification']
+    },
+    'inspection': {
+        'Requested': ['Cancelled'],
+        'Scheduled': ['Cancelled']
+    },
+    'transaction': {
+        'Initiated': ['Cancelled'],
+        'Mandate': ['Cancelled'],
+        'Terms_Accepted': ['Cancelled'],
+        'Inspection': ['Cancelled'],
+        'Offer': ['Cancelled'],
+        'Payment': ['Cancelled'],
+        'Documentation': ['Cancelled']
+    }
+}
+
+
+@app.route('/admin/override/<string:entity_type>/<int:entity_id>/', methods=['POST'])
+@superadmin_required
+def admin_controlled_override(entity_type, entity_id):
+    acting_user_id = session.get('user_id')
+
+    target_status = request.form.get('target_status', '').strip()
+    override_reason = request.form.get('override_reason', '').strip()
+
+    if not override_reason:
+        flash('Override failed: A mandatory operational justification/reason must be provided.', 'danger')
+        return redirect(request.referrer or url_for('admin_command_centre'))
+
+    if not target_status:
+        flash('Override failed: Target status is required.', 'danger')
+        return redirect(request.referrer or url_for('admin_command_centre'))
+
+    entity_type_clean = entity_type.strip().lower()
+    if entity_type_clean not in ALLOWED_RAW_OVERRIDE_TRANSITIONS:
+        flash(f'Invalid entity type "{entity_type}" for controlled override.', 'danger')
+        return redirect(url_for('admin_command_centre'))
+
+    # Fetch Entity & Current Status
+    if entity_type_clean == 'dab':
+        item = DirectAssetBrief.query.get_or_404(entity_id)
+        old_status = item.status or 'Draft'
+        entity_name = f'DAB #{item.dab_id}'
+    elif entity_type_clean == 'property':
+        item = Property.query.get_or_404(entity_id)
+        old_status = item.publication_status or 'Draft'
+        entity_name = f'Property #{item.property_id}'
+    elif entity_type_clean == 'inspection':
+        item = Inspection.query.get_or_404(entity_id)
+        old_status = item.status or 'Requested'
+        entity_name = f'Inspection #{item.inspection_id}'
+    elif entity_type_clean == 'transaction':
+        item = Transaction.query.get_or_404(entity_id)
+        old_status = item.status or 'Initiated'
+        entity_name = f'Transaction #{item.transaction_id}'
+
+    # Validate Transition Matrix
+    allowed_targets = ALLOWED_RAW_OVERRIDE_TRANSITIONS[entity_type_clean].get(old_status, [])
+    if target_status not in allowed_targets:
+        flash(f'Override failed: Transitioning {entity_name} from "{old_status}" to "{target_status}" via raw override is prohibited.', 'danger')
+        return redirect(request.referrer or url_for('admin_command_centre'))
+
+    # Execute Validated Raw State Mutation
+    now = datetime.utcnow()
+    if entity_type_clean == 'property':
+        item.publication_status = target_status
+    else:
+        item.status = target_status
+
+    # Audit Trail (Logged strictly on successful validation and mutation)
+    audit = AuditLog(
+        user_id=acting_user_id,
+        action='CONTROLLED_OVERRIDE',
+        entity_type=entity_type_clean.upper(),
+        entity_id=entity_id,
+        previous_values=json.dumps({'status': old_status}),
+        new_values=json.dumps({
+            'status': target_status,
+            'override_reason': override_reason
+        }),
+        created_at=now
+    )
+    db.session.add(audit)
+    db.session.commit()
+
+    flash(f'Controlled override executed for {entity_name}: Status updated from "{old_status}" to "{target_status}". Reason: {override_reason}', 'success')
+    return redirect(request.referrer or url_for('admin_command_centre'))
+
+
+# ==========================================
+# PHASE 24 â€” AUDIT LOG VIEWER
+# ==========================================
+@app.route('/admin/audit-logs/', methods=['GET'])
+@audit_admin_required
+def admin_audit_logs():
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id) if user_id else None
+
+    period = request.args.get('period', '30d').strip().lower()
+    selected_action = request.args.get('action', 'all').strip()
+    selected_entity_type = request.args.get('entity_type', 'all').strip()
+    selected_admin_id = request.args.get('admin_id', 'all').strip()
+    page = request.args.get('page', 1, type=int)
+
+    query = AuditLog.query
+
+    now = datetime.utcnow()
+    if period == '7d':
+        query = query.filter(AuditLog.created_at >= now - timedelta(days=7))
+    elif period == '90d':
+        query = query.filter(AuditLog.created_at >= now - timedelta(days=90))
+    elif period == 'all':
+        pass
+    else:  # 30d default
+        period = '30d'
+        query = query.filter(AuditLog.created_at >= now - timedelta(days=30))
+
+    if selected_action and selected_action != 'all':
+        query = query.filter(AuditLog.action.ilike(f"%{selected_action}%"))
+
+    if selected_entity_type and selected_entity_type != 'all':
+        query = query.filter(AuditLog.entity_type.ilike(f"%{selected_entity_type}%"))
+
+    if selected_admin_id and selected_admin_id != 'all':
+        try:
+            query = query.filter(AuditLog.user_id == int(selected_admin_id))
+        except ValueError:
+            pass
+
+    query = query.order_by(AuditLog.created_at.desc())
+    pagination = query.paginate(page=page, per_page=25, error_out=False)
+    audit_logs = pagination.items
+
+    actions = [row[0] for row in db.session.query(AuditLog.action).distinct().all() if row[0]]
+    actions.sort()
+
+    entity_types = [row[0] for row in db.session.query(AuditLog.entity_type).distinct().all() if row[0]]
+    entity_types.sort()
+
+    admin_users = User.query.filter((User.is_super_admin == True) | (User.user_roles.any())).order_by(User.full_name).all()
+
+    return render_template(
+        'admin/audit_logs.html',
+        title='Audit Log Viewer â€” Odacity Admin',
+        user=user_rec,
+        audit_logs=audit_logs,
+        pagination=pagination,
+        actions=actions,
+        entity_types=entity_types,
+        admin_users=admin_users,
+        period=period,
+        selected_action=selected_action,
+        selected_entity_type=selected_entity_type,
+        selected_admin_id=selected_admin_id
     )
