@@ -3679,15 +3679,47 @@ def notifications():
     user = User.query.get_or_404(user_id)
     notifs = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
 
-    # Mark unread notifications as read
-    unread_notifs = [n for n in notifs if not n.is_read]
+    return render_template('user/notifications.html', title='My Notifications — ODACITY', user=user, notifications=notifs)
+
+
+@app.route('/notifications/<int:notification_id>/read/', methods=['POST'])
+def mark_notification_read(notification_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to manage your notifications.', 'warning')
+        return redirect(url_for('login', next=url_for('notifications')))
+
+    # Mandatory IDOR Ownership Verification
+    notif = Notification.query.filter_by(notification_id=notification_id, user_id=user_id).first_or_404()
+
+    if not notif.is_read:
+        notif.is_read = True
+        notif.read_at = datetime.utcnow()
+        db.session.commit()
+        flash('Notification marked as read.', 'success')
+
+    return redirect(url_for('notifications'))
+
+
+@app.route('/notifications/read-all/', methods=['POST'])
+def mark_all_notifications_read():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to manage your notifications.', 'warning')
+        return redirect(url_for('login', next=url_for('notifications')))
+
+    unread_notifs = Notification.query.filter_by(user_id=user_id, is_read=False).all()
     if unread_notifs:
+        now = datetime.utcnow()
         for n in unread_notifs:
             n.is_read = True
-            n.read_at = datetime.utcnow()
+            n.read_at = now
         db.session.commit()
+        flash(f'All {len(unread_notifs)} notification(s) marked as read.', 'success')
+    else:
+        flash('All notifications are already marked as read.', 'info')
 
-    return render_template('user/notifications.html', title='My Notifications — ODACITY', user=user, notifications=notifs)
+    return redirect(url_for('notifications'))
 
 
 @app.route('/onboarding/customized-listing/<token>/')
