@@ -54,8 +54,8 @@ PROPERTY_ADMIN_ROLES = {
 }
 
 COMPLIANCE_ADMIN_ROLES = {
-    'super admin', 'compliance admin', 'property admin',
-    'super_admin', 'compliance_admin', 'property_admin'
+    'super admin', 'compliance admin',
+    'super_admin', 'compliance_admin'
 }
 
 SUPPORT_ADMIN_ROLES = {
@@ -285,7 +285,7 @@ def property_admin_required(f):
 
 
 def compliance_admin_required(f):
-    """Decorator allowing Compliance Admin, Property Admin, and Super Admin."""
+    """Decorator allowing strictly Compliance Admin and Super Admin for legal document verification."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user_id = session.get('user_id')
@@ -907,6 +907,13 @@ def admin_verify_document(document_id):
     v_case = VerificationCase.query.filter_by(dab_id=dab.dab_id).first() if dab else None
     case_id = v_case.verification_case_id if v_case else None
 
+    # G-25-02 Lock Enforcement: Prevent re-verification/mutation of locked verified document
+    if doc.locked_at:
+        flash(f"Document '{doc.document_type}' for Property #{prop.property_id if prop else document_id} is verified and locked against further modification.", 'warning')
+        if case_id:
+            return redirect(url_for('admin_intent_detail', case_id=case_id))
+        return redirect(url_for('admin_intents'))
+
     action = request.form.get('action', 'verify').lower()
     notes = request.form.get('notes', '').strip()
     rejection_reason = request.form.get('rejection_reason', '').strip()
@@ -919,6 +926,7 @@ def admin_verify_document(document_id):
             doc.review_status = 'Verified'
             doc.verified_at = now
             doc.verified_by_user_id = admin_user_id
+            doc.locked_at = now
             if notes:
                 doc.notes = notes
             flash(f"Document '{doc.document_type}' for Property #{prop.property_id} has been VERIFIED.", 'success')
@@ -1018,6 +1026,15 @@ def admin_review_media(media_id):
             created_at=now
         )
         db.session.add(audit_entry)
+
+        sec_event = SecurityEvent(
+            user_id=admin_user_id,
+            event_type='PROPERTY_MEDIA_REVIEWED',
+            description=f"Property photo #{med.media_id} quality reviewed ({action}) by admin #{admin_user_id}",
+            ip_address=request.remote_addr,
+            created_at=now
+        )
+        db.session.add(sec_event)
 
         db.session.commit()
 
