@@ -22,12 +22,14 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm mb-4">
                 {% set approved_media = property.media | selectattr('review_status', 'equalto', 'Approved') | list %}
-                {% if approved_media %}
-                    {% set primary_media = approved_media | selectattr('is_primary', 'equalto', true) | first or approved_media[0] %}
-                    <img src="{{ primary_media.file_path if (primary_media.file_path.startswith('/') or primary_media.file_path.startswith('http')) else url_for('static', filename=primary_media.file_path) }}" class="card-img-top rounded-top" alt="{{ primary_media.alt_text or property.title }}" style="max-height: 420px; object-fit: cover;">
-                {% else %}
-                    <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top rounded-top" alt="{{ property.title }}" style="max-height: 420px; object-fit: cover;">
-                {% endif %}
+                <div class="position-relative overflow-hidden rounded-top" style="aspect-ratio: 16/9; max-height: 420px; background-color: #f1f5f9;">
+                    {% if approved_media %}
+                        {% set primary_media = approved_media | selectattr('is_primary', 'equalto', true) | first or approved_media[0] %}
+                        <img src="{{ primary_media | property_image_url('hero') }}" class="card-img-top rounded-top w-100 h-100" alt="{{ primary_media.alt_text or property.title }}" style="max-height: 420px; object-fit: cover; aspect-ratio: 16/9;" decoding="async" fetchpriority="high">
+                    {% else %}
+                        <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top rounded-top w-100 h-100" alt="{{ property.title }}" style="max-height: 420px; object-fit: cover; aspect-ratio: 16/9;" decoding="async">
+                    {% endif %}
+                </div>
 
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -82,7 +84,9 @@
                     <div class="row g-2">
                         {% for media_item in approved_media %}
                             <div class="col-4 col-md-3">
-                                <img src="{{ media_item.file_path if (media_item.file_path.startswith('/') or media_item.file_path.startswith('http')) else url_for('static', filename=media_item.file_path) }}" class="img-thumbnail rounded" alt="{{ media_item.alt_text or property.title }}" style="height: 100px; width: 100%; object-fit: cover;">
+                                <div class="overflow-hidden rounded border" style="aspect-ratio: 4/3; height: 100px; background-color: #f8fafc;">
+                                    <img src="{{ media_item | property_image_url('thumb') }}" class="img-thumbnail rounded border-0 w-100 h-100" alt="{{ media_item.alt_text or property.title }}" style="height: 100px; width: 100%; object-fit: cover; aspect-ratio: 4/3;" loading="lazy" decoding="async">
+                                </div>
                             </div>
                         {% endfor %}
                     </div>
@@ -164,6 +168,28 @@
                             <form method="POST" action="{{ url_for('save_property', property_id=property.property_id) }}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-danger w-100 fw-bold">❤️ Save Property to Favorites</button>
+                            </form>
+                        {% endif %}
+                    </div>
+
+                    <!-- PROPERTY GOAL ACTION -->
+                    <div class="mb-3">
+                        {% if is_current_goal %}
+                            <div class="alert alert-dark py-2 small mb-2 text-center border-danger">
+                                <i class="bi bi-flag-fill text-danger me-1"></i> <strong>Current Property Goal</strong>
+                            </div>
+                            <form method="POST" action="{{ url_for('remove_property_goal') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm w-100 fw-bold">
+                                    <i class="bi bi-x-circle me-1"></i> Remove Goal
+                                </button>
+                            </form>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('set_property_goal', property_id=property.property_id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-dark w-100 fw-bold">
+                                    <i class="bi bi-flag-fill text-danger me-1"></i> Set as Property Goal
+                                </button>
                             </form>
                         {% endif %}
                     </div>

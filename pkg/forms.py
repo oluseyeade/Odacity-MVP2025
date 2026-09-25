@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileRequired
-from wtforms import StringField, PasswordField, EmailField, SubmitField, DateField, SelectField, TextAreaField, DecimalField, BooleanField
+from wtforms import StringField, PasswordField, EmailField, SubmitField, DateField, SelectField, TextAreaField, DecimalField, BooleanField, MultipleFileField
 from wtforms.validators import DataRequired, Email, Optional
 
 class RegisterForm(FlaskForm):
@@ -213,6 +213,9 @@ class ControlledPropertySubmissionForm(FlaskForm):
     price = DecimalField("Asking Price / Budget (NGN)", validators=[DataRequired(message="Asking price is required.")])
 
     # SECTION D — PROPERTY PHOTOS / MEDIA
+    property_photos = MultipleFileField("Property Photographs (JPG, JPEG, PNG, max 20 images)", validators=[
+        FileAllowed(['jpg', 'png', 'jpeg'], message="Accepted image formats: JPG, PNG, JPEG")
+    ])
     primary_photo = FileField("Primary Property Photograph", validators=[
         FileAllowed(['jpg', 'png', 'jpeg'], message="Accepted image formats: JPG, PNG, JPEG")
     ])

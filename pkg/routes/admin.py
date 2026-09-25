@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from pkg import app
-from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer, Transaction, Invoice, Payment, PerformanceGuarantee, GuaranteeCycle, GuaranteeEvent, GuaranteeSettlement, BankGuaranteeReference, Mandate, TransactionDocument
-from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification
+from pkg.models import db, User, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer, Transaction, Invoice, Payment, PerformanceGuarantee, GuaranteeCycle, GuaranteeEvent, GuaranteeSettlement, BankGuaranteeReference, Mandate, TransactionDocument, Referral, ReferralReward, ReferralEvent, GoldAccount, GoldReward, GoldEvent
+from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification, create_user_notification
 
 logger = logging.getLogger(__name__)
 
@@ -531,7 +531,7 @@ def admin_intent_approve(case_id):
         db.session.commit()
         logger.info(f"[Intent Approval] Successfully approved VerificationCase #{v_case.verification_case_id} by Admin #{admin_user_id}")
 
-        # 7. Dispatch Email 2 (ONLY AFTER SUCCESSFUL COMMIT)
+        # 7. Dispatch Email 2 (ONLY AFTER SUCCESSFUL COMMIT) & In-App Notification
         email, full_name = extract_contact_info(v_case)
         if email:
             try:
@@ -543,6 +543,17 @@ def admin_intent_approve(case_id):
                 )
             except Exception as e:
                 logger.warning(f"Failed to dispatch Email 2 notification for case #{case_id}: {e}")
+
+            target_user = User.query.filter_by(email=email).first()
+            if target_user:
+                create_user_notification(
+                    user_id=target_user.user_id,
+                    notification_type='INTENT_APPROVED',
+                    subject='Enquiry Intent Approved',
+                    message=f'Your {get_entity_display_name(v_case.entity_type)} enquiry intent has been approved.',
+                    url=link_url,
+                    send_email=False
+                )
 
         flash(f'Intent #{case_id} ({get_entity_display_name(v_case.entity_type)}) has been APPROVED successfully. Customized Listing Link created and notification sent.', 'success')
 
@@ -702,6 +713,17 @@ def admin_intent_decline(case_id):
                 )
             except Exception as e:
                 logger.warning(f"Failed to dispatch Email 2 decline notification for case #{case_id}: {e}")
+
+            target_user = User.query.filter_by(email=email).first()
+            if target_user:
+                create_user_notification(
+                    user_id=target_user.user_id,
+                    notification_type='INTENT_DECLINED',
+                    subject='Enquiry Intent Status Update',
+                    message=f'Your {get_entity_display_name(v_case.entity_type)} enquiry intent has been reviewed.',
+                    url='/dashboard/',
+                    send_email=False
+                )
 
         flash(f'Intent #{case_id} ({get_entity_display_name(v_case.entity_type)}) has been DECLINED.', 'warning')
 
@@ -1267,6 +1289,18 @@ def admin_approve_property(property_id):
                         db.session.add(sec_pg)
 
             db.session.commit()
+
+            owner_user_id = dab.owner.user_id if (dab and dab.owner) else None
+            if owner_user_id:
+                create_user_notification(
+                    user_id=owner_user_id,
+                    notification_type='PROPERTY_APPROVED',
+                    subject='Property Approved & Listed',
+                    message=f'Your property "{prop.title}" has been approved and listed.',
+                    url=f'/properties/{prop.property_id}/',
+                    send_email=True
+                )
+
             flash(f"Property #{property_id} ('{prop.title}') has been APPROVED successfully. Entered Private Listing (72-Hour Window). Phase 8/9 complete.", 'success')
 
 
@@ -1559,6 +1593,18 @@ def admin_schedule_inspection(inspection_id):
     db.session.add(sec_event)
 
     db.session.commit()
+
+    buyer_user_id = insp.customer.user_id if insp.customer else None
+    if buyer_user_id:
+        create_user_notification(
+            user_id=buyer_user_id,
+            notification_type='INSPECTION_SCHEDULED',
+            subject='Inspection Date Scheduled',
+            message=f'Your inspection for "{insp.property.title if insp.property else "property"}" is scheduled for {scheduled_for_dt.strftime("%b %d, %Y %H:%M")}.',
+            url='/renter/inspections/',
+            send_email=True
+        )
+
     flash(f'Inspection #{inspection_id} has been successfully scheduled for {scheduled_for_dt.strftime("%b %d, %Y %H:%M")}.', 'success')
     return redirect(url_for('admin_inspections'))
 
@@ -1608,6 +1654,17 @@ def admin_complete_inspection(inspection_id):
     db.session.add(sec_event)
 
     db.session.commit()
+
+    buyer_user_id = insp.customer.user_id if insp.customer else None
+    if buyer_user_id:
+        create_user_notification(
+            user_id=buyer_user_id,
+            notification_type='INSPECTION_COMPLETED',
+            subject='Inspection Completed',
+            message=f'Your inspection for "{insp.property.title if insp.property else "property"}" has been marked as Completed.',
+            url='/renter/inspections/',
+            send_email=True
+        )
     flash(f'Inspection #{inspection_id} marked as COMPLETED.', 'success')
     return redirect(url_for('admin_inspections'))
 
@@ -1783,6 +1840,17 @@ def admin_generate_invoice(transaction_id):
     db.session.add(sec_event)
     db.session.commit()
 
+    buyer_user_id = tx.customer.user_id if tx.customer else None
+    if buyer_user_id:
+        create_user_notification(
+            user_id=buyer_user_id,
+            notification_type='INVOICE_GENERATED',
+            subject=f'Invoice Generated for Transaction #{tx.transaction_id}',
+            message=f'Invoice #{inv_number} for ₦{amt_due_dec:,.2f} is ready for payment.',
+            url='/buyer/dashboard/',
+            send_email=True
+        )
+
     flash(f'Invoice {inv_number} successfully issued for Transaction #{tx.transaction_id}.', 'success')
     return redirect(url_for('transaction_detail', transaction_id=tx.transaction_id))
 
@@ -1889,6 +1957,17 @@ def admin_record_payment(transaction_id, invoice_id):
     db.session.add(sec_event)
     db.session.commit()
 
+    buyer_user_id = tx.customer.user_id if tx.customer else None
+    if buyer_user_id:
+        create_user_notification(
+            user_id=buyer_user_id,
+            notification_type='PAYMENT_RECORDED',
+            subject=f'Payment Confirmed for Invoice {inv.invoice_number}',
+            message=f'Payment {pay_ref} of ₦{pay_amt:,.2f} has been recorded for Invoice {inv.invoice_number}.',
+            url='/buyer/dashboard/',
+            send_email=True
+        )
+
     flash(f'Payment {pay_ref} of ₦{pay_amt:,.2f} recorded successfully.', 'success')
     return redirect(url_for('transaction_detail', transaction_id=transaction_id))
 
@@ -1931,6 +2010,11 @@ def admin_update_transaction_status(transaction_id):
     tx.updated_at = now
     if new_status == 'Completion':
         tx.completion_date = now
+        try:
+            from pkg.routes.user import process_referral_qualification
+            process_referral_qualification(tx)
+        except Exception as e:
+            logger.error(f"Referral qualification trigger failed for transaction #{tx.transaction_id}: {e}")
 
     audit = AuditLog(
         user_id=user_id,
@@ -1953,6 +2037,29 @@ def admin_update_transaction_status(transaction_id):
     )
     db.session.add(sec_event)
     db.session.commit()
+
+    if new_status == 'Completion':
+        buyer_user_id = tx.customer.user_id if tx.customer else None
+        if buyer_user_id:
+            create_user_notification(
+                user_id=buyer_user_id,
+                notification_type='TRANSACTION_COMPLETED',
+                subject=f'Transaction #{tx.transaction_id} Completed',
+                message=f'Congratulations! Your transaction #{tx.transaction_id} for property "{tx.property.title if tx.property else "property"}" is COMPLETED.',
+                url='/buyer/dashboard/',
+                send_email=True
+            )
+
+        owner_user_id = tx.property.dab.owner.user_id if (tx.property and tx.property.dab and tx.property.dab.owner) else None
+        if owner_user_id:
+            create_user_notification(
+                user_id=owner_user_id,
+                notification_type='TRANSACTION_COMPLETED',
+                subject=f'Transaction #{tx.transaction_id} Completed',
+                message=f'Transaction #{tx.transaction_id} for property "{tx.property.title if tx.property else "property"}" has been COMPLETED.',
+                url='/owner/dashboard/',
+                send_email=True
+            )
 
     flash(f'Transaction status updated to {new_status}.', 'success')
     return redirect(url_for('transaction_detail', transaction_id=transaction_id))
@@ -2027,6 +2134,17 @@ def admin_approve_transaction_document(transaction_id, document_id):
     )
     db.session.add(sec_event)
     db.session.commit()
+
+    buyer_user_id = tx.customer.user_id if tx.customer else None
+    if buyer_user_id:
+        create_user_notification(
+            user_id=buyer_user_id,
+            notification_type='DOCUMENT_APPROVED',
+            subject='Transaction Legal Document Approved',
+            message=f'Legal document "{doc.document_type}" for Transaction #{tx.transaction_id} has been approved.',
+            url='/buyer/dashboard/',
+            send_email=True
+        )
 
     flash(f'Transaction document "{doc.document_type}" (#{document_id}) approved successfully.', 'success')
     return redirect(url_for('transaction_detail', transaction_id=transaction_id))
@@ -2317,6 +2435,18 @@ def admin_trigger_guarantee_milestone(guarantee_id):
 
     if recorded_milestones:
         db.session.commit()
+
+        owner_user_id = guarantee.owner.user_id if guarantee.owner else None
+        if owner_user_id:
+            create_user_notification(
+                user_id=owner_user_id,
+                notification_type='GUARANTEE_MILESTONE',
+                subject=f'Performance Guarantee #{guarantee_id} Milestone Reached',
+                message=f'Recorded milestone(s) for Performance Guarantee #{guarantee_id}: {", ".join(recorded_milestones)}.',
+                url='/owner/dashboard/',
+                send_email=True
+            )
+
         flash(f'Recorded milestone(s) for Guarantee #{guarantee_id}: {", ".join(recorded_milestones)}', 'success')
     else:
         flash(f'No new milestones to record for Guarantee #{guarantee_id} ({elapsed_days} days elapsed).', 'info')
@@ -2659,3 +2789,48 @@ def admin_record_guarantee_settlement_payment(settlement_id):
 
     flash(f'Settlement #{settlement_id} payment of ₦{settlement.amount:,.2f} recorded successfully. Guarantee status updated to {guarantee.status}.', 'success')
     return redirect(url_for('admin_performance'))
+
+
+# ==========================================
+# PHASE 20 — REFERRALS ADMIN CONTROL ROUTE
+# ==========================================
+@app.route('/admin/referrals/', methods=['GET'])
+def admin_referrals():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please login to access admin features.', 'danger')
+        return redirect(url_for('login'))
+
+    user_rec = User.query.get(user_id)
+    if not user_rec or not has_admin_permission(user_rec):
+        flash('Access denied. Administrative privileges required.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    status_filter = request.args.get('status', 'all').strip()
+
+    query = Referral.query.order_by(Referral.created_at.desc())
+    if status_filter and status_filter != 'all':
+        query = query.filter_by(status=status_filter)
+
+    referrals = query.all()
+
+    total_referrals = Referral.query.count()
+    attributed_count = Referral.query.filter_by(status='Attributed').count()
+    qualified_count = Referral.query.filter_by(status='Qualified').count()
+    completed_count = Referral.query.filter_by(status='Completed').count()
+
+    total_rewards = ReferralReward.query.all()
+    total_reward_sum = sum(float(r.reward_amount or 0.0) for r in total_rewards if r.reward_amount)
+
+    return render_template(
+        'admin/referrals.html',
+        title='Referrals Audit & Governance — Odacity Admin',
+        referrals=referrals,
+        status_filter=status_filter,
+        total_referrals=total_referrals,
+        attributed_count=attributed_count,
+        qualified_count=qualified_count,
+        completed_count=completed_count,
+        total_reward_sum=total_reward_sum,
+        user=user_rec
+    )

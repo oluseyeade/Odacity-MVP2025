@@ -4,14 +4,16 @@ import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urlparse
+from sqlalchemy.orm.attributes import flag_modified
 from flask import render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from PIL import Image
 
 from pkg import app
 from pkg.models import db, User, CustomerProfile, PropertyOwnerProfile, DirectAssetBrief, SecurityEvent, Property, PropertyMedia, PropertyDocument, PerformanceGuarantee, SavedProperty, SavedSearch, Application, Inspection, Offer, Transaction, GoldReward, GoldAccount, Referral, ReferralReward, ReferralEvent, GoldEvent, Mandate, GuaranteeCycle, Notification, VerificationCase, VerificationEvent, AuditLog, Negotiation, Invoice, Payment, TransactionDocument
 from pkg.forms import RegisterForm, LoginForm, CustomerProfileForm, CustomerKycForm, SavePropertyForm, SaveSearchForm, DeleteSavedSearchForm, RentalApplicationForm, ScheduleInspectionForm, CancelApplicationForm, CancelInspectionForm, PurchaseOfferForm, CancelOfferForm, PropertyOwnerProfileForm, DirectAssetBriefForm, RespondOfferForm, BuyerRespondOfferForm, DabInstitutionEnquiryForm, DabAgentEnquiryForm, DabIndividualEnquiryForm, GeneralEnquiryForm, ControlledPropertySubmissionForm
-from pkg.services.email_service import send_enquiry_acknowledgement
+from pkg.services.email_service import send_enquiry_acknowledgement, create_user_notification
 from pkg.routes.admin import has_admin_permission, has_transaction_initiation_permission, has_phase16_operational_permission, has_performance_operational_permission
 
 
@@ -243,6 +245,7 @@ def property_detail(property_id):
             return redirect(url_for('properties'))
 
     is_saved = False
+    is_current_goal = False
     active_application = None
     active_inspection = None
     active_offer = None
@@ -272,6 +275,17 @@ def property_detail(property_id):
                 Offer.status.notin_(['Cancelled', 'Rejected', 'Expired'])
             ).first()
 
+            prefs = cust_profile.preferences or {}
+            if isinstance(prefs, str):
+                try:
+                    prefs = json.loads(prefs)
+                except Exception:
+                    prefs = {}
+            if isinstance(prefs, dict):
+                g_data = prefs.get('property_goal', {})
+                if isinstance(g_data, dict) and g_data.get('property_id') == property_id:
+                    is_current_goal = True
+
     app_form = RentalApplicationForm()
     insp_form = ScheduleInspectionForm()
     offer_form = PurchaseOfferForm()
@@ -282,6 +296,7 @@ def property_detail(property_id):
         property=prop,
         intent=intent,
         is_saved=is_saved,
+        is_current_goal=is_current_goal,
         active_application=active_application,
         active_inspection=active_inspection,
         active_offer=active_offer,
@@ -382,9 +397,18 @@ def contact():
 
             db.session.commit()
 
-            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement & In-App Notification
             try:
                 send_enquiry_acknowledgement(form.general_email.data.strip(), form.general_name.data.strip(), "General Enquiry")
+                if session.get('user_id'):
+                    create_user_notification(
+                        user_id=session.get('user_id'),
+                        notification_type='ENQUIRY_SUBMITTED',
+                        subject='General Enquiry Received',
+                        message=f'Thank you, {form.general_name.data.strip()}! Your General Enquiry has been received.',
+                        url='/dashboard/',
+                        send_email=False
+                    )
             except Exception:
                 pass
 
@@ -515,9 +539,18 @@ def enquiry_individual():
 
             db.session.commit()
 
-            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement & In-App Notification
             try:
                 send_enquiry_acknowledgement(form.dab_individual_email.data.strip(), form.dab_individual_name.data.strip(), "DAB Individual")
+                if user_id:
+                    create_user_notification(
+                        user_id=user_id,
+                        notification_type='ENQUIRY_SUBMITTED',
+                        subject='DAB Individual Enquiry Submitted',
+                        message=f'Your DAB Individual Enquiry for "{form.dab_individual_name.data.strip()}" has been submitted.',
+                        url='/dashboard/',
+                        send_email=False
+                    )
             except Exception:
                 pass
 
@@ -646,9 +679,18 @@ def enquiry_institution():
 
             db.session.commit()
 
-            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement & In-App Notification
             try:
                 send_enquiry_acknowledgement(form.inst_official_email.data.strip(), form.inst_contact_person.data.strip(), "DAB Institution")
+                if user_id:
+                    create_user_notification(
+                        user_id=user_id,
+                        notification_type='ENQUIRY_SUBMITTED',
+                        subject='DAB Institution Enquiry Submitted',
+                        message=f'Your DAB Institution Enquiry for "{form.inst_name.data.strip()}" has been submitted.',
+                        url='/dashboard/',
+                        send_email=False
+                    )
             except Exception:
                 pass
 
@@ -809,9 +851,18 @@ def enquiry_agent():
 
             db.session.commit()
 
-            # Dispatch Email 1 — Enquiry Submission Acknowledgement
+            # Dispatch Email 1 — Enquiry Submission Acknowledgement & In-App Notification
             try:
                 send_enquiry_acknowledgement(form.agent_email.data.strip(), form.agent_name.data.strip(), "DAB Agent")
+                if user_id:
+                    create_user_notification(
+                        user_id=user_id,
+                        notification_type='ENQUIRY_SUBMITTED',
+                        subject='DAB Agent Enquiry Submitted',
+                        message=f'Your DAB Agent Enquiry for "{form.agent_name.data.strip()}" has been submitted.',
+                        url='/dashboard/',
+                        send_email=False
+                    )
             except Exception:
                 pass
 
@@ -913,7 +964,7 @@ def register():
                                     referrer_customer_id=referrer_profile.customer_id,
                                     referred_customer_id=profile.customer_id,
                                     referral_code_used=ref_code,
-                                    status='Registered',
+                                    status='Attributed',
                                     relationship_created_at=now,
                                     created_at=now
                                 )
@@ -932,6 +983,16 @@ def register():
                                     created_at=now
                                 )
                                 db.session.add(ref_evt)
+
+                                # Dispatch Referral Attributed Notification to Referrer
+                                create_user_notification(
+                                    user_id=referrer_profile.user_id,
+                                    notification_type='REFERRAL_ATTRIBUTED',
+                                    subject='New Referral Attributed',
+                                    message=f'{user.full_name} has joined Odacity using your referral code.',
+                                    url='/profile/',
+                                    send_email=False
+                                )
                                 session.pop('referral_code', None)
                 except ValueError:
                     pass
@@ -1399,20 +1460,312 @@ def get_customer_referral_context(user_id, cust_profile):
     }
 
 
+def get_customer_property_goal_context(cust_profile):
+    if not cust_profile:
+        return {'property_goal': None}
+
+    prefs = cust_profile.preferences or {}
+    if not isinstance(prefs, dict):
+        try:
+            prefs = json.loads(prefs) if isinstance(prefs, str) else {}
+        except Exception:
+            prefs = {}
+
+    goal_data = prefs.get('property_goal', {})
+    if not isinstance(goal_data, dict) or not goal_data.get('property_id'):
+        return {'property_goal': None}
+
+    try:
+        pid = int(goal_data.get('property_id'))
+    except (ValueError, TypeError):
+        return {'property_goal': None}
+
+    prop = Property.query.get(pid)
+    if not prop:
+        return {'property_goal': None}
+
+    service_type = 'sale'
+    if prop.dab and prop.dab.service_type:
+        service_type = prop.dab.service_type.lower()
+    elif prop.property_type and 'rent' in prop.property_type.lower():
+        service_type = 'rent'
+
+    goal_type = goal_data.get('goal_type')
+    if not goal_type:
+        goal_type = 'Rental Property Goal' if service_type in ['rent', 'lease'] else 'Home Purchase Goal'
+
+    target_amount = float(prop.price or 0.0)
+    target_date_str = goal_data.get('target_date', '')
+
+    # Derive Referral Rewards monetary contribution from Phase 20 ReferralReward records
+    referral_rewards = ReferralReward.query.filter_by(
+        referrer_customer_id=cust_profile.customer_id
+    ).filter(ReferralReward.status.in_(['Approved', 'Settled', 'Earned', 'Paid'])).all()
+
+    referral_rewards_total = sum(float(r.reward_amount or 0.0) for r in referral_rewards if r.reward_amount)
+
+    # Gold Points & Account (Displayed SEPARATELY without monetary valuation)
+    gold_acc = GoldAccount.query.filter_by(customer_id=cust_profile.customer_id).first()
+    gold_points = gold_acc.current_points if gold_acc else 0
+
+    # Remaining Opportunity calculation: Target Amount - Referral Rewards Contribution
+    remaining_amount = max(0.0, target_amount - referral_rewards_total)
+
+    # Progress percentage based on referral reward contribution towards target amount
+    progress_percentage = min(100.0, round((referral_rewards_total / target_amount * 100.0), 2)) if target_amount > 0 else 0.0
+
+    publication_status = prop.publication_status or prop.status or 'Available'
+    is_available = publication_status not in ['Sold', 'Rented', 'Archived', 'Unavailable']
+
+    # Get primary media image if exists
+    primary_media = None
+    if prop.media:
+        primary_media = next((m for m in prop.media if m.is_primary and m.file_path), None)
+        if not primary_media and prop.media:
+            primary_media = prop.media[0]
+
+    image_url = None
+    if primary_media and primary_media.file_path:
+        fp = primary_media.file_path
+        image_url = fp if (fp.startswith('/') or fp.startswith('http')) else url_for('static', filename=fp)
+
+    location_str = f"{prop.locality or prop.city or ''}, {prop.state or ''}".strip(', ') or prop.location or 'Lagos'
+
+    # Dynamic Next Action recommendation based on customer's current lifecycle state
+    active_tx = Transaction.query.filter_by(customer_id=cust_profile.customer_id).filter(Transaction.status != 'Completion').first()
+    active_offer = Offer.query.filter_by(customer_id=cust_profile.customer_id).filter(Offer.status.in_(['Submitted', 'Under_Review', 'Counter_Offer'])).first()
+    active_insp = Inspection.query.filter_by(customer_id=cust_profile.customer_id).filter(Inspection.status.in_(['Requested', 'Scheduled'])).first()
+
+    if active_tx:
+        next_action_title = f"Complete Transaction #{active_tx.transaction_id}"
+        next_action_desc = f"Your transaction is currently at stage '{active_tx.status}'. Progress your transaction to move closer to your property goal."
+        next_action_url = url_for('buyer_offers')
+    elif active_offer:
+        next_action_title = "Review Pending Offer"
+        next_action_desc = f"Your offer of ₦{active_offer.offer_amount:,.2f} is under review. Check for owner responses."
+        next_action_url = url_for('buyer_offers')
+    elif active_insp:
+        next_action_title = "Attend Inspection"
+        next_action_desc = "An inspection is scheduled. Inspect your target property to proceed."
+        next_action_url = url_for('renter_inspections')
+    else:
+        next_action_title = "Invite Referrals & Explore Properties"
+        next_action_desc = "Share your referral link to earn referral rewards toward your property ambition."
+        next_action_url = url_for('properties')
+
+    days_remaining = None
+    if target_date_str:
+        try:
+            t_date = datetime.strptime(target_date_str, '%Y-%m-%d')
+            days_remaining = (t_date - datetime.utcnow()).days
+            if days_remaining < 0:
+                days_remaining = 0
+        except ValueError:
+            pass
+
+    return {
+        'property_goal': {
+            'property_id': prop.property_id,
+            'title': prop.title,
+            'location': location_str,
+            'image_url': image_url,
+            'service_type': service_type,
+            'goal_type': goal_type,
+            'target_amount': target_amount,
+            'target_date': target_date_str,
+            'days_remaining': days_remaining,
+            'referral_rewards_total': referral_rewards_total,
+            'gold_points': gold_points,
+            'remaining_amount': remaining_amount,
+            'progress_percentage': progress_percentage,
+            'is_available': is_available,
+            'publication_status': publication_status,
+            'next_action_title': next_action_title,
+            'next_action_desc': next_action_desc,
+            'next_action_url': next_action_url,
+            'gold_valuation_status': 'Partnership valuation pending'
+        }
+    }
+
+
+@app.route('/property-goal/set', methods=['POST'])
+@app.route('/properties/<int:property_id>/set-goal/', methods=['POST'])
+def set_property_goal(property_id=None):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to set your property goal.', 'warning')
+        return redirect(url_for('login'))
+
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    if not cust_profile:
+        flash('Customer profile not found.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if property_id is None:
+        raw_pid = request.form.get('property_id')
+        try:
+            property_id = int(raw_pid) if raw_pid else None
+        except (ValueError, TypeError):
+            property_id = None
+
+    if not property_id:
+        flash('Please select an existing Odacity property to set as your goal.', 'warning')
+        return redirect(url_for('properties'))
+
+    target_prop = Property.query.get(property_id)
+    if not target_prop:
+        flash('Selected property record was not found.', 'danger')
+        return redirect(url_for('properties'))
+
+    service_type = 'sale'
+    if target_prop.dab and target_prop.dab.service_type:
+        service_type = target_prop.dab.service_type.lower()
+    elif target_prop.property_type and 'rent' in target_prop.property_type.lower():
+        service_type = 'rent'
+
+    goal_type = 'Rental Property Goal' if service_type in ['rent', 'lease'] else 'Home Purchase Goal'
+    target_date_raw = request.form.get('target_date', '').strip()
+
+    target_date = ''
+    if target_date_raw:
+        try:
+            parsed_d = datetime.strptime(target_date_raw, '%Y-%m-%d')
+            target_date = parsed_d.strftime('%Y-%m-%d')
+        except ValueError:
+            pass
+
+    prefs = cust_profile.preferences or {}
+    if not isinstance(prefs, dict):
+        try:
+            prefs = json.loads(prefs) if isinstance(prefs, str) else {}
+        except Exception:
+            prefs = {}
+
+    prev_goal = prefs.get('property_goal', {})
+    prefs['property_goal'] = {
+        'property_id': target_prop.property_id,
+        'goal_type': goal_type,
+        'target_date': target_date,
+        'updated_at': datetime.utcnow().isoformat()
+    }
+
+    cust_profile.preferences = prefs
+    flag_modified(cust_profile, 'preferences')
+
+    now = datetime.utcnow()
+    audit_entry = AuditLog(
+        user_id=user_id,
+        action='PROPERTY_GOAL_UPDATED',
+        entity_type='CustomerProfile',
+        entity_id=cust_profile.customer_id,
+        previous_values=prev_goal,
+        new_values=prefs['property_goal'],
+        ip_address=request.remote_addr if request else None,
+        created_at=now
+    )
+    db.session.add(audit_entry)
+
+    sec_entry = SecurityEvent(
+        user_id=user_id,
+        event_type='PROPERTY_GOAL_UPDATED',
+        description=f"Property Goal set to: {target_prop.title} (#PROP-{target_prop.property_id})",
+        ip_address=request.remote_addr if request else None,
+        created_at=now
+    )
+    db.session.add(sec_entry)
+
+    db.session.commit()
+    flash(f'Property "{target_prop.title}" set as your Property Goal!', 'success')
+    return redirect(request.referrer or url_for('dashboard'))
+
+
+@app.route('/property-goal/remove', methods=['POST'])
+def remove_property_goal():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to manage your property goal.', 'warning')
+        return redirect(url_for('login'))
+
+    cust_profile = CustomerProfile.query.filter_by(user_id=user_id).first()
+    if not cust_profile:
+        flash('Customer profile not found.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    prefs = cust_profile.preferences or {}
+    if not isinstance(prefs, dict):
+        try:
+            prefs = json.loads(prefs) if isinstance(prefs, str) else {}
+        except Exception:
+            prefs = {}
+
+    prev_goal = prefs.pop('property_goal', None)
+    cust_profile.preferences = prefs
+    flag_modified(cust_profile, 'preferences')
+
+    now = datetime.utcnow()
+    if prev_goal:
+        audit_entry = AuditLog(
+            user_id=user_id,
+            action='PROPERTY_GOAL_REMOVED',
+            entity_type='CustomerProfile',
+            entity_id=cust_profile.customer_id,
+            previous_values=prev_goal,
+            new_values=None,
+            ip_address=request.remote_addr if request else None,
+            created_at=now
+        )
+        db.session.add(audit_entry)
+
+        sec_entry = SecurityEvent(
+            user_id=user_id,
+            event_type='PROPERTY_GOAL_REMOVED',
+            description="Property Goal removed",
+            ip_address=request.remote_addr if request else None,
+            created_at=now
+        )
+        db.session.add(sec_entry)
+
+        db.session.commit()
+
+    flash('Property Goal removed.', 'info')
+    return redirect(request.referrer or url_for('dashboard'))
+
+
 def process_referral_qualification(transaction):
     if not transaction or not transaction.customer_id:
         return None
 
-    referral = Referral.query.filter_by(referred_customer_id=transaction.customer_id).filter(Referral.status != 'Completed').first()
+    # Idempotency Guard: Avoid duplicate reward generation for the same qualifying transaction
+    existing_reward = ReferralReward.query.filter_by(
+        qualifying_transaction_id=transaction.transaction_id
+    ).first()
+    if existing_reward:
+        return existing_reward
+
+    referral = Referral.query.filter_by(
+        referred_customer_id=transaction.customer_id
+    ).filter(Referral.status != 'Completed').first()
     if not referral:
         return None
 
     now = datetime.utcnow()
-    referral.status = 'Completed'
+
+    # Step 1: Explicit transition to Qualified
+    referral.status = 'Qualified'
     referral.qualified_at = now
 
     trans_amount = float(transaction.total_amount or transaction.transaction_value or 0.0)
-    reward_amount = round(trans_amount * 0.05, 2)
+    odacity_earning = round(trans_amount * 0.10, 2)
+    reward_amount = round(odacity_earning * 0.05, 2)  # Effective 0.5% of transaction value
+
+    ref_evt_qual = ReferralEvent(
+        referral_id=referral.referral_id,
+        event_type='Qualifying_Transaction_Detected',
+        event_data={'transaction_id': transaction.transaction_id, 'amount': trans_amount, 'reward_amount': reward_amount},
+        occurred_at=now,
+        created_at=now
+    )
+    db.session.add(ref_evt_qual)
 
     reward = ReferralReward(
         referral_id=referral.referral_id,
@@ -1421,7 +1774,7 @@ def process_referral_qualification(transaction):
         referrer_customer_id=referral.referrer_customer_id,
         status='Approved',
         transaction_value=trans_amount,
-        odacity_earning=round(trans_amount * 0.10, 2),
+        odacity_earning=odacity_earning,
         reward_rate_percentage=5.00,
         reward_amount=reward_amount,
         calculated_at=now,
@@ -1429,15 +1782,6 @@ def process_referral_qualification(transaction):
         created_at=now
     )
     db.session.add(reward)
-
-    ref_evt = ReferralEvent(
-        referral_id=referral.referral_id,
-        event_type='Qualifying_Transaction_Detected',
-        event_data={'transaction_id': transaction.transaction_id, 'amount': trans_amount, 'reward_amount': reward_amount},
-        occurred_at=now,
-        created_at=now
-    )
-    db.session.add(ref_evt)
 
     gold_acc = GoldAccount.query.filter_by(customer_id=referral.referrer_customer_id).first()
     if not gold_acc:
@@ -1470,6 +1814,67 @@ def process_referral_qualification(transaction):
         created_at=now
     )
     db.session.add(gold_reward)
+
+    # Step 2: Transition to Completed
+    referral.status = 'Completed'
+
+    referrer_user_id = referral.referrer.user_id if (referral.referrer and hasattr(referral.referrer, 'user_id')) else None
+    if referrer_user_id:
+        create_user_notification(
+            user_id=referrer_user_id,
+            notification_type='REFERRAL_QUALIFIED',
+            subject='Referral Reward Earned!',
+            message=f'Your referral has qualified! You earned a reward of ₦{reward_amount:,.2f} and {points_earned} Gold points.',
+            url='/profile/',
+            send_email=True
+        )
+
+    ref_evt_comp = ReferralEvent(
+        referral_id=referral.referral_id,
+        event_type='Reward_Settled',
+        event_data={'reward_amount': reward_amount, 'status': 'Completed'},
+        occurred_at=now,
+        created_at=now
+    )
+    db.session.add(ref_evt_comp)
+
+    # System-level Audit & Security logging
+    referrer_user_id = referral.referrer.user_id if (referral.referrer and hasattr(referral.referrer, 'user_id')) else None
+    ip_addr = request.remote_addr if request else None
+
+    audit_entry = AuditLog(
+        user_id=referrer_user_id,
+        action='REFERRAL_QUALIFIED',
+        entity_type='Referral',
+        entity_id=referral.referral_id,
+        previous_values={'status': 'Attributed'},
+        new_values={'status': 'Completed', 'reward_amount': reward_amount, 'transaction_id': transaction.transaction_id},
+        ip_address=ip_addr,
+        created_at=now
+    )
+    db.session.add(audit_entry)
+
+    sec_entry = SecurityEvent(
+        user_id=referrer_user_id,
+        event_type='REFERRAL_QUALIFIED',
+        description=f"Referral #{referral.referral_id} qualified via transaction #{transaction.transaction_id}. Reward amount: NGN {reward_amount:.2f}",
+        ip_address=ip_addr,
+        created_at=now
+    )
+    db.session.add(sec_entry)
+
+    audit_settle = AuditLog(
+        user_id=referrer_user_id,
+        action='REFERRAL_REWARD_SETTLED',
+        entity_type='ReferralReward',
+        entity_id=reward.referral_reward_id if hasattr(reward, 'referral_reward_id') else None,
+        previous_values={'status': 'Pending'},
+        new_values={'status': 'Approved', 'reward_amount': reward_amount},
+        ip_address=ip_addr,
+        created_at=now
+    )
+    db.session.add(audit_settle)
+
     db.session.commit()
     return reward
 
@@ -1519,6 +1924,7 @@ def dashboard():
                 received_apps_count = Application.query.filter(Application.property_id.in_(prop_ids)).count()
 
     ref_ctx = get_customer_referral_context(user_id, cust_profile)
+    goal_ctx = get_customer_property_goal_context(cust_profile)
 
     return render_template(
         'user/dashboard.html',
@@ -1535,7 +1941,8 @@ def dashboard():
         received_offers_count=received_offers_count,
         received_apps_count=received_apps_count,
         recent_events=recent_events,
-        **ref_ctx
+        **ref_ctx,
+        **goal_ctx
     )
 
 
@@ -1577,6 +1984,7 @@ def buyer_dashboard():
     guarantee_cycle = GuaranteeCycle.query.filter_by(performance_guarantee_id=perf_guarantee.guarantee_id).order_by(GuaranteeCycle.cycle_number.desc()).first() if perf_guarantee else None
 
     ref_ctx = get_customer_referral_context(user_id, cust_profile)
+    goal_ctx = get_customer_property_goal_context(cust_profile)
     recent_events = SecurityEvent.query.filter_by(user_id=user_id).order_by(SecurityEvent.created_at.desc()).limit(5).all()
 
     return render_template(
@@ -1598,7 +2006,8 @@ def buyer_dashboard():
         perf_guarantee=perf_guarantee,
         guarantee_cycle=guarantee_cycle,
         recent_events=recent_events,
-        **ref_ctx
+        **ref_ctx,
+        **goal_ctx
     )
 
 
@@ -1846,6 +2255,15 @@ def request_inspection(property_id):
     db.session.add(sec_event)
     db.session.commit()
 
+    create_user_notification(
+        user_id=user_id,
+        notification_type='INSPECTION_REQUESTED',
+        subject='Inspection Requested',
+        message=f'Your inspection request for "{prop.title}" has been received.',
+        url='/renter/inspections/',
+        send_email=True
+    )
+
     flash('Inspection request submitted successfully.', 'success')
     return redirect(url_for('renter_inspections'))
 
@@ -1987,6 +2405,17 @@ def submit_offer(property_id):
     )
     db.session.add(sec_event)
     db.session.commit()
+
+    owner_user_id = prop.dab.owner.user_id if (prop.dab and prop.dab.owner) else None
+    if owner_user_id:
+        create_user_notification(
+            user_id=owner_user_id,
+            notification_type='OFFER_RECEIVED',
+            subject='New Purchase Offer Received',
+            message=f'You received a purchase offer of ₦{amount:,.2f} for property "{prop.title}".',
+            url='/seller/offers/',
+            send_email=True
+        )
 
     flash('Purchase offer submitted successfully.', 'success')
     return redirect(url_for('buyer_offers'))
@@ -2583,6 +3012,17 @@ def respond_offer(offer_id):
         db.session.add(sec_event)
         db.session.commit()
 
+        buyer_user_id = offer_rec.customer.user_id if offer_rec.customer else None
+        if buyer_user_id:
+            create_user_notification(
+                user_id=buyer_user_id,
+                notification_type='OFFER_RESPONSE',
+                subject=f'Offer Status Update: {action}',
+                message=f'The seller has responded to your offer for "{offer_rec.property.title if offer_rec.property else "property"}": {action}.',
+                url='/buyer/offers/',
+                send_email=True
+            )
+
         flash(f'Purchase offer #{offer_id} marked as {action}.', 'success' if action == 'Accepted' else 'info')
         return redirect(url_for('seller_offers'))
 
@@ -2734,6 +3174,17 @@ def buyer_respond_offer(offer_id):
         )
         db.session.add(sec_event)
         db.session.commit()
+
+        owner_user_id = offer_rec.property.dab.owner.user_id if (offer_rec.property and offer_rec.property.dab and offer_rec.property.dab.owner) else None
+        if owner_user_id:
+            create_user_notification(
+                user_id=owner_user_id,
+                notification_type='OFFER_RESPONSE',
+                subject=f'Buyer Offer Response: {action}',
+                message=f'The buyer has responded to your offer for "{offer_rec.property.title if offer_rec.property else "property"}": {action}.',
+                url='/seller/offers/',
+                send_email=True
+            )
 
         flash(f'Counter-offer of ₦{counter_val:,.2f} submitted to property owner.', 'success')
         return redirect(url_for('buyer_offers'))
@@ -3441,36 +3892,79 @@ def controlled_property_submission(token):
                 prop.status = 'Submitted'
                 prop.updated_at = now
 
-            # 4. Handle Property Photographs (PropertyMedia - review_status = 'Uploaded')
+            # 4. Handle Property Photographs (PropertyMedia - review_status = 'Uploaded', Max 20 Limit, Server-Side Magic Byte Validation)
             media_upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'property_media')
             os.makedirs(media_upload_dir, exist_ok=True)
 
-            photo_fields = [
-                (form.primary_photo, True, 1),
-                (form.photo_2, False, 2),
-                (form.photo_3, False, 3)
-            ]
+            existing_media_count = PropertyMedia.query.filter_by(property_id=prop.property_id, type='image').count()
 
-            for field_obj, is_primary, order in photo_fields:
-                if field_obj.data and hasattr(field_obj.data, 'filename') and field_obj.data.filename:
-                    ext = os.path.splitext(field_obj.data.filename)[1].lower()
-                    unique_name = f"{uuid.uuid4().hex}{ext}"
-                    save_path = os.path.join(media_upload_dir, unique_name)
-                    field_obj.data.save(save_path)
-                    rel_path = f"pkg/static/uploads/property_media/{unique_name}"
+            # Gather files from multi-file input 'property_photos' and legacy fields
+            raw_photos = request.files.getlist('property_photos')
+            primary_selected_idx = request.form.get('primary_photo_index', '0')
+            try:
+                primary_selected_idx = int(primary_selected_idx)
+            except (ValueError, TypeError):
+                primary_selected_idx = 0
 
-                    media_rec = PropertyMedia(
-                        property_id=prop.property_id,
-                        type='image',
-                        media_type='image',
-                        file_path=rel_path,
-                        alt_text=f"Property Photo {order}",
-                        display_order=order,
-                        is_primary=is_primary,
-                        review_status='Uploaded',
-                        created_at=now
-                    )
-                    db.session.add(media_rec)
+            photos_to_process = []
+            for idx, f in enumerate(raw_photos):
+                if f and hasattr(f, 'filename') and f.filename:
+                    is_p = (idx == primary_selected_idx)
+                    photos_to_process.append((f, is_p))
+
+            if not photos_to_process:
+                legacy_fields = [
+                    (form.primary_photo.data, True),
+                    (form.photo_2.data, False),
+                    (form.photo_3.data, False)
+                ]
+                for f_data, is_p in legacy_fields:
+                    if f_data and hasattr(f_data, 'filename') and f_data.filename:
+                        photos_to_process.append((f_data, is_p))
+
+            if existing_media_count + len(photos_to_process) > 20:
+                flash(f"A maximum of 20 property images is allowed. This property currently has {existing_media_count} images.", "danger")
+                return render_template(
+                    'user/controlled_property_submission.html',
+                    title='Controlled Property Brief Submission',
+                    case_token=target_case.case_token,
+                    target_case=target_case,
+                    contact_email=email,
+                    contact_name=full_name,
+                    existing_dab=existing_dab,
+                    form=form
+                )
+
+            has_primary_existing = PropertyMedia.query.filter_by(property_id=prop.property_id, is_primary=True).first() is not None
+            order_offset = existing_media_count + 1
+
+            for idx, (file_obj, is_p) in enumerate(photos_to_process):
+                rel_path, fmt_name, err = validate_and_save_property_image(file_obj, media_upload_dir)
+                if err:
+                    flash(f"Error processing photo '{file_obj.filename}': {err}", "warning")
+                    continue
+
+                make_primary = False
+                if is_p and not has_primary_existing:
+                    make_primary = True
+                    has_primary_existing = True
+                elif not has_primary_existing and idx == 0:
+                    make_primary = True
+                    has_primary_existing = True
+
+                media_rec = PropertyMedia(
+                    property_id=prop.property_id,
+                    type='image',
+                    media_type='image',
+                    file_path=rel_path,
+                    alt_text=f"Property Photo {order_offset}",
+                    display_order=order_offset,
+                    is_primary=make_primary,
+                    review_status='Uploaded',
+                    created_at=now
+                )
+                db.session.add(media_rec)
+                order_offset += 1
 
             # 5. Handle Property Title Documents (PropertyDocument - review_status = 'Pending')
             doc_upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'property_documents')
@@ -3538,6 +4032,297 @@ def controlled_property_submission(token):
         display_name=get_entity_display_name(target_case.entity_type),
         title='Controlled Property Submission — Odacity'
     )
+
+
+def validate_and_save_property_image(file_storage, upload_dir):
+    """
+    Validates uploaded property image format (JPG, JPEG, PNG) via server-side magic byte headers.
+    Saves raw original file intact, then safely generates resized derivatives (card, hero, thumb) using Pillow.
+    Returns (rel_path, format_name, error_message).
+    """
+    if not file_storage or not hasattr(file_storage, 'filename') or not file_storage.filename:
+        return None, None, "No file provided"
+
+    filename = file_storage.filename.strip()
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ['.jpg', '.jpeg', '.png']:
+        return None, None, "Invalid image format. Please upload a JPG, JPEG, or PNG image."
+
+    file_storage.seek(0)
+    header = file_storage.read(8)
+    file_storage.seek(0)
+
+    is_jpeg = header.startswith(b'\xff\xd8\xff')
+    is_png = header.startswith(b'\x89PNG\r\n\x1a\n') or header.startswith(b'\x89PNG')
+
+    if not (is_jpeg or is_png):
+        return None, None, "Unsupported or invalid image format. Please upload a JPG, JPEG, or PNG image."
+
+    safe_ext = '.png' if is_png else '.jpg'
+    unique_name = f"{uuid.uuid4().hex}{safe_ext}"
+    save_path = os.path.join(upload_dir, unique_name)
+
+    # 1. Save raw original file intact
+    file_storage.save(save_path)
+    rel_path = f"uploads/property_media/{unique_name}"
+
+    # 2. Safely generate derivatives using Pillow
+    try:
+        Image.MAX_IMAGE_PIXELS = 25_000_000
+        with Image.open(save_path) as img:
+            resample_filter = getattr(Image.Resampling, 'LANCZOS', Image.LANCZOS)
+
+            variants = [
+                ('card', 600, 85),
+                ('hero', 1200, 85),
+                ('thumb', 250, 80)
+            ]
+
+            for var_name, max_w, quality in variants:
+                var_dir = os.path.join(upload_dir, var_name)
+                os.makedirs(var_dir, exist_ok=True)
+                var_path = os.path.join(var_dir, unique_name)
+
+                img_copy = img.copy()
+                w, h = img_copy.size
+
+                # Proportional resize without upscaling smaller source images
+                if w > max_w:
+                    new_h = int(h * (max_w / float(w)))
+                    img_copy = img_copy.resize((max_w, new_h), resample_filter)
+
+                if is_png:
+                    img_copy.save(var_path, format='PNG', optimize=True)
+                else:
+                    if img_copy.mode in ('RGBA', 'LA', 'P'):
+                        img_copy = img_copy.convert('RGB')
+                    img_copy.save(var_path, format='JPEG', quality=quality, optimize=True)
+    except Exception as e:
+        print(f"Warning: Failed to generate image derivatives for '{unique_name}': {e}")
+
+    return rel_path, ('png' if is_png else 'jpeg'), None
+
+
+@app.route('/properties/<int:property_id>/media/upload/', methods=['POST'])
+def upload_property_media(property_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to manage property media.', 'warning')
+        return redirect(url_for('login'))
+
+    prop = Property.query.get_or_404(property_id)
+
+    user = User.query.get(user_id)
+    is_admin = user and (user.is_super_admin or has_admin_permission(user))
+    owner_profile = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+    is_owner = (owner_profile and prop.dab and prop.dab.owner_profile_id == owner_profile.owner_profile_id)
+
+    if not (is_admin or is_owner):
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='UNAUTHORIZED_MEDIA_UPLOAD_ATTEMPT',
+            description=f"Unauthorized media upload attempt for property #{property_id}",
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+        flash('Access denied. You are not authorized to modify media for this property.', 'danger')
+        abort(403)
+
+    existing_count = PropertyMedia.query.filter_by(property_id=property_id, type='image').count()
+    uploaded_files = request.files.getlist('photos') or request.files.getlist('property_photos')
+
+    if not uploaded_files or not any(f and f.filename for f in uploaded_files):
+        flash('No image files were selected for upload.', 'warning')
+        return redirect(request.referrer or url_for('property_detail', property_id=property_id))
+
+    valid_files = [f for f in uploaded_files if f and hasattr(f, 'filename') and f.filename]
+    if existing_count + len(valid_files) > 20:
+        flash(f"A maximum of 20 property images is allowed. This property currently has {existing_count} images.", "danger")
+        return redirect(request.referrer or url_for('property_detail', property_id=property_id))
+
+    media_upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'property_media')
+    os.makedirs(media_upload_dir, exist_ok=True)
+
+    has_primary = PropertyMedia.query.filter_by(property_id=property_id, is_primary=True).first() is not None
+    now = datetime.utcnow()
+    saved_count = 0
+
+    for idx, f in enumerate(valid_files):
+        rel_path, fmt, err = validate_and_save_property_image(f, media_upload_dir)
+        if err:
+            flash(f"Error: {err} ({f.filename})", "warning")
+            continue
+
+        make_p = False
+        if not has_primary and idx == 0:
+            make_p = True
+            has_primary = True
+
+        media_rec = PropertyMedia(
+            property_id=property_id,
+            type='image',
+            media_type='image',
+            file_path=rel_path,
+            alt_text=f"Property Photo {existing_count + saved_count + 1}",
+            display_order=existing_count + saved_count + 1,
+            is_primary=make_p,
+            review_status='Uploaded',
+            created_at=now
+        )
+        db.session.add(media_rec)
+        saved_count += 1
+
+    if saved_count > 0:
+        db.session.commit()
+        flash(f"Successfully uploaded {saved_count} property photo(s). They are currently under quality review.", "success")
+
+    return redirect(request.referrer or url_for('property_detail', property_id=property_id))
+
+
+@app.route('/properties/<int:property_id>/media/<int:media_id>/set-primary/', methods=['POST'])
+def set_primary_property_media(property_id, media_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to manage property media.', 'warning')
+        return redirect(url_for('login'))
+
+    prop = Property.query.get_or_404(property_id)
+    med = PropertyMedia.query.filter_by(media_id=media_id, property_id=property_id).first_or_404()
+
+    user = User.query.get(user_id)
+    is_admin = user and (user.is_super_admin or has_admin_permission(user))
+    owner_profile = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+    is_owner = (owner_profile and prop.dab and prop.dab.owner_profile_id == owner_profile.owner_profile_id)
+
+    if not (is_admin or is_owner):
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='UNAUTHORIZED_MEDIA_ACCESS_ATTEMPT',
+            description=f"Unauthorized media modification attempt for property #{property_id}",
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+        flash('Access denied.', 'danger')
+        abort(403)
+
+    PropertyMedia.query.filter_by(property_id=property_id).update({'is_primary': False})
+    med.is_primary = True
+    db.session.commit()
+
+    flash("Primary cover photo updated successfully.", "success")
+    return redirect(request.referrer or url_for('property_detail', property_id=property_id))
+
+
+@app.route('/properties/<int:property_id>/media/<int:media_id>/delete/', methods=['POST'])
+def delete_property_media(property_id, media_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to manage property media.', 'warning')
+        return redirect(url_for('login'))
+
+    prop = Property.query.get_or_404(property_id)
+    med = PropertyMedia.query.filter_by(media_id=media_id, property_id=property_id).first_or_404()
+
+    user = User.query.get(user_id)
+    is_admin = user and (user.is_super_admin or has_admin_permission(user))
+    owner_profile = PropertyOwnerProfile.query.filter_by(user_id=user_id).first()
+    is_owner = (owner_profile and prop.dab and prop.dab.owner_profile_id == owner_profile.owner_profile_id)
+
+    if not (is_admin or is_owner):
+        sec_event = SecurityEvent(
+            user_id=user_id,
+            event_type='UNAUTHORIZED_MEDIA_ACCESS_ATTEMPT',
+            description=f"Unauthorized media modification attempt for property #{property_id}",
+            ip_address=request.remote_addr,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+        db.session.commit()
+        flash('Access denied.', 'danger')
+        abort(403)
+
+    # Clean up physical files (original + derivatives)
+    if med.file_path and not (med.file_path.startswith('http') or med.file_path.startswith('/')):
+        clean_p = med.file_path.lstrip('/')
+        orig_abs = os.path.join(app.root_path, 'static', clean_p)
+        if os.path.exists(orig_abs):
+            try:
+                os.remove(orig_abs)
+            except Exception:
+                pass
+
+        filename = os.path.basename(clean_p)
+        for var in ['card', 'hero', 'thumb']:
+            var_abs = os.path.join(app.root_path, 'static', 'uploads', 'property_media', var, filename)
+            if os.path.exists(var_abs):
+                try:
+                    os.remove(var_abs)
+                except Exception:
+                    pass
+
+    was_primary = med.is_primary
+    db.session.delete(med)
+    db.session.commit()
+
+    if was_primary:
+        next_media = PropertyMedia.query.filter_by(property_id=property_id).order_by(PropertyMedia.display_order.asc()).first()
+        if next_media:
+            next_media.is_primary = True
+            db.session.commit()
+
+    flash("Property photo deleted.", "info")
+    return redirect(request.referrer or url_for('property_detail', property_id=property_id))
+
+
+from flask import render_template, request, redirect, url_for, flash, session, abort, has_request_context
+
+
+def get_property_image_url(media_or_path, variant=None):
+    """
+    Jinja template helper/filter for resolving property image derivative URLs with automatic fallback to original.
+    Supports media objects or file path strings.
+    Variants: 'card', 'hero', 'thumb'.
+    """
+    if not media_or_path:
+        if has_request_context():
+            return url_for('static', filename='img/furniture.png')
+        return '/static/img/furniture.png'
+
+    if hasattr(media_or_path, 'file_path'):
+        raw_path = media_or_path.file_path
+    else:
+        raw_path = str(media_or_path)
+
+    if not raw_path:
+        if has_request_context():
+            return url_for('static', filename='img/furniture.png')
+        return '/static/img/furniture.png'
+
+    if raw_path.startswith('/') or raw_path.startswith('http://') or raw_path.startswith('https://'):
+        return raw_path
+
+    clean_path = raw_path.lstrip('/')
+
+    if variant in ['card', 'hero', 'thumb']:
+        parts = clean_path.split('/')
+        if len(parts) >= 2 and parts[-2] == 'property_media':
+            derived_rel = f"uploads/property_media/{variant}/{parts[-1]}"
+            abs_derived = os.path.join(app.root_path, 'static', derived_rel)
+            if os.path.exists(abs_derived):
+                if has_request_context():
+                    return url_for('static', filename=derived_rel)
+                return f"/static/{derived_rel}"
+
+    if has_request_context():
+        return url_for('static', filename=clean_path)
+    return f"/static/{clean_path}"
+
+app.jinja_env.filters['property_image_url'] = get_property_image_url
+app.jinja_env.globals['get_property_image_url'] = get_property_image_url
 
 
 

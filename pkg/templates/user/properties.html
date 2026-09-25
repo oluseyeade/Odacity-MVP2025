@@ -113,12 +113,12 @@
                 {% for prop in properties %}
                 <div class="col-md-6">
                     <div class="card h-100 shadow-sm border-0 intent-card">
-                        <div class="position-relative">
+                        <div class="position-relative overflow-hidden" style="aspect-ratio: 16/9; min-height: 220px; background-color: #f1f5f9;">
                             {% set primary_media = prop.media | selectattr('review_status', 'equalto', 'Approved') | first %}
-                            {% if primary_media and primary_media.file_path %}
-                                <img src="{{ primary_media.file_path if (primary_media.file_path.startswith('/') or primary_media.file_path.startswith('http')) else url_for('static', filename=primary_media.file_path) }}" class="card-img-top" alt="{{ primary_media.alt_text or prop.title }}" style="height: 220px; object-fit: cover;">
+                            {% if primary_media %}
+                                <img src="{{ primary_media | property_image_url('card') }}" class="card-img-top w-100 h-100" alt="{{ primary_media.alt_text or prop.title }}" style="height: 220px; object-fit: cover; aspect-ratio: 16/9;" loading="lazy" decoding="async">
                             {% else %}
-                                <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top" alt="{{ prop.title }}" style="height: 220px; object-fit: cover;">
+                                <img src="{{ url_for('static', filename='img/furniture.png') }}" class="card-img-top w-100 h-100" alt="{{ prop.title }}" style="height: 220px; object-fit: cover; aspect-ratio: 16/9;" loading="lazy" decoding="async">
                             {% endif %}
                             <span class="position-absolute top-0 start-0 m-2 badge badge-verified">✓ VERIFIED</span>
                             <span class="position-absolute top-0 end-0 m-2 badge badge-guarantee">GUARANTEED</span>

@@ -245,7 +245,157 @@
                         </div>
                     </div>
                 </div>
+        <!-- PROPERTY GOAL — ENCOURAGEMENT & REFERRAL EARNING -->
+        <div class="card odacity-card mb-4 bg-white border-secondary">
+            <div class="card-header bg-dark text-white p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                <div>
+                    <h5 class="fw-bold mb-1 text-white"><i class="bi bi-flag-fill text-danger me-2"></i>My Property Goal</h5>
+                    <p class="text-white-50 small mb-0">Track your property ambition and discover how qualified referrals bring you closer to your goal.</p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    {% if property_goal %}
+                        <a href="{{ url_for('properties') }}" class="btn btn-sm btn-outline-light rounded-pill">
+                            <i class="bi bi-arrow-repeat me-1"></i> Change Goal Property
+                        </a>
+                        <form action="{{ url_for('remove_property_goal') }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary text-white-50 rounded-pill">
+                                <i class="bi bi-x-circle me-1"></i> Remove
+                            </button>
+                        </form>
+                    {% else %}
+                        <a href="{{ url_for('properties') }}" class="btn btn-sm odacity-btn-red rounded-pill">
+                            <i class="bi bi-search me-1"></i> Select Goal Property
+                        </a>
+                    {% endif %}
+                </div>
             </div>
+            <div class="card-body p-4">
+                {% if property_goal %}
+                    {% if not property_goal.is_available %}
+                        <div class="alert alert-warning py-2 px-3 small border-warning rounded-3 mb-4 d-flex align-items-center justify-content-between">
+                            <div>
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <strong>Goal Property Notice:</strong> Your selected goal property (<em>{{ property_goal.title }}</em>) is currently <strong>{{ property_goal.publication_status }}</strong>.
+                            </div>
+                            <a href="{{ url_for('properties') }}" class="btn btn-sm btn-warning rounded-pill fw-bold text-nowrap ms-2">Select Another Property</a>
+                        </div>
+                    {% endif %}
+
+                    <!-- SELECTED PROPERTY HERO ROW -->
+                    <div class="row g-4 align-items-center mb-4">
+                        <div class="col-md-3">
+                            {% if property_goal.image_url %}
+                                <img src="{{ property_goal.image_url }}" class="img-fluid rounded-3 shadow-sm border" alt="{{ property_goal.title }}" style="width: 100%; height: 130px; object-fit: cover;">
+                            {% else %}
+                                <div class="bg-light border rounded-3 p-4 text-center text-muted" style="height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                    <i class="bi bi-building fs-2 text-secondary mb-1"></i>
+                                    <span class="small fw-semibold">Odacity Verified Property</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-9">
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-1 rounded-pill fw-bold">{{ property_goal.goal_type }}</span>
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border px-3 py-1 rounded-pill">#PROP-{{ property_goal.property_id }}</span>
+                                {% if property_goal.is_available %}
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-1 rounded-pill">✓ Available</span>
+                                {% else %}
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-3 py-1 rounded-pill">{{ property_goal.publication_status }}</span>
+                                {% endif %}
+                            </div>
+                            <h4 class="fw-bold text-dark mb-1">{{ property_goal.title }}</h4>
+                            <p class="text-muted small mb-2"><i class="bi bi-geo-alt-fill text-danger me-1"></i> {{ property_goal.location }}</p>
+                            <a href="{{ url_for('property_detail', property_id=property_goal.property_id) }}" class="btn btn-sm btn-outline-dark rounded-pill">
+                                <i class="bi bi-eye me-1"></i> View Property Details
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- GOAL METRICS ROW -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4 col-6">
+                            <div class="p-3 bg-light border rounded-3 text-center">
+                                <span class="text-muted small fw-semibold d-block text-uppercase">Target Property Price</span>
+                                <span class="fs-5 fw-bold text-danger">₦{{ "{:,.2f}".format(property_goal.target_amount) }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 col-6">
+                            <div class="p-3 bg-light border rounded-3 text-center">
+                                <span class="text-muted small fw-semibold d-block text-uppercase">Referral Rewards Earned</span>
+                                <span class="fs-5 fw-bold text-success">₦{{ "{:,.2f}".format(property_goal.referral_rewards_total) }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <div class="p-3 bg-light border rounded-3 text-center">
+                                <span class="text-muted small fw-semibold d-block text-uppercase">Remaining Opportunity</span>
+                                <span class="fs-5 fw-bold text-dark">₦{{ "{:,.2f}".format(property_goal.remaining_amount) }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PROGRESS BAR & ENCOURAGEMENT CTA -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted fw-bold">Referral Progress Opportunity</span>
+                            <span class="small fw-bold text-danger">{{ property_goal.progress_percentage }}%</span>
+                        </div>
+                        <div class="progress" style="height: 12px; border-radius: 6px;">
+                            <div class="progress-bar bg-danger progress-bar-striped progress-bar-animated" role="progressbar" style="width: {{ property_goal.progress_percentage }}%;" aria-valuenow="{{ property_goal.progress_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+
+                    <!-- GOLD & ENCOURAGEMENT CALLOUT -->
+                    <div class="row g-3 align-items-center p-3 bg-light border rounded-3 mx-0 mb-3">
+                        <div class="col-md-4 border-end">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="fs-2 text-warning"><i class="bi bi-coin"></i></div>
+                                <div>
+                                    <span class="d-block small text-muted fw-bold text-uppercase">Gold Points Balance</span>
+                                    <span class="fs-4 fw-bold text-dark">{{ property_goal.gold_points }} Gold</span>
+                                    <span class="d-block text-muted" style="font-size: 0.75rem;"><i class="bi bi-info-circle me-1"></i>{{ property_goal.gold_valuation_status }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="ps-md-2">
+                                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-rocket-takeoff text-danger me-2"></i>Achieve Your Goal Faster</h6>
+                                <p class="small text-muted mb-0">Your referral rewards have created ₦{{ "{:,.2f}".format(property_goal.referral_rewards_total) }} in earning opportunity toward your property ambition. Increase your qualified referrals to create more earning opportunities.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NEXT ACTION RECOMMENDATION -->
+                    <div class="alert alert-info border-info d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-0 rounded-3">
+                        <div>
+                            <span class="badge bg-info text-dark text-uppercase mb-1">Recommended Next Action</span>
+                            <h6 class="fw-bold text-dark mb-0">{{ property_goal.next_action_title }}</h6>
+                            <span class="small text-muted">{{ property_goal.next_action_desc }}</span>
+                        </div>
+                        <a href="{{ property_goal.next_action_url }}" class="btn btn-sm btn-dark text-nowrap rounded-pill px-3">
+                            <i class="bi bi-arrow-right-circle me-1"></i> Take Action
+                        </a>
+                    </div>
+                {% else %}
+                    <!-- EMPTY STATE CARD -->
+                    <div class="text-center py-4 px-3">
+                        <div class="mb-3">
+                            <div class="bg-light text-danger rounded-circle d-inline-flex align-items-center justify-content-center p-3 fs-1 shadow-sm" style="width: 80px; height: 80px;">
+                                🎯
+                            </div>
+                        </div>
+                        <h4 class="fw-bold text-dark mb-2">Set Your Property Goal</h4>
+                        <p class="text-muted mb-4 mx-auto" style="max-width: 600px;">
+                            Choose an existing Odacity property you'd love to own or rent and make it your aspirational goal. Track how building your referral network creates earning opportunities to help you achieve your property ambitions.
+                        </p>
+                        <a href="{{ url_for('properties') }}" class="btn odacity-btn-red px-4 py-2.5 rounded-pill shadow-sm fw-bold">
+                            <i class="bi bi-search me-1"></i> Browse Marketplace & Select Goal Property
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- REFERRAL & QR CODE SECTION -->
         <div class="card odacity-card mb-4 bg-white">
             <div class="card-header bg-dark text-white p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">

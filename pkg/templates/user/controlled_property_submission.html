@@ -289,29 +289,66 @@
 
                     <!-- STEP 2: PHOTOS & MEDIA -->
                     <div class="form-step-panel" id="step-panel-2">
-                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-images text-danger me-2"></i>Step 2: Property Photographs</h4>
-                        <p class="text-muted small mb-4">Upload clear photographs of the property exterior and interior (JPG, PNG, JPEG).</p>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h4 class="fw-bold text-dark mb-0"><i class="bi bi-images text-danger me-2"></i>Step 2: Property Photographs</h4>
+                            <span class="badge bg-primary px-3 py-2 fs-6 rounded-pill" id="photo-counter-badge">
+                                <i class="bi bi-camera me-1"></i> <span id="photo-count">0</span> / 20 images selected
+                            </span>
+                        </div>
+                        <p class="text-muted small mb-3">Upload up to 20 clear photographs of the property exterior and interior (JPG, JPEG, PNG only).</p>
 
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <div class="card p-3 bg-light border-0 rounded-3 mb-2">
-                                    <label for="primary_photo" class="form-label fw-bold text-dark mb-1">{{ form.primary_photo.label.text }}</label>
-                                    {{ form.primary_photo(class="form-control", id="primary_photo", accept="image/*") }}
-                                    <span class="small text-muted mt-1">Primary photo will be featured as the main thumbnail.</span>
-                                </div>
+                        <input type="hidden" name="primary_photo_index" id="primary_photo_index" value="0">
+
+                        <!-- DROPZONE & FILE INPUT -->
+                        <div class="card border-2 border-dashed bg-light p-4 text-center rounded-3 mb-4" id="dropzone-area" style="border-style: dashed; border-color: #cbd5e1; cursor: pointer;">
+                            <div class="py-3">
+                                <i class="bi bi-cloud-arrow-up text-danger display-5 mb-2 d-block"></i>
+                                <h6 class="fw-bold text-dark mb-1">Drag & Drop Property Photos Here</h6>
+                                <p class="text-muted small mb-3">or click to browse from your device (JPG, JPEG, PNG)</p>
+                                <label for="property_photos" class="btn btn-outline-danger btn-sm rounded-pill px-4 fw-bold mb-0">
+                                    <i class="bi bi-folder2-open me-1"></i> Choose Photos
+                                </label>
+                                <input type="file" name="property_photos" id="property_photos" class="d-none" multiple accept=".jpg,.jpeg,.png,image/jpeg,image/png">
                             </div>
+                        </div>
 
-                            <div class="col-md-6">
-                                <div class="card p-3 bg-light border-0 rounded-3">
-                                    <label for="photo_2" class="form-label fw-bold text-dark mb-1">{{ form.photo_2.label.text }}</label>
-                                    {{ form.photo_2(class="form-control", id="photo_2", accept="image/*") }}
-                                </div>
-                            </div>
+                        <!-- LIVE PREVIEW GRID -->
+                        <div id="preview-section" style="display: none;">
+                            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-grid-3x3-gap-fill text-muted me-1"></i> Selected Images Preview & Primary Cover Selection</h6>
+                            <div class="row g-3 mb-4" id="photo-preview-grid"></div>
+                        </div>
 
-                            <div class="col-md-6">
-                                <div class="card p-3 bg-light border-0 rounded-3">
-                                    <label for="photo_3" class="form-label fw-bold text-dark mb-1">{{ form.photo_3.label.text }}</label>
-                                    {{ form.photo_3(class="form-control", id="photo_3", accept="image/*") }}
+                        <!-- LEGACY SINGLE FIELD FALLBACK -->
+                        <div class="accordion accordion-flush mb-3" id="legacyPhotoAccordion">
+                            <div class="accordion-item bg-transparent">
+                                <h2 class="accordion-header" id="headingLegacy">
+                                    <button class="accordion-button collapsed py-2 px-0 bg-transparent text-muted small" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLegacy" aria-expanded="false" aria-controls="collapseLegacy">
+                                        <i class="bi bi-paperclip me-1"></i> Legacy Single File Upload Inputs (Optional Fallback)
+                                    </button>
+                                </h2>
+                                <div id="collapseLegacy" class="accordion-collapse collapse" aria-labelledby="headingLegacy" data-bs-parent="#legacyPhotoAccordion">
+                                    <div class="accordion-body px-0 pt-2 pb-0">
+                                        <div class="row g-3">
+                                            <div class="col-12">
+                                                <div class="card p-3 bg-light border-0 rounded-3">
+                                                    <label for="primary_photo" class="form-label fw-bold text-dark mb-1">{{ form.primary_photo.label.text }}</label>
+                                                    {{ form.primary_photo(class="form-control", id="primary_photo", accept=".jpg,.jpeg,.png") }}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card p-3 bg-light border-0 rounded-3">
+                                                    <label for="photo_2" class="form-label fw-bold text-dark mb-1">{{ form.photo_2.label.text }}</label>
+                                                    {{ form.photo_2(class="form-control", id="photo_2", accept=".jpg,.jpeg,.png") }}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card p-3 bg-light border-0 rounded-3">
+                                                    <label for="photo_3" class="form-label fw-bold text-dark mb-1">{{ form.photo_3.label.text }}</label>
+                                                    {{ form.photo_3(class="form-control", id="photo_3", accept=".jpg,.jpeg,.png") }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -445,6 +482,167 @@
 {% block extra_js %}
 <script>
     let currentStep = 1;
+    let selectedFilesArray = [];
+    let primaryPhotoIndex = 0;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const photoInput = document.getElementById('property_photos');
+        const dropzoneArea = document.getElementById('dropzone-area');
+        const previewGrid = document.getElementById('photo-preview-grid');
+        const previewSection = document.getElementById('preview-section');
+        const countSpan = document.getElementById('photo-count');
+        const primaryIndexInput = document.getElementById('primary_photo_index');
+
+        if (dropzoneArea && photoInput) {
+            // Drag and drop event handlers
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzoneArea.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzoneArea.classList.add('bg-white', 'border-danger');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzoneArea.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzoneArea.classList.remove('bg-white', 'border-danger');
+                }, false);
+            });
+
+            dropzoneArea.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            });
+
+            dropzoneArea.addEventListener('click', (e) => {
+                if (e.target !== photoInput && e.target.tagName !== 'LABEL') {
+                    photoInput.click();
+                }
+            });
+
+            photoInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+        }
+
+        function handleFiles(files) {
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+            const allowedExts = ['.jpg', '.jpeg', '.png'];
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+                if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
+                    alert(`File "${file.name}" is not a supported image format. Only JPG, JPEG, and PNG images are allowed.`);
+                    continue;
+                }
+
+                if (selectedFilesArray.length >= 20) {
+                    alert("Maximum limit of 20 property images reached.");
+                    break;
+                }
+
+                // Check for duplicates
+                const exists = selectedFilesArray.some(f => f.name === file.name && f.size === file.size);
+                if (!exists) {
+                    selectedFilesArray.push(file);
+                }
+            }
+
+            syncFileInputAndRender();
+        }
+
+        function syncFileInputAndRender() {
+            // Create DataTransfer to update input.files
+            const dt = new DataTransfer();
+            selectedFilesArray.forEach(file => dt.items.add(file));
+            if (photoInput) {
+                photoInput.files = dt.files;
+            }
+
+            // Update counter
+            if (countSpan) {
+                countSpan.innerText = selectedFilesArray.length;
+            }
+
+            if (selectedFilesArray.length === 0) {
+                if (previewSection) previewSection.style.display = 'none';
+                if (previewGrid) previewGrid.innerHTML = '';
+                primaryPhotoIndex = 0;
+                if (primaryIndexInput) primaryIndexInput.value = 0;
+                return;
+            }
+
+            if (previewSection) previewSection.style.display = 'block';
+            if (!previewGrid) return;
+
+            // Ensure primary index is valid
+            if (primaryPhotoIndex >= selectedFilesArray.length) {
+                primaryPhotoIndex = 0;
+            }
+            if (primaryIndexInput) primaryIndexInput.value = primaryPhotoIndex;
+
+            previewGrid.innerHTML = '';
+            selectedFilesArray.forEach((file, idx) => {
+                const isPrimary = (idx === primaryPhotoIndex);
+                const col = document.createElement('div');
+                col.className = 'col-6 col-md-4 col-lg-3';
+
+                const objectUrl = URL.createObjectURL(file);
+                const sizeKB = (file.size / 1024).toFixed(1);
+
+                col.innerHTML = `
+                    <div class="card h-100 shadow-sm border ${isPrimary ? 'border-danger border-2' : 'border-light'} rounded-3 overflow-hidden position-relative">
+                        <div class="position-relative" style="height: 140px; background-color: #f8fafc;">
+                            <img src="${objectUrl}" class="w-100 h-100" style="object-fit: cover;" alt="${file.name}">
+                            ${isPrimary ? '<span class="position-absolute top-0 start-0 m-2 badge bg-danger fw-bold"><i class="bi bi-star-fill me-1"></i>Primary Cover</span>' : ''}
+                            <button type="button" class="btn btn-dark btn-sm rounded-circle position-absolute top-0 end-0 m-2 py-0 px-2 opacity-75 hover-opacity-100 remove-btn" data-index="${idx}" title="Remove image">
+                                &times;
+                            </button>
+                        </div>
+                        <div class="card-body p-2 text-center bg-white">
+                            <p class="small text-truncate mb-1 fw-semibold text-dark" title="${file.name}">${file.name}</p>
+                            <span class="badge bg-light text-muted border small mb-2">${sizeKB} KB</span>
+                            <div class="form-check d-flex justify-content-center align-items-center mb-0">
+                                <input class="form-check-input me-1 primary-radio" type="radio" name="primary_select" id="primary_radio_${idx}" value="${idx}" ${isPrimary ? 'checked' : ''}>
+                                <label class="form-check-label small fw-bold text-muted cursor-pointer" for="primary_radio_${idx}">
+                                    ${isPrimary ? '<span class="text-danger">Main Cover</span>' : 'Set as Cover'}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                previewGrid.appendChild(col);
+            });
+
+            // Add event listeners for remove buttons and primary radios
+            previewGrid.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const removeIdx = parseInt(this.getAttribute('data-index'), 10);
+                    selectedFilesArray.splice(removeIdx, 1);
+                    if (primaryPhotoIndex === removeIdx) {
+                        primaryPhotoIndex = 0;
+                    } else if (primaryPhotoIndex > removeIdx) {
+                        primaryPhotoIndex--;
+                    }
+                    syncFileInputAndRender();
+                });
+            });
+
+            previewGrid.querySelectorAll('.primary-radio').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    primaryPhotoIndex = parseInt(this.value, 10);
+                    syncFileInputAndRender();
+                });
+            });
+        }
+    });
 
     function showStep(step) {
         document.querySelectorAll('.form-step-panel').forEach(p => p.classList.remove('active'));

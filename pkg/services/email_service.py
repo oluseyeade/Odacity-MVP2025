@@ -176,3 +176,102 @@ Property Ownership Without the Stress"""
     logger.info(f"[Email 2] Sent intent decline notification to {recipient_email} for {full_name} ({enquiry_type})")
     return email_record
 
+
+def create_user_notification(
+    user_id,
+    notification_type,
+    subject,
+    message,
+    url=None,
+    send_email=False,
+    email_template=None,
+    email_context=None,
+    idempotency_window_minutes=5
+):
+    """
+    Phase 23.1 — Unified Notification Dispatch Helper
+    Creates an in-app Notification record for the target user (is_read=False, read_at=None)
+    and optionally dispatches a transactional email to the user's registered email via _sent_outbox.
+
+    Enforces defensive duplicate suppression using existing schema fields (user_id, notification_type, subject, created_at).
+    """
+    from datetime import datetime, timedelta
+    from pkg.models import db, User, Notification
+
+    if not user_id:
+        logger.warning("[Notification] Cannot create notification: Missing user_id")
+        return None
+
+    user = User.query.get(user_id)
+    if not user:
+        logger.warning(f"[Notification] Cannot create notification: User #{user_id} not found")
+        return None
+
+    now = datetime.utcnow()
+
+    # Defensive Idempotency Suppression Check (No schema changes)
+    if idempotency_window_minutes and idempotency_window_minutes > 0:
+        window_start = now - timedelta(minutes=idempotency_window_minutes)
+        existing = Notification.query.filter(
+            Notification.user_id == user_id,
+            Notification.notification_type == notification_type,
+            Notification.subject == subject,
+            Notification.created_at >= window_start
+        ).first()
+
+        if existing:
+            logger.info(f"[Notification] Defensive duplicate check suppressed duplicate alert for user #{user_id} ({notification_type}: '{subject}') within {idempotency_window_minutes}m window.")
+            return existing
+
+    # Create In-App Notification (is_read=False, read_at=None)
+    notif = Notification(
+        user_id=user_id,
+        notification_type=notification_type,
+        type=notification_type,
+        subject=subject,
+        body=message,
+        message=message,
+        url=url,
+        is_read=False,
+        read_at=None,
+        created_at=now
+    )
+
+    db.session.add(notif)
+    db.session.commit()
+    logger.info(f"[Notification] In-app notification #{notif.notification_id} created for user #{user_id} ({notification_type})")
+
+    # Optional Email Outbox Dispatch
+    if send_email and user.email:
+        phone, whatsapp = get_contact_info()
+        ctx = email_context.copy() if email_context else {}
+        ctx.setdefault('full_name', user.full_name or "Valued Customer")
+        ctx.setdefault('phone', phone)
+        ctx.setdefault('whatsapp', whatsapp)
+        ctx.setdefault('subject', subject)
+        ctx.setdefault('message', message)
+        ctx.setdefault('url', url)
+
+        body_html = None
+        if email_template:
+            try:
+                body_html = render_template(email_template, **ctx)
+            except Exception as e:
+                logger.warning(f"[Notification] Failed to render email template '{email_template}': {e}")
+
+        email_record = {
+            "to": user.email,
+            "subject": subject,
+            "body_text": message,
+            "body_html": body_html,
+            "full_name": user.full_name,
+            "notification_type": notification_type,
+            "url": url,
+            "phone": phone,
+            "whatsapp": whatsapp
+        }
+
+        _sent_outbox.append(email_record)
+        logger.info(f"[Email Notification] Sent transactional email to {user.email} for user #{user_id} ({notification_type})")
+
+    return notif
