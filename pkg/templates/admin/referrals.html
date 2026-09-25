@@ -1,0 +1,159 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ title or "Referrals Audit & Governance — Odacity Admin" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-stats-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    }
+    .admin-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+
+    <!-- FLASH MESSAGES -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+                    {% if category == 'success' %}
+                        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                    {% elif category == 'danger' %}
+                        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                    {% endif %}
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-people text-danger me-2"></i>Referrals Audit & Governance</h2>
+            <p class="text-muted mb-0">Monitor customer referral attributions, qualification milestones, and settled reward earnings.</p>
+        </div>
+    </div>
+
+    <!-- STATS ROW -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="admin-stats-card text-center">
+                <span class="d-block text-muted small fw-semibold text-uppercase mb-1">Total Referrals</span>
+                <span class="fs-3 fw-bold text-dark">{{ total_referrals }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="admin-stats-card text-center">
+                <span class="d-block text-muted small fw-semibold text-uppercase mb-1">Attributed</span>
+                <span class="fs-3 fw-bold text-info">{{ attributed_count }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="admin-stats-card text-center">
+                <span class="d-block text-muted small fw-semibold text-uppercase mb-1">Qualified / Completed</span>
+                <span class="fs-3 fw-bold text-success">{{ completed_count + qualified_count }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="admin-stats-card text-center">
+                <span class="d-block text-muted small fw-semibold text-uppercase mb-1">Total Rewards Settled</span>
+                <span class="fs-3 fw-bold text-danger">₦{{ "%.2f"|format(total_reward_sum) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- FILTERS ROW -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+        <div class="btn-group btn-group-sm" role="group">
+            <a href="{{ url_for('admin_referrals', status='all') }}" class="btn {% if status_filter == 'all' %}btn-dark{% else %}btn-outline-secondary{% endif %}">All</a>
+            <a href="{{ url_for('admin_referrals', status='Attributed') }}" class="btn {% if status_filter == 'Attributed' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Attributed</a>
+            <a href="{{ url_for('admin_referrals', status='Qualified') }}" class="btn {% if status_filter == 'Qualified' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Qualified</a>
+            <a href="{{ url_for('admin_referrals', status='Completed') }}" class="btn {% if status_filter == 'Completed' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Completed</a>
+        </div>
+    </div>
+
+    <!-- TABLE CARD -->
+    <div class="admin-table-card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Code</th>
+                        <th>Referrer</th>
+                        <th>Referred Customer</th>
+                        <th>Status</th>
+                        <th>Attributed Date</th>
+                        <th>Qualified Date</th>
+                        <th>Reward Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if referrals %}
+                        {% for ref in referrals %}
+                            <tr>
+                                <td class="fw-bold">#{{ ref.referral_id }}</td>
+                                <td><code>{{ ref.referral_code_used or 'REF-OD-' ~ ref.referrer_customer_id }}</code></td>
+                                <td>
+                                    {% if ref.referrer and ref.referrer.user %}
+                                        {{ ref.referrer.user.first_name }} {{ ref.referrer.user.last_name }} (#{{ ref.referrer_customer_id }})
+                                    {% else %}
+                                        Customer #{{ ref.referrer_customer_id }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if ref.referred and ref.referred.user %}
+                                        {{ ref.referred.user.first_name }} {{ ref.referred.user.last_name }} (#{{ ref.referred_customer_id }})
+                                    {% else %}
+                                        Customer #{{ ref.referred_customer_id }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if ref.status == 'Completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif ref.status == 'Qualified' %}
+                                        <span class="badge bg-primary">Qualified</span>
+                                    {% elif ref.status == 'Attributed' %}
+                                        <span class="badge bg-info text-dark">Attributed</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ ref.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">{{ ref.created_at.strftime('%Y-%m-%d %H:%M') if ref.created_at else '—' }}</td>
+                                <td class="small text-muted">{{ ref.qualified_at.strftime('%Y-%m-%d %H:%M') if ref.qualified_at else '—' }}</td>
+                                <td>
+                                    {% if ref.rewards %}
+                                        <span class="fw-bold text-success">₦{{ "%.2f"|format(ref.rewards[0].reward_amount) }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No referral records found matching filter.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
