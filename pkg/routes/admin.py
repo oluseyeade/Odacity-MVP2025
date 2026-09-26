@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import secrets
 import logging
@@ -9,6 +9,11 @@ from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash
 from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
+from flask import jsonify
+from pkg.services.admin_overview import (
+    get_business_snapshot, get_superadmin_tasks, get_performance_indices,
+    get_funnel_metrics, get_activity_feed, get_metric_catalogue
+)
 from pkg import app
 from pkg.models import db, User, Role, UserRole, VerificationCase, VerificationEvent, AuditLog, SecurityEvent, Property, DirectAssetBrief, PropertyDocument, PropertyMedia, Inspection, CustomerProfile, Offer, Transaction, Invoice, Payment, PerformanceGuarantee, GuaranteeCycle, GuaranteeEvent, GuaranteeSettlement, BankGuaranteeReference, Mandate, TransactionDocument, Referral, ReferralReward, ReferralEvent, GoldAccount, GoldReward, GoldEvent
 from pkg.services.email_service import send_intent_approval_notification, send_intent_decline_notification, create_user_notification
@@ -504,8 +509,19 @@ def admin_intents():
     """
     status_filter = request.args.get('status', 'all')
     type_filter = request.args.get('type', 'all')
+    property_id_param = request.args.get('property_id', type=int)
 
     query = VerificationCase.query
+
+    if property_id_param:
+        prop = Property.query.get(property_id_param)
+        prop_vcase = VerificationCase.query.filter_by(entity_type='property', entity_id=property_id_param).first()
+        if prop_vcase:
+            query = query.filter_by(entity_type='property', entity_id=property_id_param)
+        elif prop and prop.dab_id:
+            query = query.filter_by(dab_id=prop.dab_id)
+        else:
+            query = query.filter_by(entity_type='property', entity_id=property_id_param)
 
     if status_filter != 'all':
         query = query.filter_by(status=status_filter)
@@ -1913,9 +1929,14 @@ def admin_transactions():
     is_operational_admin = user_rec and has_phase16_operational_permission(user_rec)
 
     status_filter = request.args.get('status', '').strip()
+    invoice_id_param = request.args.get('invoice_id', type=int)
     query = Transaction.query.order_by(Transaction.created_at.desc())
 
-    if status_filter:
+    if invoice_id_param:
+        inv = Invoice.query.get(invoice_id_param)
+        if inv and inv.transaction_id:
+            query = query.filter_by(transaction_id=inv.transaction_id)
+    elif status_filter:
         query = query.filter_by(status=status_filter)
 
     transactions = query.all()
@@ -2362,9 +2383,14 @@ def admin_performance():
     can_record_payment = has_settlement_payment_permission(user)
 
     status_filter = request.args.get('status', '').strip()
+    settlement_id_param = request.args.get('settlement_id', type=int)
 
     query = PerformanceGuarantee.query
-    if status_filter:
+    if settlement_id_param:
+        s = GuaranteeSettlement.query.get(settlement_id_param)
+        if s and s.performance_guarantee_id:
+            query = query.filter_by(guarantee_id=s.performance_guarantee_id)
+    elif status_filter:
         query = query.filter_by(status=status_filter)
 
     perf_guarantees = query.order_by(PerformanceGuarantee.created_at.desc()).all()
@@ -2957,9 +2983,14 @@ def admin_referrals():
     user_rec = User.query.get(user_id) if user_id else None
 
     status_filter = request.args.get('status', 'all').strip()
+    reward_id_param = request.args.get('reward_id', type=int)
 
     query = Referral.query.order_by(Referral.created_at.desc())
-    if status_filter and status_filter != 'all':
+    if reward_id_param:
+        gr = GoldReward.query.get(reward_id_param)
+        if gr and gr.customer_id:
+            query = query.filter(Referral.referrer_customer_id == gr.customer_id)
+    elif status_filter and status_filter != 'all':
         query = query.filter_by(status=status_filter)
 
     referrals = query.all()
@@ -2994,197 +3025,106 @@ def admin_command_centre():
     user_id = session.get('user_id')
     user_rec = User.query.get(user_id) if user_id else None
 
+    view = request.args.get('view', 'operations').strip().lower()
+    if view not in ['operations', 'performance']:
+        view = 'operations'
+
     period = request.args.get('period', '30d').strip().lower()
-    now = datetime.utcnow()
-
-    if period == '7d':
-        start_date = now - timedelta(days=7)
-    elif period == '90d':
-        start_date = now - timedelta(days=90)
-    elif period == '12m':
-        start_date = now - timedelta(days=365)
-    elif period == 'all':
-        start_date = None
-    else:  # 30d default
+    if period not in ['7d', '30d', '90d', '12m', 'all']:
         period = '30d'
-        start_date = now - timedelta(days=30)
 
-    # 1. User KPIs
-    total_users = User.query.count()
-    active_users = User.query.filter_by(is_active=True).count()
-    if start_date:
-        new_users = User.query.filter(User.created_at >= start_date).count()
-    else:
-        new_users = total_users
+    # Delegate aggregations to service layer
+    snap = get_business_snapshot(period, user_rec)
+    tasks = get_superadmin_tasks(user_rec)
+    indices = get_performance_indices(period)
+    funnel = get_funnel_metrics(period)
+    feed = get_activity_feed(15)
+    catalogue = get_metric_catalogue()
 
-    # Count admin users (superadmin flag or assigned admin roles)
-    admin_users_count = User.query.filter((User.is_super_admin == True) | (User.user_roles.any())).count()
-
-    # 2. DAB KPIs (Preserve lifetime total & current pending state; add period submission count)
-    total_dabs = DirectAssetBrief.query.count()
-    pending_dabs = DirectAssetBrief.query.filter(DirectAssetBrief.status.in_(['Submitted', 'Under Verification'])).count()
-    approved_dabs = DirectAssetBrief.query.filter_by(status='Approved').count()
-
-    dab_sub_q = DirectAssetBrief.query.filter(DirectAssetBrief.submitted_at.isnot(None))
-    if start_date:
-        dab_sub_q = dab_sub_q.filter(DirectAssetBrief.submitted_at >= start_date)
-    dabs_period = dab_sub_q.count()
-
-    # 3. Property KPIs (Preserve lifetime total & current supply state; add period creation activity)
-    total_properties = Property.query.count()
-    unverified_properties = Property.query.filter_by(publication_status='Under Verification').count()
-    available_properties = Property.query.filter_by(publication_status='Available').count()
-    reserved_properties = Property.query.filter_by(publication_status='Reserved').count()
-
-    prop_act_q = Property.query
-    if start_date:
-        prop_act_q = prop_act_q.filter(Property.created_at >= start_date)
-    properties_period = prop_act_q.count()
-
-    # 4. Transaction KPIs
-    # F-24-03 FIX: Active transactions exclude both Completion and Cancelled
-    active_transactions = Transaction.query.filter(~Transaction.status.in_(['Completion', 'Cancelled'])).count()
-
-    # F-24-04 FIX: Timeframe-scoped completed deal volume and commission
-    completed_tx_query = Transaction.query.filter_by(status='Completion')
-    val_query = db.session.query(func.sum(Transaction.transaction_value)).filter(Transaction.status == 'Completion')
-    comm_query = db.session.query(func.sum(Transaction.odacity_commission_amount)).filter(Transaction.status == 'Completion')
-
-    if start_date:
-        completed_tx_query = completed_tx_query.filter(Transaction.created_at >= start_date)
-        val_query = val_query.filter(Transaction.created_at >= start_date)
-        comm_query = comm_query.filter(Transaction.created_at >= start_date)
-
-    completed_transactions = completed_tx_query.count()
-    val_sum = val_query.scalar()
-    total_volume = float(val_sum) if val_sum else 0.0
-
-    comm_sum = comm_query.scalar()
-    total_commission = float(comm_sum) if comm_sum else 0.0
-
-    # 5. Inspection KPIs (Preserve current queue state; add period request activity)
-    requested_inspections = Inspection.query.filter_by(status='Requested').count()
-    scheduled_inspections = Inspection.query.filter_by(status='Scheduled').count()
-
-    insp_act_q = Inspection.query.filter(Inspection.requested_at.isnot(None))
-    if start_date:
-        insp_act_q = insp_act_q.filter(Inspection.requested_at >= start_date)
-    inspections_period = insp_act_q.count()
-
-    # 6. Offer KPIs (Preserve current queue state; add period submission activity)
-    submitted_offers = Offer.query.filter(Offer.status.in_(['Submitted', 'Under_Review'])).count()
-
-    offer_act_q = Offer.query.filter(Offer.submitted_at.isnot(None))
-    if start_date:
-        offer_act_q = offer_act_q.filter(Offer.submitted_at >= start_date)
-    offers_period = offer_act_q.count()
-
-    # 7. Performance Guarantees
-    active_guarantees = PerformanceGuarantee.query.filter_by(status='Active').count()
-
-    # 8. Financial Liabilities & Referrals
-    # F-24-04 FIX: Timeframe-scoped earned referral rewards & referral creation activity when start_date is set
-    rew_query = db.session.query(func.sum(ReferralReward.reward_amount)).filter_by(status='Earned')
-    ref_act_q = Referral.query
-    if start_date:
-        rew_query = rew_query.filter(ReferralReward.created_at >= start_date)
-        ref_act_q = ref_act_q.filter(Referral.created_at >= start_date)
-
-    rew_sum = rew_query.scalar()
-    total_referral_rewards = float(rew_sum) if rew_sum else 0.0
-    referrals_period = ref_act_q.count()
-
-    w_sum = db.session.query(func.sum(GoldReward.amount)).filter_by(reward_type='Withdrawal_Cash', status='Pending').scalar()
-    pending_withdrawals_sum = float(w_sum) if w_sum else 0.0
-    pending_withdrawals_count = GoldReward.query.filter_by(reward_type='Withdrawal_Cash', status='Pending').count()
-
-    # F-24-02 FIX: Outstanding/overdue invoices filter by supported statuses (Issued, Partially_Paid, Overdue)
-    overdue_invoices_count = Invoice.query.filter(Invoice.status.in_(['Issued', 'Partially_Paid', 'Overdue'])).count()
-
-    # Build KPIs Dict for Template
+    # Maintain backward compatibility KPI dict
     kpis = {
-        'total_users': total_users,
-        'active_users': active_users,
-        'new_users_period': new_users,
-        'admin_users_count': admin_users_count,
-        'total_dabs': total_dabs,
-        'pending_dabs': pending_dabs,
-        'approved_dabs': approved_dabs,
-        'dabs_period': dabs_period,
-        'total_props': total_properties,
-        'unverified_props': unverified_properties,
-        'published_props': available_properties,
-        'reserved_props': reserved_properties,
-        'properties_period': properties_period,
-        'active_txs': active_transactions,
-        'completed_txs': completed_transactions,
-        'total_tx_val': total_volume,
-        'total_commission': total_commission,
-        'requested_inspections': requested_inspections,
-        'scheduled_inspections': scheduled_inspections,
-        'inspections_period': inspections_period,
-        'submitted_offers': submitted_offers,
-        'offers_period': offers_period,
-        'active_guarantees': active_guarantees,
-        'total_earned_rewards': total_referral_rewards,
-        'referrals_period': referrals_period,
-        'pending_withdrawals_sum': pending_withdrawals_sum,
-        'pending_withdrawals_count': pending_withdrawals_count,
-        'overdue_invoices_count': overdue_invoices_count,
+        'total_users': snap['total_users'],
+        'active_users': snap['active_users'],
+        'new_users_period': snap['new_users_curr'],
+        'admin_users_count': snap['admin_users_count'],
+        'total_dabs': snap['total_dabs'],
+        'pending_dabs': snap['pending_dabs'],
+        'approved_dabs': snap['approved_dabs'],
+        'dabs_period': snap['dabs_curr'],
+        'total_props': snap['total_props'],
+        'unverified_props': snap['unverified_props'],
+        'published_props': snap['published_props'],
+        'reserved_props': snap['reserved_props'],
+        'properties_period': snap['props_curr'],
+        'active_txs': snap['active_txs'],
+        'completed_txs': snap['completed_txs_curr'],
+        'total_tx_val': snap['tx_val_curr'],
+        'total_commission': snap['commission_curr'],
+        'requested_inspections': snap['requested_inspections'],
+        'scheduled_inspections': snap['scheduled_inspections'],
+        'inspections_period': snap['inspections_curr'],
+        'submitted_offers': snap['submitted_offers'],
+        'offers_period': snap['offers_curr'],
+        'active_guarantees': snap['active_guarantees'],
+        'total_earned_rewards': snap['total_earned_rewards'],
+        'referrals_period': snap['referrals_curr'],
+        'pending_withdrawals_sum': snap['pending_withdrawals_sum'],
+        'pending_withdrawals_count': snap['pending_withdrawals_count'],
+        'overdue_invoices_count': snap['overdue_invoices_count'],
     }
 
-    # Management Attention Alerts Array
+    # Backward compatibility alerts
     alerts = []
-    if pending_dabs > 0:
+    if snap['pending_dabs'] > 0:
         alerts.append({
             'severity': 'warning',
             'title': 'DAB Review Bottleneck',
-            'count': pending_dabs,
+            'count': snap['pending_dabs'],
             'label': 'DAB(s) Pending Review',
             'description': 'Direct Asset Briefs submitted by users requiring verification.',
             'url': url_for('admin_intents')
         })
-    if unverified_properties > 0:
+    if snap['unverified_props'] > 0:
         alerts.append({
             'severity': 'warning',
             'title': 'Unverified Property Supply',
-            'count': unverified_properties,
+            'count': snap['unverified_props'],
             'label': 'Property(ies) Unverified',
             'description': 'Listings pending compliance verification before publication.',
             'url': url_for('admin_intents')
         })
-    if requested_inspections > 0:
+    if snap['requested_inspections'] > 0:
         alerts.append({
             'severity': 'info',
             'title': 'Requested Inspections',
-            'count': requested_inspections,
+            'count': snap['requested_inspections'],
             'label': 'Inspection(s) Requested',
             'description': 'Customer booking requests awaiting visit scheduling.',
             'url': url_for('admin_inspections')
         })
-    if submitted_offers > 0:
+    if snap['submitted_offers'] > 0:
         alerts.append({
             'severity': 'primary',
             'title': 'Submitted Offers Queue',
-            'count': submitted_offers,
+            'count': snap['submitted_offers'],
             'label': 'Offer(s) Pending Review',
             'description': 'Buyer property offers awaiting evaluation.',
             'url': url_for('admin_offers')
         })
-    if pending_withdrawals_count > 0:
+    if snap['pending_withdrawals_count'] > 0:
         alerts.append({
             'severity': 'danger',
             'title': 'Outstanding Cash Withdrawals',
-            'count': pending_withdrawals_count,
-            'label': f'Withdrawal Request(s) (â‚¦{pending_withdrawals_sum:,.2f})',
+            'count': snap['pending_withdrawals_count'],
+            'label': 'Withdrawal Request(s)',
             'description': 'Pending cash reward redemptions requiring finance action.',
             'url': url_for('admin_referrals')
         })
-    if overdue_invoices_count > 0:
+    if snap['overdue_invoices_count'] > 0:
         alerts.append({
             'severity': 'warning',
             'title': 'Unpaid / Overdue Invoices',
-            'count': overdue_invoices_count,
+            'count': snap['overdue_invoices_count'],
             'label': 'Unpaid Invoice(s)',
             'description': 'Transaction invoices currently outstanding.',
             'url': url_for('admin_transactions')
@@ -3192,14 +3132,28 @@ def admin_command_centre():
 
     return render_template(
         'admin/command_centre.html',
-        title='Superadmin Command Centre & BI â€” Odacity Admin',
+        title='Superadmin Executive Control Centre — Odacity Admin',
         user=user_rec,
+        view=view,
         period=period,
+        snap=snap,
+        tasks=tasks,
+        indices=indices,
+        funnel=funnel,
+        feed=feed,
+        catalogue=catalogue,
         kpis=kpis,
         alerts=alerts
     )
 
 
+@app.route('/admin/task-centre/', methods=['GET'])
+@superadmin_required
+def admin_task_centre_feed():
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id) if user_id else None
+    tasks_data = get_superadmin_tasks(user_rec)
+    return jsonify(tasks_data)
 # ==========================================
 # PHASE 24 â€” ADMIN GOVERNANCE & USERS
 # ==========================================

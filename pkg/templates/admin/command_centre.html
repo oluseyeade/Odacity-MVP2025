@@ -1,218 +1,543 @@
 {% extends "admin/layout.html" %}
 
-{% block title %}Superadmin Command Centre — ODACITY{% endblock %}
+{% block title %}Superadmin Executive Control Centre — ODACITY{% endblock %}
 
 {% block admin_content %}
 <div class="container py-4">
-    <!-- Header Banner -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center bg-dark text-white rounded-4 p-4 mb-4 shadow-sm">
+    <!-- Executive Header Banner -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center bg-dark text-white rounded-4 p-4 mb-4 shadow-sm border border-secondary">
         <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-danger text-uppercase px-3 py-2 rounded-pill fw-bold" style="letter-spacing: 1px;">Superadmin Governance</span>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-danger text-uppercase px-3 py-2 rounded-pill fw-bold" style="letter-spacing: 1px;">Superadmin Control Tower</span>
                 <span class="badge bg-outline-light border text-light rounded-pill">Odacity MVP 2025</span>
+                <span class="badge bg-secondary rounded-pill text-light"><i class="bi bi-clock me-1"></i>As of: {{ snap.window.now.strftime('%Y-%m-%d %H:%M UTC') }}</span>
             </div>
-            <h3 class="fw-bold mb-1">Odacity Business Command Centre</h3>
-            <p class="text-secondary small mb-0">Central Business Intelligence, Pipeline Monitoring, Governance & Executive Controls</p>
+            <h3 class="fw-bold mb-1">Odacity Executive Control Centre</h3>
+            <p class="text-secondary small mb-0">Dual-Mode Operational Command Tower & Investor Performance Dashboard</p>
         </div>
-        <div class="mt-3 mt-md-0 d-flex align-items-center gap-2">
-            <label class="text-secondary small fw-semibold text-nowrap"><i class="bi bi-funnel me-1"></i>Period:</label>
-            <div class="btn-group btn-group-sm" role="group">
-                <a href="{{ url_for('admin_command_centre', period='7d') }}" class="btn {% if period == '7d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">7D</a>
-                <a href="{{ url_for('admin_command_centre', period='30d') }}" class="btn {% if period == '30d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">30D</a>
-                <a href="{{ url_for('admin_command_centre', period='90d') }}" class="btn {% if period == '90d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">90D</a>
-                <a href="{{ url_for('admin_command_centre', period='12m') }}" class="btn {% if period == '12m' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">12M</a>
-                <a href="{{ url_for('admin_command_centre', period='all') }}" class="btn {% if period == 'all' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">All</a>
+
+        <div class="mt-3 mt-md-0 d-flex flex-column align-items-md-end gap-2">
+            <!-- Mode Switcher Toggle Buttons -->
+            <div class="btn-group p-1 bg-secondary bg-opacity-25 rounded-pill border border-secondary" role="group" aria-label="Dashboard Mode">
+                <a href="{{ url_for('admin_command_centre', view='operations', period=period) }}" class="btn btn-sm rounded-pill px-3 fw-bold {% if view == 'operations' %}btn-danger shadow{% else %}btn-dark text-light{% endif %}">
+                    <i class="bi bi-cpu-fill me-1"></i> OPERATIONS
+                </a>
+                <a href="{{ url_for('admin_command_centre', view='performance', period=period) }}" class="btn btn-sm rounded-pill px-3 fw-bold {% if view == 'performance' %}btn-danger shadow{% else %}btn-dark text-light{% endif %}">
+                    <i class="bi bi-graph-up-arrow me-1"></i> PERFORMANCE
+                </a>
+            </div>
+
+            <!-- Timeframe Period Selector & Controls -->
+            <div class="d-flex align-items-center gap-2">
+                <label class="text-secondary small fw-semibold text-nowrap"><i class="bi bi-funnel me-1"></i>Period:</label>
+                <div class="btn-group btn-group-sm" role="group">
+                    <a href="{{ url_for('admin_command_centre', view=view, period='7d') }}" class="btn {% if period == '7d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">7D</a>
+                    <a href="{{ url_for('admin_command_centre', view=view, period='30d') }}" class="btn {% if period == '30d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">30D</a>
+                    <a href="{{ url_for('admin_command_centre', view=view, period='90d') }}" class="btn {% if period == '90d' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">90D</a>
+                    <a href="{{ url_for('admin_command_centre', view=view, period='12m') }}" class="btn {% if period == '12m' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">12M</a>
+                    <a href="{{ url_for('admin_command_centre', view=view, period='all') }}" class="btn {% if period == 'all' %}btn-danger fw-bold{% else %}btn-outline-light{% endif %}">All</a>
+                </div>
+                <button onclick="window.print()" class="btn btn-sm btn-outline-warning rounded-pill" title="Print / Boardroom Presentation Mode">
+                    <i class="bi bi-printer me-1"></i> Print / Present
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Section 1: Business Overview KPI Matrix -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-4 col-xl-2">
-            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-primary">
-                <span class="text-muted text-uppercase font-monospace small fw-semibold">Customer Base</span>
-                <h3 class="fw-bold my-2 text-dark">{{ kpis.total_users }}</h3>
-                <div class="d-flex justify-content-between align-items-center small text-secondary">
-                    <span>Active: <strong>{{ kpis.active_users }}</strong></span>
-                    <span class="badge bg-primary-subtle text-primary">+{{ kpis.new_users_period }} ({{ period.upper() }})</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 col-xl-2">
-            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-info">
-                <span class="text-muted text-uppercase font-monospace small fw-semibold">DAB Submissions</span>
-                <h3 class="fw-bold my-2 text-dark">{{ kpis.total_dabs }}</h3>
-                <div class="d-flex justify-content-between align-items-center small text-secondary">
-                    <span>Pending: <strong>{{ kpis.pending_dabs }}</strong></span>
-                    <span class="badge bg-info-subtle text-info fw-bold">+{{ kpis.dabs_period }} ({{ period.upper() }})</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 col-xl-2">
-            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-success">
-                <span class="text-muted text-uppercase font-monospace small fw-semibold">Property Supply</span>
-                <h3 class="fw-bold my-2 text-dark">{{ kpis.published_props }}</h3>
-                <div class="d-flex justify-content-between align-items-center small text-secondary">
-                    <span>Total: <strong>{{ kpis.total_props }}</strong></span>
-                    <span class="badge bg-success-subtle text-success fw-bold">+{{ kpis.properties_period }} ({{ period.upper() }})</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 col-xl-2">
-            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-warning">
-                <span class="text-muted text-uppercase font-monospace small fw-semibold">Active Deals</span>
-                <h3 class="fw-bold my-2 text-dark">{{ kpis.active_txs }}</h3>
-                <div class="d-flex justify-content-between align-items-center small text-secondary">
-                    <span>Completed:</span>
-                    <span class="badge bg-success fw-bold">{{ kpis.completed_txs }}</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 col-xl-2">
-            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-danger">
-                <span class="text-muted text-uppercase font-monospace small fw-semibold">Deal Volume (NGN)</span>
-                <h4 class="fw-bold my-2 text-dark">₦{{ "%.2f"|format(kpis.total_tx_val) }}</h4>
-                <div class="d-flex justify-content-between align-items-center small text-secondary">
-                    <span>Commission:</span>
-                    <strong class="text-danger">₦{{ "%.2f"|format(kpis.total_commission) }}</strong>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 col-xl-2">
-            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-secondary">
-                <span class="text-muted text-uppercase font-monospace small fw-semibold">Reward Liability</span>
-                <h4 class="fw-bold my-2 text-dark">₦{{ "%.2f"|format(kpis.total_earned_rewards) }}</h4>
-                <div class="d-flex justify-content-between align-items-center small text-secondary">
-                    <span>Cash Withdrawals:</span>
-                    <span class="badge bg-danger text-white">₦{{ "%.2f"|format(kpis.pending_withdrawals_sum) }}</span>
-                </div>
-            </div>
+    {% if snap.window.insufficient_history %}
+    <div class="alert alert-warning border-0 shadow-sm rounded-4 mb-4 d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
+        <div>
+            <strong>Historical Data Depth Limitation Notice:</strong> The selected period <strong>12M</strong> exceeds available database historical coverage (~60 days of data). Metrics display all available records to date.
         </div>
     </div>
+    {% endif %}
 
-    <!-- Section 2: Management Attention & Bottleneck Alerts -->
-    <div class="card border-0 shadow-sm rounded-4 mb-4">
+    <!-- MODE 1: OPERATIONS CONTROL TOWER -->
+    {% if view == 'operations' %}
+
+    <!-- SUPER ADMIN NOTIFICATION & TASK CENTRE -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white border-start border-4 border-danger">
         <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Management Attention & Operational Bottlenecks</h5>
-            <span class="badge bg-dark rounded-pill">{{ alerts|length }} Actionable Alert(s)</span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-danger rounded-circle p-2"><i class="bi bi-list-check text-white"></i></span>
+                <h5 class="fw-bold mb-0 text-dark">SUPER ADMIN TASK CENTRE</h5>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-danger text-white rounded-pill px-3 py-2" id="task-critical-badge">{{ tasks.counts.critical }} Critical</span>
+                <span class="badge bg-warning text-dark rounded-pill px-3 py-2" id="task-high-badge">{{ tasks.counts.high }} High Priority</span>
+                <span class="badge bg-dark rounded-pill px-3 py-2" id="task-total-badge">{{ tasks.counts.total }} Outstanding Task(s)</span>
+                <button onclick="refreshTaskQueue()" class="btn btn-sm btn-outline-secondary rounded-circle ms-1" title="Refresh Tasks"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
         </div>
-        <div class="card-body pt-0">
-            {% if alerts %}
-                <div class="row g-3">
-                    {% for alert in alerts %}
-                        <div class="col-md-6 col-lg-4">
-                            <div class="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-center">
-                                <div>
-                                    <span class="badge bg-{{ alert.severity }} text-uppercase mb-1" style="font-size: 0.75rem;">{{ alert.title }}</span>
-                                    <h6 class="fw-bold mb-1 text-dark">{{ alert.count }} {{ alert.label }}</h6>
-                                    <small class="text-muted">{{ alert.description }}</small>
-                                </div>
-                                <a href="{{ alert.url }}" class="btn btn-sm btn-outline-dark rounded-pill text-nowrap ms-2">Action &rarr;</a>
+
+        <div class="card-body pt-0" id="task-queue-container">
+            {% if tasks.tasks %}
+            <div class="row g-3">
+                {% for t in tasks.tasks %}
+                <div class="col-md-6 col-lg-4 task-item-card" id="card-{{ t.task_id }}">
+                    <div class="p-3 border rounded-4 bg-light h-100 d-flex flex-column justify-content-between shadow-sm border-start border-4 {% if t.priority == 'CRITICAL' %}border-danger{% elif t.priority == 'HIGH' %}border-warning{% else %}border-primary{% endif %}">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="badge {% if t.priority == 'CRITICAL' %}bg-danger{% elif t.priority == 'HIGH' %}bg-warning text-dark{% else %}bg-primary{% endif %} text-uppercase fw-bold" style="font-size: 0.7rem;">
+                                    {{ t.priority }} • {{ t.task_type }}
+                                </span>
+                                <span class="badge bg-secondary-subtle text-secondary font-monospace small" style="font-size: 0.7rem;">
+                                    {{ t.status }}
+                                </span>
+                            </div>
+                            <h6 class="fw-bold text-dark mb-1">{{ t.title }}</h6>
+                            <p class="text-secondary small mb-2">{{ t.description }}</p>
+                            <div class="text-muted small mb-3">
+                                <i class="bi bi-person-badge me-1"></i><strong>Role:</strong> {{ t.responsible_role }}
                             </div>
                         </div>
-                    {% endfor %}
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="text-muted extra-small"><i class="bi bi-clock me-1"></i>Auto-resolves on completion</span>
+                            <a href="{{ t.detail_url or t.action_url }}" class="btn btn-sm btn-dark rounded-pill px-3">
+                                Inspect Record &rarr;
+                            </a>
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
+            </div>
             {% else %}
-                <div class="alert alert-success border-0 rounded-3 mb-0">
-                    <i class="bi bi-check-circle-fill me-2"></i>All operational queues are clear. No pending bottlenecks require immediate management attention.
-                </div>
+            <div class="alert alert-success border-0 rounded-4 mb-0 py-4 text-center">
+                <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
+                <h5 class="fw-bold text-dark mb-1">ALL CLEAR</h5>
+                <p class="text-secondary mb-0">No outstanding operational actions require your attention at this time.</p>
+            </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Section 3: Operational Pipeline Matrix -->
+    <!-- Operations Executive KPI Strip -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-primary">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Customer Base</span>
+                <h3 class="fw-bold my-2 text-dark">{{ snap.total_users }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Active: <strong>{{ snap.active_users }}</strong></span>
+                    <span class="badge bg-primary-subtle text-primary">+{{ snap.new_users_curr }} ({{ period.upper() }})</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-info">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">DAB Submissions</span>
+                <h3 class="fw-bold my-2 text-dark">{{ snap.total_dabs }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Pending: <strong class="text-warning">{{ snap.pending_dabs }}</strong></span>
+                    <span class="badge bg-info-subtle text-info fw-bold">+{{ snap.dabs_curr }} ({{ period.upper() }})</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-success">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Active Supply</span>
+                <h3 class="fw-bold my-2 text-dark">{{ snap.published_props }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Total: <strong>{{ snap.total_props }}</strong></span>
+                    <span class="badge bg-success-subtle text-success fw-bold">+{{ snap.props_curr }} ({{ period.upper() }})</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-warning">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Active Deals</span>
+                <h3 class="fw-bold my-2 text-dark">{{ snap.active_txs }}</h3>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Closed:</span>
+                    <span class="badge bg-success fw-bold">{{ snap.completed_txs_curr }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-danger">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Deal Volume</span>
+                <h4 class="fw-bold my-2 text-dark">NGN {{ "%.2f"|format(snap.tx_val_curr) }}</h4>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Commission:</span>
+                    <strong class="text-danger">NGN {{ "%.2f"|format(snap.commission_curr) }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-xl-2">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 bg-white border-start border-4 border-secondary">
+                <span class="text-muted text-uppercase font-monospace small fw-semibold">Reward Liability</span>
+                <h4 class="fw-bold my-2 text-dark">NGN {{ "%.2f"|format(snap.total_earned_rewards) }}</h4>
+                <div class="d-flex justify-content-between align-items-center small text-secondary">
+                    <span>Cash Out:</span>
+                    <span class="badge bg-danger text-white">NGN {{ "%.2f"|format(snap.pending_withdrawals_sum) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Operational Control Towers Grid -->
     <div class="row g-4 mb-4">
-        <!-- Demand & Supply Pipeline -->
+        <!-- Supply & Verification Control Tower -->
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
-                <h5 class="fw-bold text-dark border-bottom pb-3 mb-3">Supply & Verification Pipeline</h5>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-shield-check text-primary me-2"></i>Supply & Verification Control</h5>
+                    <a href="{{ url_for('admin_intents') }}" class="btn btn-sm btn-outline-dark rounded-pill">Manage &rarr;</a>
+                </div>
                 <div class="list-group list-group-flush">
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="fw-bold mb-0">Pending Direct Asset Briefs (DAB)</h6>
-                            <small class="text-muted">Awaiting intent evaluation & approval (Period Submissions: +{{ kpis.dabs_period }})</small>
+                            <small class="text-muted">Awaiting intent evaluation & approval</small>
                         </div>
-                        <span class="badge bg-warning text-dark fs-6">{{ kpis.pending_dabs }}</span>
+                        <span class="badge bg-warning text-dark fs-6">{{ snap.pending_dabs }}</span>
                     </div>
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="fw-bold mb-0">Properties Under Verification</h6>
-                            <small class="text-muted">Title deeds & site verification in progress (Period Created: +{{ kpis.properties_period }})</small>
+                            <h6 class="fw-bold mb-0">Properties Under Title Verification</h6>
+                            <small class="text-muted">Deed & site compliance in progress</small>
                         </div>
-                        <span class="badge bg-info text-white fs-6">{{ kpis.unverified_props }}</span>
+                        <span class="badge bg-info text-white fs-6">{{ snap.unverified_props }}</span>
                     </div>
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="fw-bold mb-0">Published Available Properties</h6>
-                            <small class="text-muted">Active marketplace listings</small>
+                            <small class="text-muted">Marketplace discovery supply</small>
                         </div>
-                        <span class="badge bg-success fs-6">{{ kpis.published_props }}</span>
+                        <span class="badge bg-success fs-6">{{ snap.published_props }}</span>
                     </div>
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="fw-bold mb-0">Active Performance Guarantees</h6>
-                            <small class="text-muted">Properties under guarantee lifecycle</small>
+                            <small class="text-muted">Under legal guarantee lifecycle</small>
                         </div>
-                        <span class="badge bg-primary fs-6">{{ kpis.active_guarantees }}</span>
+                        <span class="badge bg-primary fs-6">{{ snap.active_guarantees }}</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Deal Execution & Customer Operations -->
+        <!-- Deal Execution Control Tower -->
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
-                <h5 class="fw-bold text-dark border-bottom pb-3 mb-3">Deal Execution & Operations</h5>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-briefcase text-danger me-2"></i>Deal Execution Control</h5>
+                    <a href="{{ url_for('admin_transactions') }}" class="btn btn-sm btn-outline-dark rounded-pill">Manage &rarr;</a>
+                </div>
                 <div class="list-group list-group-flush">
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="fw-bold mb-0">Inspection Bookings Requested</h6>
-                            <small class="text-muted">Awaiting scheduling (Period Requests: +{{ kpis.inspections_period }})</small>
+                            <h6 class="fw-bold mb-0">Requested Inspection Bookings</h6>
+                            <small class="text-muted">Awaiting scheduling with owner/buyer</small>
                         </div>
-                        <span class="badge bg-warning text-dark fs-6">{{ kpis.requested_inspections }}</span>
+                        <span class="badge bg-warning text-dark fs-6">{{ snap.requested_inspections }}</span>
                     </div>
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="fw-bold mb-0">Scheduled Inspections</h6>
-                            <small class="text-muted">Confirmed inspection visits</small>
+                            <small class="text-muted">Confirmed site visits</small>
                         </div>
-                        <span class="badge bg-info text-white fs-6">{{ kpis.scheduled_inspections }}</span>
+                        <span class="badge bg-info text-white fs-6">{{ snap.scheduled_inspections }}</span>
                     </div>
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="fw-bold mb-0">Submitted Offers Awaiting Review</h6>
-                            <small class="text-muted">Buyer letters & price proposals (Period Submitted: +{{ kpis.offers_period }})</small>
+                            <h6 class="fw-bold mb-0">Submitted Offers Pending Review</h6>
+                            <small class="text-muted">Buyer price proposals awaiting review</small>
                         </div>
-                        <span class="badge bg-primary fs-6">{{ kpis.submitted_offers }}</span>
+                        <span class="badge bg-primary fs-6">{{ snap.submitted_offers }}</span>
                     </div>
                     <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="fw-bold mb-0">Active Deal Transactions & Referrals</h6>
-                            <small class="text-muted">Transactions in progress (Period Referrals: +{{ kpis.referrals_period }})</small>
+                            <h6 class="fw-bold mb-0">Active In-Flight Transactions</h6>
+                            <small class="text-muted">Deals in execution stage</small>
                         </div>
-                        <span class="badge bg-danger fs-6">{{ kpis.active_txs }}</span>
+                        <span class="badge bg-danger fs-6">{{ snap.active_txs }}</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Section 4: Governance & Superadmin Quick Actions -->
-    <div class="card border-0 shadow-sm rounded-4 p-4 bg-light border-start border-4 border-dark">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+    <!-- Live Recent Ecosystem Activity Stream -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+        <h5 class="fw-bold text-dark border-bottom pb-3 mb-3"><i class="bi bi-activity text-secondary me-2"></i>Live Ecosystem Activity Stream</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>Category</th>
+                        <th>Title / Event</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in feed %}
+                    <tr>
+                        <td class="small text-muted font-monospace">{{ item.timestamp.strftime('%H:%M:%S') if item.timestamp else 'N/A' }}</td>
+                        <td><span class="badge {{ item.badge }}">{{ item.category }}</span></td>
+                        <td class="fw-semibold">{{ item.title }}</td>
+                        <td class="small text-secondary">{{ item.description }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-center text-muted">No recent activity logs available.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODE 2: INVESTOR PERFORMANCE OVERVIEW -->
+    {% else %}
+
+    <!-- Investor Executive Summary Snapshot Strip -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-white border-top border-4 border-danger">
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
             <div>
-                <h5 class="fw-bold text-dark mb-1"><i class="bi bi-shield-lock-fill me-2"></i>Superadmin Governance Controls</h5>
-                <p class="text-secondary small mb-0">Manage Admin user accounts, assign Master PRD roles, perform controlled operational overrides, and review system audit logs.</p>
+                <h4 class="fw-bold text-dark mb-0">ODACITY PERFORMANCE SNAPSHOT</h4>
+                <small class="text-secondary">Authoritative Database-Driven Growth & Commercial Overview (Period: {{ period.upper() }})</small>
             </div>
-            <div class="d-flex flex-wrap gap-2">
-                <a href="{{ url_for('admin_users') }}" class="btn btn-dark rounded-pill fw-bold">
-                    <i class="bi bi-people-fill me-1"></i> Admin User Governance
-                </a>
-                <a href="{{ url_for('admin_audit_logs') }}" class="btn btn-outline-dark rounded-pill fw-bold">
-                    <i class="bi bi-journal-text me-1"></i> View Audit Trail
-                </a>
+            <button class="btn btn-sm btn-outline-dark rounded-pill" data-bs-toggle="modal" data-bs-target="#metricCatalogueModal">
+                <i class="bi bi-book me-1"></i> Metric Catalogue
+            </button>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-4 col-xl-2">
+                <div class="p-3 bg-light rounded-4 border">
+                    <span class="text-muted small font-monospace text-uppercase d-block mb-1">Customer Base</span>
+                    <h3 class="fw-bold text-dark mb-1">{{ snap.total_users }}</h3>
+                    <div class="small">
+                        <span class="text-muted">Period:</span>
+                        <span class="fw-bold text-success">+{{ snap.new_users_curr }} ({{ snap.user_growth_change.pct_str }})</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 col-xl-2">
+                <div class="p-3 bg-light rounded-4 border">
+                    <span class="text-muted small font-monospace text-uppercase d-block mb-1">Active Asset Supply</span>
+                    <h3 class="fw-bold text-dark mb-1">{{ snap.published_props }}</h3>
+                    <div class="small">
+                        <span class="text-muted">Total:</span>
+                        <span class="fw-bold text-info">{{ snap.total_props }} (+{{ snap.props_curr }})</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 col-xl-2">
+                <div class="p-3 bg-light rounded-4 border">
+                    <span class="text-muted small font-monospace text-uppercase d-block mb-1">Completed Deals</span>
+                    <h3 class="fw-bold text-dark mb-1">{{ snap.completed_txs_curr }}</h3>
+                    <div class="small">
+                        <span class="text-muted">Growth:</span>
+                        <span class="fw-bold text-success">{{ snap.tx_count_change.pct_str }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 col-xl-2">
+                <div class="p-3 bg-light rounded-4 border">
+                    <span class="text-muted small font-monospace text-uppercase d-block mb-1">Gross Deal Value</span>
+                    <h4 class="fw-bold text-dark mb-1">NGN {{ "%.2f"|format(snap.tx_val_curr) }}</h4>
+                    <div class="small">
+                        <span class="text-muted">Change:</span>
+                        <span class="fw-bold text-success">{{ snap.tx_val_change.pct_str }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 col-xl-2">
+                <div class="p-3 bg-light rounded-4 border">
+                    <span class="text-muted small font-monospace text-uppercase d-block mb-1">Platform Commission</span>
+                    <h4 class="fw-bold text-danger mb-1">NGN {{ "%.2f"|format(snap.commission_curr) }}</h4>
+                    <div class="small">
+                        <span class="text-muted">Collected:</span>
+                        <span class="fw-bold text-dark">NGN {{ "%.2f"|format(snap.total_collected) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 col-xl-2">
+                <div class="p-3 bg-light rounded-4 border">
+                    <span class="text-muted small font-monospace text-uppercase d-block mb-1">Verification Coverage</span>
+                    <h3 class="fw-bold text-primary mb-1">{{ indices.verification_coverage }}%</h3>
+                    <div class="small">
+                        <span class="text-muted">Approval Rate:</span>
+                        <span class="fw-bold text-dark">{{ indices.approval_rate }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Corporate Performance Indices Strip -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 border-start border-4 border-primary">
+                <span class="text-muted text-uppercase small font-monospace">Verification Coverage</span>
+                <h3 class="fw-bold my-2 text-dark">{{ indices.verification_coverage }}%</h3>
+                <small class="text-secondary">Verified properties / Total listing supply</small>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 border-start border-4 border-success">
+                <span class="text-muted text-uppercase small font-monospace">Intent Approval Rate</span>
+                <h3 class="fw-bold my-2 text-dark">{{ indices.approval_rate }}%</h3>
+                <small class="text-secondary">Approved DABs / Total submitted briefs</small>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 border-start border-4 border-warning">
+                <span class="text-muted text-uppercase small font-monospace">Transaction Completion Rate</span>
+                <h3 class="fw-bold my-2 text-dark">{{ indices.tx_completion_rate }}%</h3>
+                <small class="text-secondary">Completed deals / Total terminal deals</small>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100 border-start border-4 border-info">
+                <span class="text-muted text-uppercase small font-monospace">Invoice Collection Rate</span>
+                <h3 class="fw-bold my-2 text-dark">{{ indices.invoice_collection_rate }}%</h3>
+                <small class="text-secondary">Collected payments / Total invoiced amount</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conversion Funnel & Commercial Pipeline -->
+    <div class="row g-4 mb-4">
+        <!-- Supply-to-Deal Conversion Lifecycle Funnel -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+                <h5 class="fw-bold text-dark border-bottom pb-3 mb-3"><i class="bi bi-funnel-fill text-danger me-2"></i>Supply-to-Deal Conversion Lifecycle Funnel</h5>
+                <div class="d-flex flex-column gap-3">
+                    {% for f in funnel %}
+                    <div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-semibold text-dark"><i class="bi {{ f.icon }} me-2 text-secondary"></i>{{ f.stage }}</span>
+                            <span class="badge bg-dark rounded-pill px-3">{{ f.count }}</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ [((f.count / (funnel[0].count or 1)) * 100)|round(1), 5]|max }}%;" aria-valuenow="{{ f.count }}" aria-valuemin="0" aria-valuemax="{{ funnel[0].count }}"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Exposure & Commercial Exposure -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-4">
+                <h5 class="fw-bold text-dark border-bottom pb-3 mb-3"><i class="bi bi-cash-coin text-success me-2"></i>Financial & Commercial Exposure</h5>
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Total Invoiced Amount</h6>
+                            <small class="text-muted">Total invoice billings issued</small>
+                        </div>
+                        <strong class="text-dark">NGN {{ "%.2f"|format(snap.total_invoiced) }}</strong>
+                    </div>
+
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Collected Payments</h6>
+                            <small class="text-muted">Verified cash collections</small>
+                        </div>
+                        <strong class="text-success">NGN {{ "%.2f"|format(snap.total_collected) }}</strong>
+                    </div>
+
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Outstanding Invoice Balance</h6>
+                            <small class="text-muted">Uncollected billed invoices</small>
+                        </div>
+                        <strong class="text-danger">NGN {{ "%.2f"|format(snap.outstanding_balance) }}</strong>
+                    </div>
+
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="fw-bold mb-0">Referral Reward Liabilities</h6>
+                            <small class="text-muted">Earned partner rewards</small>
+                        </div>
+                        <strong class="text-warning">NGN {{ "%.2f"|format(snap.total_earned_rewards) }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Transparent Metric Catalogue Modal -->
+<div class="modal fade" id="metricCatalogueModal" tabindex="-1" aria-labelledby="metricCatalogueModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-header-title mb-0 fw-bold" id="metricCatalogueModalLabel"><i class="bi bi-book me-2"></i>Odacity Executive Metric Catalogue</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Metric Name</th>
+                                <th>Category</th>
+                                <th>DB Source</th>
+                                <th>Calculation / Formula</th>
+                                <th>Visibility</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in catalogue %}
+                            <tr>
+                                <td class="fw-bold">{{ m.name }}</td>
+                                /><td><span class="badge bg-secondary">{{ m.category }}</span></td>
+                                <td><code>{{ m.source }}</code></td>
+                                <td class="font-monospace small">{{ m.calculation }}</td>
+                                <td>{{ m.visibility }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Near-Real-Time Task Centre Polling Script -->
+<script>
+function refreshTaskQueue() {
+    fetch('/admin/task-centre/')
+        .then(response => response.json())
+        .then(data => {
+            if (!data || !data.counts) return;
+
+            // Update badge numbers
+            const critBadge = document.getElementById('task-critical-badge');
+            const highBadge = document.getElementById('task-high-badge');
+            const totalBadge = document.getElementById('task-total-badge');
+            const navBadge = document.getElementById('nav-task-count');
+
+            if (critBadge) critBadge.textContent = `${data.counts.critical} Critical`;
+            if (highBadge) highBadge.textContent = `${data.counts.high} High Priority`;
+            if (totalBadge) totalBadge.textContent = `${data.counts.total} Outstanding Task(s)`;
+            if (navBadge) navBadge.textContent = data.counts.total > 0 ? data.counts.total : '';
+        })
+        .catch(err => console.log('Task polling error:', err));
+}
+
+// Poll every 10 seconds in near-real-time
+setInterval(refreshTaskQueue, 10000);
+</script>
 {% endblock %}
