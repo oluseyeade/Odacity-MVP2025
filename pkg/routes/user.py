@@ -1075,6 +1075,8 @@ def login():
         next_page = request.args.get('next')
         if next_page and urlparse(next_page).netloc == '':
             return redirect(next_page)
+        if has_admin_permission(user):
+            return redirect(url_for('admin_dashboard'))
         return redirect(url_for('dashboard'))
 
     return render_template('user/login.html', title='Log In', form=form)

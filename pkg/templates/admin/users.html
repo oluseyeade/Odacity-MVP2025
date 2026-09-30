@@ -24,8 +24,8 @@
     <!-- Admin User Table -->
     <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
-            <h5 class="fw-bold mb-0">Administrative Accounts ({{ admin_users|length }})</h5>
-            <span class="badge bg-secondary font-monospace">{{ admin_users|length }} Total</span>
+            <h5 class="fw-bold mb-0">Administrative Accounts ({{ users|length }})</h5>
+            <span class="badge bg-secondary font-monospace">{{ users|length }} Total</span>
         </div>
 
         <div class="table-responsive">
@@ -43,7 +43,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for u in admin_users %}
+                    {% for u in users %}
                         <tr>
                             <td class="font-monospace fw-bold">#{{ u.user_id }}</td>
                             <td>
@@ -59,9 +59,11 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if u.assigned_roles %}
-                                    {% for rname in u.assigned_roles %}
-                                        <span class="badge bg-primary text-uppercase font-monospace me-1">{{ rname }}</span>
+                                {% if u.user_roles %}
+                                    {% for ur in u.user_roles %}
+                                        {% if ur.role and ur.role.name %}
+                                            <span class="badge bg-primary text-uppercase font-monospace me-1">{{ ur.role.name }}</span>
+                                        {% endif %}
                                     {% endfor %}
                                 {% else %}
                                     <span class="text-muted small italic">No role assigned</span>
@@ -115,16 +117,12 @@
                                                 <div class="modal-body p-4">
                                                     <div class="mb-3">
                                                         <label class="form-label fw-bold">Master PRD Admin Role</label>
-                                                        <select name="role_name" class="form-select rounded-3" required>
+                                                        <select name="role_id" class="form-select rounded-3" required>
                                                             <option value="">-- Select Master PRD Role --</option>
-                                                            <option value="super admin" {% if 'super admin' in u.assigned_roles or 'super_admin' in u.assigned_roles %}selected{% endif %}>Super Admin</option>
-                                                            <option value="property admin" {% if 'property admin' in u.assigned_roles or 'property_admin' in u.assigned_roles %}selected{% endif %}>Property Admin</option>
-                                                            <option value="mandate manager" {% if 'mandate manager' in u.assigned_roles or 'mandate_manager' in u.assigned_roles %}selected{% endif %}>Mandate Manager</option>
-                                                            <option value="transaction manager" {% if 'transaction manager' in u.assigned_roles or 'transaction_manager' in u.assigned_roles %}selected{% endif %}>Transaction Manager</option>
-                                                            <option value="finance admin" {% if 'finance admin' in u.assigned_roles or 'finance_admin' in u.assigned_roles %}selected{% endif %}>Finance Admin</option>
-                                                            <option value="compliance admin" {% if 'compliance admin' in u.assigned_roles or 'compliance_admin' in u.assigned_roles %}selected{% endif %}>Compliance Admin</option>
-                                                            <option value="customer support" {% if 'customer support' in u.assigned_roles or 'customer_support' in u.assigned_roles %}selected{% endif %}>Customer Support</option>
-                                                            <option value="audit admin" {% if 'audit admin' in u.assigned_roles or 'audit_admin' in u.assigned_roles %}selected{% endif %}>Audit Admin</option>
+                                                            {% set user_role_ids = u.user_roles|map(attribute='role_id')|list if u.user_roles else [] %}
+                                                            {% for r in roles %}
+                                                                <option value="{{ r.role_id }}" {% if r.role_id in user_role_ids %}selected{% endif %}>{{ r.name }}</option>
+                                                            {% endfor %}
                                                         </select>
                                                     </div>
                                                 </div>
@@ -175,16 +173,11 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Master PRD Role *</label>
-                            <select name="role_name" class="form-select rounded-3" required>
+                            <select name="role_id" class="form-select rounded-3" required>
                                 <option value="">-- Select Master PRD Role --</option>
-                                <option value="property admin">Property Admin</option>
-                                <option value="mandate manager">Mandate Manager</option>
-                                <option value="transaction manager">Transaction Manager</option>
-                                <option value="finance admin">Finance Admin</option>
-                                <option value="compliance admin">Compliance Admin</option>
-                                <option value="customer support">Customer Support</option>
-                                <option value="audit admin">Audit Admin</option>
-                                <option value="super admin">Super Admin</option>
+                                {% for r in roles %}
+                                    <option value="{{ r.role_id }}">{{ r.name }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-6 d-flex align-items-end">

@@ -1,0 +1,351 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Central Admin Dashboard — ODACITY{% endblock %}
+
+{% block admin_content %}
+<div class="container py-4">
+    <!-- Header Banner -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center bg-dark text-white rounded-4 p-4 mb-4 shadow-sm">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-danger text-uppercase px-3 py-2 rounded-pill fw-bold" style="letter-spacing: 1px;">Admin Hub</span>
+                {% for rname in assigned_role_names %}
+                    <span class="badge bg-primary text-uppercase font-monospace px-3 py-2 rounded-pill">{{ rname }}</span>
+                {% endfor %}
+                {% if user.is_super_admin %}
+                    <span class="badge bg-warning text-dark text-uppercase font-monospace px-3 py-2 rounded-pill">Superadmin</span>
+                {% endif %}
+            </div>
+            <h3 class="fw-bold mb-1">Welcome back, {{ user.full_name }}</h3>
+            <p class="text-secondary small mb-0">Central Operational Dashboard — Odacity Multi-Role Access Control</p>
+        </div>
+        <div class="mt-3 mt-md-0 d-flex gap-2">
+            {% if user.is_super_admin %}
+                <a href="{{ url_for('admin_command_centre') }}" class="btn btn-warning rounded-pill fw-bold">
+                    <i class="bi bi-speedometer2 me-1"></i> Executive Control Centre
+                </a>
+            {% endif %}
+            <a href="{{ url_for('admin_users_directory') }}" class="btn btn-outline-info rounded-pill">
+                <i class="bi bi-person me-1"></i> Admin Directory
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary KPI Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-semibold">Pending Intents</div>
+                        <div class="h3 fw-bold mb-0 text-dark">{{ metrics.pending_intents }}</div>
+                    </div>
+                    <div class="bg-light-primary text-primary p-3 rounded-circle">
+                        <i class="bi bi-shield-lock h4 mb-0"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-semibold">Inspections Needed</div>
+                        <div class="h3 fw-bold mb-0 text-dark">{{ metrics.pending_inspections }}</div>
+                    </div>
+                    <div class="bg-light-info text-info p-3 rounded-circle">
+                        <i class="bi bi-calendar-check h4 mb-0"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-semibold">Active Transactions</div>
+                        <div class="h3 fw-bold mb-0 text-dark">{{ metrics.active_transactions }}</div>
+                    </div>
+                    <div class="bg-light-success text-success p-3 rounded-circle">
+                        <i class="bi bi-receipt h4 mb-0"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-semibold">Pending Settlements</div>
+                        <div class="h3 fw-bold mb-0 text-dark">{{ metrics.pending_settlements }}</div>
+                    </div>
+                    <div class="bg-light-warning text-warning p-3 rounded-circle">
+                        <i class="bi bi-shield-check h4 mb-0"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authorized Workspaces Grid -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-grid-fill me-2 text-danger"></i>Authorized Administrative Workspaces</h5>
+            <span class="badge bg-secondary font-monospace">Role-Aware Access</span>
+        </div>
+
+        <div class="row g-3">
+            <!-- Property Intake & Intent Approvals -->
+            {% if perms.can_access_intents %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-primary text-white p-2 rounded-3">
+                            <i class="bi bi-shield-lock h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Intent Approvals & Intake</h6>
+                            <small class="text-muted">Property Owner & Buyer Intake</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Review incoming property briefs, verify owner documentation, and issue approval links.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        {% if perms.can_mutate_intents %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Approval Access</span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border rounded-pill">Read-Only</span>
+                        {% endif %}
+                        <a href="{{ url_for('admin_intents') }}" class="btn btn-sm btn-outline-primary rounded-pill fw-bold">Open Module <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Inspection Management -->
+            {% if perms.can_access_inspections %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-info text-white p-2 rounded-3">
+                            <i class="bi bi-calendar-check h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Inspection Management</h6>
+                            <small class="text-muted">Site Visits & Verification Reports</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Schedule physical site inspections, assign agents, and upload completion reports.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        {% if perms.can_schedule_inspections or perms.can_complete_inspections %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Operational Access</span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border rounded-pill">Read-Only</span>
+                        {% endif %}
+                        <a href="{{ url_for('admin_inspections') }}" class="btn btn-sm btn-outline-info rounded-pill fw-bold">Open Module <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Offer Management -->
+            {% if perms.can_access_offers %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-success text-white p-2 rounded-3">
+                            <i class="bi bi-cash-stack h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Offer & Negotiations</h6>
+                            <small class="text-muted">Buyer Offers & Seller Responses</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Monitor purchase offers, counter-offers, and negotiation progressions across properties.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        <span class="badge bg-secondary-subtle text-secondary border rounded-pill">Read-Only Oversight</span>
+                        <a href="{{ url_for('admin_offers') }}" class="btn btn-sm btn-outline-success rounded-pill fw-bold">Open Module <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Transaction Management -->
+            {% if perms.can_access_transactions %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-dark text-white p-2 rounded-3">
+                            <i class="bi bi-receipt h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Transaction Management</h6>
+                            <small class="text-muted">Lifecycle, Invoices & Payments</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Track transaction milestones, generate invoices, record payments, and manage contracts.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        {% if perms.can_mutate_transactions or perms.can_access_finance %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Operational Access</span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border rounded-pill">Read-Only</span>
+                        {% endif %}
+                        <a href="{{ url_for('admin_transactions') }}" class="btn btn-sm btn-outline-dark rounded-pill fw-bold">Open Module <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Performance Guarantee Management -->
+            {% if perms.can_access_performance %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-warning text-dark p-2 rounded-3">
+                            <i class="bi bi-shield-check h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Performance Guarantees</h6>
+                            <small class="text-muted">Bank Guarantees & Settlements</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Manage performance guarantees, activate cycles, record milestones, and approve settlements.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        {% if perms.can_mutate_performance or perms.can_access_finance %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Operational Access</span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border rounded-pill">Read-Only</span>
+                        {% endif %}
+                        <a href="{{ url_for('admin_performance') }}" class="btn btn-sm btn-outline-warning text-dark rounded-pill fw-bold">Open Module <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Referral Management -->
+            {% if perms.can_access_referrals %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-secondary text-white p-2 rounded-3">
+                            <i class="bi bi-people h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Referrals & Rewards</h6>
+                            <small class="text-muted">Customer Growth & Gold Accounts</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Monitor referral tree hierarchies, reward points, and Gold Account ledger events.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        <span class="badge bg-secondary-subtle text-secondary border rounded-pill">Read-Only Oversight</span>
+                        <a href="{{ url_for('admin_referrals') }}" class="btn btn-sm btn-outline-secondary rounded-pill fw-bold">Open Module <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Compliance Document Verification (Compliance Admin & Super Admin) -->
+            {% if perms.can_access_compliance %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border border-danger-subtle rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-danger text-white p-2 rounded-3">
+                            <i class="bi bi-file-earmark-check h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Compliance & Title Review</h6>
+                            <small class="text-muted">Legal Document Verification</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Inspect uploaded title deeds, C of O, property documents, and approve verification cases.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Compliance Privileges</span>
+                        <a href="{{ url_for('admin_intents') }}" class="btn btn-sm btn-outline-danger rounded-pill fw-bold">Review Documents <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Audit Logs (Audit Admin & Super Admin) -->
+            {% if perms.can_access_audit %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border border-info-subtle rounded-4 p-3 shadow-sm hover-shadow transition">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-info text-white p-2 rounded-3">
+                            <i class="bi bi-journal-text h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Security Audit Logs</h6>
+                            <small class="text-muted">System Log Inspection</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Inspect system security events, login logs, data mutation audit trails, and user actions.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill">Audit Access</span>
+                        <a href="{{ url_for('admin_audit_logs') }}" class="btn btn-sm btn-outline-info rounded-pill fw-bold">View Logs <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Super Admin Governance (Super Admin Only) -->
+            {% if user.is_super_admin %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border border-warning rounded-4 p-3 shadow-sm hover-shadow transition bg-dark text-white">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-warning text-dark p-2 rounded-3">
+                            <i class="bi bi-person-gear h5 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-white">Super Admin Governance</h6>
+                            <small class="text-warning">Account & Role Management</small>
+                        </div>
+                    </div>
+                    <p class="text-secondary small mb-3">Create administrative user accounts, assign PRD roles, and toggle account activation status.</p>
+                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                        <span class="badge bg-warning text-dark rounded-pill">Superadmin Only</span>
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-sm btn-warning rounded-pill fw-bold">Manage Accounts <i class="bi bi-arrow-right ms-1"></i></a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Active Tasks Queue -->
+    {% if tasks %}
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-list-task me-2 text-primary"></i>Operational Task Centre Feed</h5>
+            <span class="badge bg-primary font-monospace">{{ tasks|length }} Pending Items</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Category</th>
+                        <th>Task Description</th>
+                        <th>Status</th>
+                        <th>Date Reported</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tasks %}
+                        <tr>
+                            <td><span class="badge bg-secondary font-monospace">{{ t.type }}</span></td>
+                            <td class="fw-semibold">{{ t.title }}</td>
+                            <td><span class="badge bg-warning text-dark rounded-pill px-3">{{ t.status }}</span></td>
+                            <td class="small text-muted">{{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '—' }}</td>
+                            <td class="text-end">
+                                <a href="{{ t.url }}" class="btn btn-sm btn-outline-primary rounded-pill">Resolve <i class="bi bi-arrow-up-right ms-1"></i></a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

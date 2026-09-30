@@ -8,7 +8,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash
-from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
+from flask import render_template, render_template_string, request, redirect, url_for, flash, session, abort, send_from_directory
 from flask import jsonify
 from pkg.services.admin_overview import (
     get_business_snapshot, get_superadmin_tasks, get_performance_indices,
@@ -3017,7 +3017,87 @@ def admin_referrals():
 
 
 # ==========================================
-# PHASE 24 â€” SUPERADMIN COMMAND CENTRE & BI
+# CENTRAL ROLE-BASED ADMIN DASHBOARD
+# ==========================================
+@app.route('/admin/dashboard', methods=['GET'])
+@app.route('/admin/dashboard/', methods=['GET'])
+@admin_view_required
+def admin_dashboard():
+    user_id = session.get('user_id')
+    user_rec = User.query.get(user_id) if user_id else None
+    if not user_rec or not user_rec.is_active:
+        flash('Please log in with an active administrative account.', 'warning')
+        return redirect(url_for('login'))
+
+    assigned_role_names = [ur.role.name for ur in user_rec.user_roles if ur.role]
+
+    perms = {
+        'can_access_intents': has_admin_permission(user_rec),
+        'can_mutate_intents': user_has_any_role(user_rec, PROPERTY_ADMIN_ROLES),
+        'can_access_inspections': has_admin_permission(user_rec),
+        'can_schedule_inspections': user_has_any_role(user_rec, SUPPORT_ADMIN_ROLES),
+        'can_complete_inspections': user_has_any_role(user_rec, PROPERTY_ADMIN_ROLES),
+        'can_access_offers': has_admin_permission(user_rec),
+        'can_access_transactions': has_admin_permission(user_rec),
+        'can_mutate_transactions': user_has_any_role(user_rec, OPERATIONAL_ADMIN_ROLES),
+        'can_access_finance': user_has_any_role(user_rec, SETTLEMENT_PAYMENT_ADMIN_ROLES),
+        'can_access_performance': has_admin_permission(user_rec),
+        'can_mutate_performance': user_has_any_role(user_rec, PERFORMANCE_OPERATIONAL_ADMIN_ROLES),
+        'can_access_referrals': has_admin_permission(user_rec),
+        'can_access_compliance': user_has_any_role(user_rec, COMPLIANCE_ADMIN_ROLES),
+        'can_access_audit': user_has_any_role(user_rec, AUDIT_ADMIN_ROLES),
+    }
+
+    metrics = {
+        'pending_intents': VerificationCase.query.filter(VerificationCase.status.in_(['Pending', 'Submitted', 'Under Review'])).count(),
+        'pending_inspections': Inspection.query.filter(Inspection.status.in_(['Scheduled', 'Requested'])).count(),
+        'active_transactions': Transaction.query.filter(Transaction.status.in_(['In Progress', 'Initiated', 'Contract Pending'])).count(),
+        'pending_settlements': GuaranteeSettlement.query.filter(GuaranteeSettlement.status.in_(['Pending Approval', 'Pending', 'Submitted'])).count(),
+    }
+
+    tasks = get_superadmin_tasks(user_rec) if (user_rec.is_super_admin or perms['can_mutate_intents'] or perms['can_mutate_transactions']) else []
+
+    return render_template(
+        'admin/central_dashboard.html',
+        title='Central Admin Dashboard — Odacity',
+        user=user_rec,
+        assigned_role_names=assigned_role_names,
+        perms=perms,
+        metrics=metrics,
+        tasks=tasks
+    )
+
+
+@app.route('/admin/users/directory/', methods=['GET'])
+@app.route('/admin/directory/', methods=['GET'])
+@admin_view_required
+def admin_users_directory():
+    current_user_id = session.get('user_id')
+    user_rec = User.query.get(current_user_id) if current_user_id else None
+    if not user_rec or not user_rec.is_active:
+        flash('Please log in with an active administrative account.', 'warning')
+        return redirect(url_for('login'))
+
+    approved_role_names = [r.lower() for r in ADMIN_ROLES]
+
+    # Query remaining admin users excluding current_user_id and non-admin users
+    admin_users = User.query.filter(
+        User.user_id != current_user_id
+    ).filter(
+        (User.is_super_admin == True) |
+        (User.user_roles.any(UserRole.role.has(func.lower(Role.name).in_(approved_role_names))))
+    ).order_by(User.full_name.asc()).all()
+
+    return render_template(
+        'admin/users_directory.html',
+        title='Administrative User Directory — Odacity Admin',
+        users=admin_users,
+        user=user_rec
+    )
+
+
+# ==========================================
+# PHASE 24 — SUPERADMIN COMMAND CENTRE & BI
 # ==========================================
 @app.route('/admin/', methods=['GET'])
 @superadmin_required
@@ -3154,6 +3234,28 @@ def admin_task_centre_feed():
     user_rec = User.query.get(user_id) if user_id else None
     tasks_data = get_superadmin_tasks(user_rec)
     return jsonify(tasks_data)
+
+@app.route('/admin/test-email/', methods=['POST'])
+@superadmin_required
+def admin_test_email():
+    """
+    Stage 3 Temporary SMTP Proof-of-Function Endpoint.
+    Super Admin access required. Triggers controlled test email via send_smtp_test_email().
+    POST requests only. Uses fixed recipient from EMAIL_TEST_RECIPIENT environment variable.
+    """
+    from pkg.services.email_service import send_smtp_test_email
+
+    test_mode = os.environ.get('EMAIL_TEST_MODE', 'false').lower() in ('true', '1', 'yes')
+    if not test_mode:
+        return jsonify({"success": False, "error": "EMAIL_TEST_MODE is disabled in environment"}), 403
+
+    res = send_smtp_test_email()
+    status_code = 200 if res.get('success') else 400
+    return jsonify(res), status_code
+
+
+
+
 # ==========================================
 # PHASE 24 â€” ADMIN GOVERNANCE & USERS
 # ==========================================
