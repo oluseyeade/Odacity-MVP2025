@@ -180,6 +180,100 @@ def create_superadmin_logic(email, password, full_name, phone=None):
         return False
 
 
+def reset_superadmin_logic(new_password, target_email='superadmin@odacityng.com'):
+    """
+    Core function for updating credentials and email of the existing Super Admin account.
+    Validates account state, updates email and password hash, and records audit/security events.
+    """
+    if not new_password or not new_password.strip() or len(new_password) < 12:
+        click.echo("ABORT: Password is required and must be at least 12 characters long.", err=True)
+        return False
+
+    clean_target_email = target_email.strip().lower()
+
+    # Pre-flight Check 1: Unambiguous Super Admin User Identification
+    super_admin_users = User.query.filter(
+        (User.is_super_admin == True) |
+        (User.user_roles.any(UserRole.role.has(Role.name.in_(['Super Admin', 'super_admin']))))
+    ).all()
+
+    if len(super_admin_users) == 0:
+        click.echo("ABORT: No Super Admin account exists in the database to recover.", err=True)
+        return False
+
+    if len(super_admin_users) > 1:
+        click.echo(
+            f"ABORT: Multiple Super Admin accounts detected ({len(super_admin_users)} accounts). Recovery aborted to prevent ambiguity.",
+            err=True
+        )
+        return False
+
+    target_user = super_admin_users[0]
+
+    # Pre-flight Check 2: Account Active Status
+    if not target_user.is_active:
+        click.echo(
+            f"ABORT: Target Super Admin account (User ID: {target_user.user_id}) is inactive. Recovery aborted.",
+            err=True
+        )
+        return False
+
+    # Pre-flight Check 3: Target Email Assignment Check
+    email_user = User.query.filter_by(email=clean_target_email).first()
+    if email_user and email_user.user_id != target_user.user_id:
+        click.echo(
+            f"ABORT: Target email '{clean_target_email}' is already assigned to a different user (User ID: {email_user.user_id}). Recovery aborted.",
+            err=True
+        )
+        return False
+
+    # Execute Recovery Transaction
+    try:
+        old_email = target_user.email
+        pw_hash = generate_password_hash(new_password)
+
+        target_user.email = clean_target_email
+        target_user.password_hash = pw_hash
+        target_user.updated_at = datetime.utcnow()
+
+        audit = AuditLog(
+            user_id=target_user.user_id,
+            action='SUPERADMIN_CREDENTIAL_RECOVERY',
+            entity_type='User',
+            entity_id=target_user.user_id,
+            previous_values=json.dumps({'email': old_email}),
+            new_values=json.dumps({
+                'email': clean_target_email,
+                'action': 'email_and_password_recovery',
+                'recovery_method': 'CLI'
+            }),
+            created_at=datetime.utcnow()
+        )
+        db.session.add(audit)
+
+        sec_event = SecurityEvent(
+            user_id=target_user.user_id,
+            event_type='SUPERADMIN_CREDENTIAL_RECOVERY_SUCCESS',
+            description=f'Super Admin credentials updated successfully (Email: {clean_target_email})',
+            ip_address='127.0.0.1',
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+
+        db.session.commit()
+
+        click.echo("SUCCESS: Super Admin credentials updated successfully.")
+        click.echo(f"User ID: {target_user.user_id}")
+        click.echo(f"Updated Email: {clean_target_email}")
+        click.echo(f"Full Name: {target_user.full_name}")
+        return True
+
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f"ABORT: Failed to reset Super Admin credentials due to database transaction error: {str(e)}", err=True)
+        return False
+
+
 @app.cli.command('init-roles')
 def init_roles_cmd():
     """CLI Command to initialize the 8 authoritative Odacity administrative roles."""
@@ -209,11 +303,27 @@ def create_superadmin_cmd(email, password, full_name, phone):
             sys.exit(1)
 
 
+@app.cli.command('reset-superadmin')
+def reset_superadmin_cmd():
+    """CLI Command to recover and update credentials for the existing Super Admin account."""
+    new_password = click.prompt("New Super Admin Password (min 12 chars)", hide_input=True, confirmation_prompt=True)
+    if not new_password or not new_password.strip() or len(new_password) < 12:
+        click.echo("ABORT: Password must be non-empty and at least 12 characters long.", err=True)
+        sys.exit(1)
+
+    with app.app_context():
+        success = reset_superadmin_logic(new_password)
+        if not success:
+            sys.exit(1)
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'init-roles':
         with app.app_context():
             success = init_roles_logic()
             sys.exit(0 if success else 1)
+    elif len(sys.argv) > 1 and sys.argv[1] == 'reset-superadmin':
+        reset_superadmin_cmd()
     else:
         email_env = os.environ.get('SUPERADMIN_EMAIL')
         pass_env = os.environ.get('SUPERADMIN_PASSWORD')
