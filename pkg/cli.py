@@ -274,6 +274,140 @@ def reset_superadmin_logic(new_password, target_email='superadmin@odacityng.com'
         return False
 
 
+def reset_propertyadmin_logic(new_password, target_email='propertyadmin@odacityng.com'):
+    """
+    Core function for updating credentials of the existing Property Admin account.
+    Enforces strict preflight ordering before any database mutation.
+    """
+    # =========================================================================
+    # PREFLIGHT 1 — Normalize and validate target email & password
+    # =========================================================================
+    if not target_email or not target_email.strip():
+        click.echo("ABORT: Target email is required.", err=True)
+        return False
+
+    clean_target_email = target_email.strip().lower()
+
+    if not new_password or not new_password.strip() or len(new_password) < 12:
+        click.echo("ABORT: Password is required and must be at least 12 characters long.", err=True)
+        return False
+
+    # =========================================================================
+    # PREFLIGHT 2 & 3 — Locate target user & require exactly ONE matching user
+    # =========================================================================
+    matching_users = User.query.filter(db.func.lower(User.email) == clean_target_email).all()
+    if len(matching_users) == 0:
+        click.echo(f"ABORT: No account found matching email '{clean_target_email}'. Recovery aborted.", err=True)
+        return False
+
+    if len(matching_users) > 1:
+        click.echo(f"ABORT: Multiple accounts detected matching email '{clean_target_email}'. Recovery aborted.", err=True)
+        return False
+
+    target_user = matching_users[0]
+
+    # =========================================================================
+    # PREFLIGHT 4 — Verify target user is active
+    # =========================================================================
+    if not target_user.is_active:
+        click.echo(f"ABORT: Target account (User ID: {target_user.user_id}) is inactive. Recovery aborted.", err=True)
+        return False
+
+    # =========================================================================
+    # PREFLIGHT 5 — Verify target user is NOT a Super Admin
+    # =========================================================================
+    if target_user.is_super_admin:
+        click.echo("ABORT: Target account has Super Admin flag set. Recovery aborted.", err=True)
+        return False
+
+    # =========================================================================
+    # PREFLIGHT 6 — Verify target user has Property Admin role
+    # =========================================================================
+    user_role_names = [ur.role.name for ur in target_user.user_roles if ur.role]
+    if 'Property Admin' not in user_role_names:
+        click.echo(f"ABORT: Target user does not possess the 'Property Admin' role. Recovery aborted.", err=True)
+        return False
+
+    if 'Super Admin' in user_role_names or 'super_admin' in user_role_names:
+        click.echo("ABORT: Target user possesses Super Admin role assignment. Recovery aborted.", err=True)
+        return False
+
+    # =========================================================================
+    # PREFLIGHT 7 — Verify exactly ONE Property Admin account exists
+    # =========================================================================
+    prop_admin_users = User.query.filter(User.user_roles.any(UserRole.role.has(Role.name == 'Property Admin'))).all()
+    unique_prop_admins = list({u.user_id: u for u in prop_admin_users}.values())
+    if len(unique_prop_admins) != 1:
+        click.echo(f"ABORT: Expected exactly 1 Property Admin account, found {len(unique_prop_admins)}. Recovery aborted.", err=True)
+        return False
+
+    # =========================================================================
+    # PREFLIGHT 8 — Verify exactly ONE Super Admin exists
+    # =========================================================================
+    super_admin_users = User.query.filter(
+        (User.is_super_admin == True) |
+        (User.user_roles.any(UserRole.role.has(Role.name.in_(['Super Admin', 'super_admin']))))
+    ).all()
+
+    unique_super_admins = list({u.user_id: u for u in super_admin_users}.values())
+    if len(unique_super_admins) != 1:
+        click.echo(f"ABORT: Expected exactly 1 Super Admin account, found {len(unique_super_admins)}. Recovery aborted.", err=True)
+        return False
+
+    # =========================================================================
+    # PREFLIGHT 9 — Verify Property Admin role exists in roles table
+    # =========================================================================
+    prop_admin_role = Role.query.filter_by(name='Property Admin').first()
+    if not prop_admin_role:
+        click.echo("ABORT: 'Property Admin' role missing from roles table. Recovery aborted.", err=True)
+        return False
+
+    # =========================================================================
+    # MUTATION GATE — All Preflight Checks Passed
+    # =========================================================================
+    try:
+        pw_hash = generate_password_hash(new_password)
+
+        target_user.password_hash = pw_hash
+        target_user.updated_at = datetime.utcnow()
+
+        audit = AuditLog(
+            user_id=target_user.user_id,
+            action='PROPERTY_ADMIN_CREDENTIAL_RECOVERY',
+            entity_type='User',
+            entity_id=target_user.user_id,
+            new_values=json.dumps({
+                'email': clean_target_email,
+                'action': 'password_recovery',
+                'recovery_method': 'CLI'
+            }),
+            created_at=datetime.utcnow()
+        )
+        db.session.add(audit)
+
+        sec_event = SecurityEvent(
+            user_id=target_user.user_id,
+            event_type='PROPERTY_ADMIN_CREDENTIAL_RECOVERY_SUCCESS',
+            description=f'Property Admin credentials updated successfully (Email: {clean_target_email})',
+            ip_address='127.0.0.1',
+            created_at=datetime.utcnow()
+        )
+        db.session.add(sec_event)
+
+        db.session.commit()
+
+        click.echo("SUCCESS: Property Admin credentials updated successfully.")
+        click.echo(f"User ID: {target_user.user_id}")
+        click.echo(f"Updated Email: {clean_target_email}")
+        click.echo(f"Full Name: {target_user.full_name}")
+        return True
+
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f"ABORT: Failed to reset Property Admin credentials due to database transaction error: {str(e)}", err=True)
+        return False
+
+
 def create_propertyadmin_logic(password, email='propertyadmin@odacityng.com', full_name='Property Admin', phone=None):
     """
     Core function for provisioning a Property Admin account.
@@ -497,6 +631,20 @@ def create_propertyadmin_cmd(email, full_name, phone):
             sys.exit(1)
 
 
+@app.cli.command('reset-propertyadmin')
+def reset_propertyadmin_cmd():
+    """CLI Command to recover and update credentials for the existing Property Admin account."""
+    new_password = click.prompt("New Property Admin Password (min 12 chars)", hide_input=True, confirmation_prompt=True)
+    if not new_password or not new_password.strip() or len(new_password) < 12:
+        click.echo("ABORT: Password must be non-empty and at least 12 characters long.", err=True)
+        sys.exit(1)
+
+    with app.app_context():
+        success = reset_propertyadmin_logic(new_password)
+        if not success:
+            sys.exit(1)
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'init-roles':
         with app.app_context():
@@ -506,6 +654,8 @@ if __name__ == '__main__':
         reset_superadmin_cmd()
     elif len(sys.argv) > 1 and sys.argv[1] == 'create-propertyadmin':
         create_propertyadmin_cmd()
+    elif len(sys.argv) > 1 and sys.argv[1] == 'reset-propertyadmin':
+        reset_propertyadmin_cmd()
     else:
         email_env = os.environ.get('SUPERADMIN_EMAIL')
         pass_env = os.environ.get('SUPERADMIN_PASSWORD')
