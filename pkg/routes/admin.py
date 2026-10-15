@@ -7,7 +7,8 @@ from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime, timedelta
 from functools import wraps
-from werkzeug.security import generate_password_hash
+from urllib.parse import urlparse, unquote
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import render_template, render_template_string, request, redirect, url_for, flash, session, abort, send_from_directory
 from flask import jsonify
 from pkg.services.admin_overview import (
@@ -219,7 +220,7 @@ def finance_admin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not user_has_any_role(user, SETTLEMENT_PAYMENT_ADMIN_ROLES):
@@ -237,7 +238,7 @@ def superadmin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not user.is_active or not user.is_super_admin:
@@ -260,7 +261,7 @@ def admin_view_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not has_admin_permission(user):
@@ -278,7 +279,7 @@ def property_admin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not user_has_any_role(user, PROPERTY_ADMIN_ROLES):
@@ -296,7 +297,7 @@ def compliance_admin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not user_has_any_role(user, COMPLIANCE_ADMIN_ROLES):
@@ -314,7 +315,7 @@ def support_admin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not user_has_any_role(user, SUPPORT_ADMIN_ROLES):
@@ -332,7 +333,7 @@ def audit_admin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not user_has_any_role(user, AUDIT_ADMIN_ROLES):
@@ -353,7 +354,7 @@ def transaction_admin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not has_admin_permission(user):
@@ -374,7 +375,7 @@ def performance_admin_required(f):
         user_id = session.get('user_id')
         if not user_id:
             flash('Please log in as an administrator to access the admin portal.', 'warning')
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('admin_login', next=request.url))
 
         user = User.query.get(user_id)
         if not user or not has_admin_permission(user):
@@ -3016,6 +3017,164 @@ def admin_referrals():
     )
 
 
+def is_safe_admin_redirect_target(target):
+    """
+    Conservative local redirect validator for administrative navigation.
+    Rejects external URLs, protocol-relative paths, backslashes, schemes,
+    control characters, encoded adversarial vectors, malformed escapes, and excessively long inputs.
+    """
+    if not target or not isinstance(target, str):
+        return False
+    if len(target) > 1024:
+        return False
+    # Reject control characters (0-31, 127)
+    if any(ord(c) < 32 or ord(c) == 127 for c in target):
+        return False
+    # Reject whitespace anywhere in target (no unencoded spaces/newlines/tabs in valid admin URL)
+    if any(c.isspace() for c in target):
+        return False
+    clean = target.strip()
+    if not clean.startswith('/'):
+        return False
+    if clean.startswith('//') or clean.startswith('/\\'):
+        return False
+    if '//' in clean or '\\' in clean:
+        return False
+    clean_lower = clean.lower()
+    if any(enc in clean_lower for enc in ['%2f', '%5c', '%00', '%0d', '%0a', '%09', '%20']):
+        return False
+
+    # Check for malformed percent escapes (every % must be followed by 2 hex digits)
+    i = 0
+    while i < len(clean):
+        if clean[i] == '%':
+            if i + 2 >= len(clean):
+                return False
+            if not all(c in '0123456789abcdefABCDEF' for c in clean[i+1:i+3]):
+                return False
+            i += 3
+        else:
+            i += 1
+
+    # Unroll percent encoding up to 3 rounds to catch double/triple encoding bypasses
+    unquoted = clean
+    for _ in range(3):
+        if '%' not in unquoted:
+            break
+        unquoted = unquote(unquoted)
+        if '//' in unquoted or '\\' in unquoted or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in unquoted):
+            return False
+        unquoted_path = unquoted.split('?')[0].split('#')[0]
+        if ':' in unquoted_path or '@' in unquoted_path:
+            return False
+
+    # Path part (before query or fragment) must not contain colons or suspicious authority markers
+    path_part = clean.split('?')[0].split('#')[0]
+    if ':' in path_part or '@' in path_part:
+        return False
+    try:
+        parsed = urlparse(clean)
+        if parsed.scheme or parsed.netloc:
+            return False
+        if not parsed.path.startswith('/') or parsed.path.startswith('//'):
+            return False
+        if parsed.username or parsed.password or parsed.hostname or parsed.port:
+            return False
+    except Exception:
+        return False
+    return True
+
+
+# ==========================================
+# DEDICATED ADMIN AUTHENTICATION ROUTES
+# ==========================================
+@app.route('/admin/login', methods=['GET', 'POST'])
+@app.route('/admin/login/', methods=['GET', 'POST'])
+def admin_login():
+    """
+    Dedicated Admin Authentication Endpoint.
+    Accessible strictly to administrative accounts (Super Admin & 8 Master PRD Admin roles).
+    Rejects unauthenticated, inactive, or unauthorized customer accounts.
+    """
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user or not check_password_hash(user.password_hash, password):
+            if user:
+                try:
+                    sec_event = SecurityEvent(
+                        user_id=user.user_id,
+                        event_type='ADMIN_LOGIN_FAILED',
+                        description='Failed admin login attempt (invalid password)',
+                        ip_address=request.remote_addr,
+                        created_at=datetime.utcnow()
+                    )
+                    db.session.add(sec_event)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+            flash('Invalid email or password.', 'danger')
+            return render_template('admin/admin_login.html', title='Admin Sign In | Odacity Command Centre')
+
+        # Active account check
+        if not user.is_active:
+            flash('Your administrative account is currently inactive. Please contact system governance.', 'warning')
+            return render_template('admin/admin_login.html', title='Admin Sign In | Odacity Command Centre')
+
+        # Admin Authorization Check: Reject normal users attempting to log in via /admin/login/
+        if not has_admin_permission(user):
+            try:
+                sec_event = SecurityEvent(
+                    user_id=user.user_id,
+                    event_type='ADMIN_LOGIN_DENIED_NON_ADMIN',
+                    description='Non-administrative account denied access to admin portal',
+                    ip_address=request.remote_addr,
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(sec_event)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            flash('Administrative privileges are required to access this portal.', 'danger')
+            return render_template('admin/admin_login.html', title='Admin Sign In | Odacity Command Centre')
+
+        # Record Successful Admin Login (Fail-Closed Enforcement)
+        now = datetime.utcnow()
+        user.last_login = now
+        try:
+            sec_event = SecurityEvent(
+                user_id=user.user_id,
+                event_type='ADMIN_LOGIN_SUCCESS',
+                description='Administrator logged in successfully via Admin Portal',
+                ip_address=request.remote_addr,
+                created_at=now
+            )
+            db.session.add(sec_event)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            session.clear()
+            flash('Authentication failed due to an internal audit logging error. Please contact system governance.', 'danger')
+            return render_template('admin/admin_login.html', title='Admin Sign In | Odacity Command Centre')
+
+        # Clear existing session to prevent session fixation, then establish admin identity
+        session.clear()
+        session['user_id'] = user.user_id
+
+        flash(f'Welcome to Odacity Command Centre, {user.full_name}.', 'success')
+
+        next_page = request.args.get('next')
+        if next_page and is_safe_admin_redirect_target(next_page):
+            return redirect(next_page.strip())
+
+        return redirect(url_for('admin_dashboard'))
+
+    return render_template('admin/admin_login.html', title='Admin Sign In | Odacity Command Centre')
+
+
 # ==========================================
 # CENTRAL ROLE-BASED ADMIN DASHBOARD
 # ==========================================
@@ -3027,7 +3186,7 @@ def admin_dashboard():
     user_rec = User.query.get(user_id) if user_id else None
     if not user_rec or not user_rec.is_active:
         flash('Please log in with an active administrative account.', 'warning')
-        return redirect(url_for('login'))
+        return redirect(url_for('admin_login'))
 
     assigned_role_names = [ur.role.name for ur in user_rec.user_roles if ur.role]
 
