@@ -34,6 +34,32 @@ def internal_error(error):
     db.session.rollback()
     return render_template('user/500.html', title='500 Internal System Error'), 500
 
+
+# ==========================================
+# CRIT-01 / FIND-02 — SECURE UPLOAD GUARD
+# ==========================================
+@app.before_request
+def block_sensitive_static_uploads():
+    """
+    CRIT-01 / FIND-02 Guard: Prevent unauthenticated / public exposure of sensitive document directories
+    via Flask's built-in static file handler (/static/uploads/...).
+    Sensitive documents (individual ID, CAC certificates, agent licenses/IDs, property titles,
+    transaction documents) must only be retrieved through authenticated and authorized routes.
+    """
+    import posixpath
+    norm_path = posixpath.normpath(request.path.replace('\\', '/'))
+    if norm_path.lower().startswith('/static/'):
+        sensitive_dirs = (
+            'dab_individual_documents',
+            'cac_certificates',
+            'agent_documents',
+            'property_documents',
+            'transaction_documents'
+        )
+        for s_dir in sensitive_dirs:
+            if f'/{s_dir}'.lower() in norm_path.lower():
+                abort(404)
+
 def is_publicly_eligible(prop):
     """
     Phase 9 Helper: Determines if a property is eligible for public marketplace discovery (past 72h window or explicit Public Listing).
